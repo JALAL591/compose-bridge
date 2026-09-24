@@ -1,8 +1,3 @@
-# 📄 النسختان النهائيتان — بدقة تقنية كاملة
-
-## 📘 `README.md` — English (Main)
-
-```markdown
 # ComposeBridge 🌉
 
 **Real-time on-device visual editor for Jetpack Compose.**
