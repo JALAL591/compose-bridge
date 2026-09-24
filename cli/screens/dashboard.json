@@ -1,0 +1,61 @@
+{
+  "screen_name": "Dashboard",
+  "package": "com.student.app",
+  "theme": {
+    "primary": "1E3A8A",
+    "gradient_end": "3B82F6",
+    "accent_orange": "F59E0B",
+    "accent_green": "10B981",
+    "accent_purple": "8B5CF6"
+  },
+  "header": {
+    "type": "DashboardHeader",
+    "props": {
+      "name": "Siraj Abbas",
+      "level": "Level 3 - Engineering"
+    }
+  },
+  "hero": {
+    "type": "HeroCard",
+    "props": {
+      "title": "✨ Welcome, Siraj Abbas!",
+      "subtitle": "Academic ID: STD_14272200",
+      "progress": 0.0,
+      "icon": "AutoAwesome"
+    }
+  },
+  "components": [
+    {
+      "type": "StatGrid",
+      "props": {
+        "columns": 3,
+        "items": [
+          {"icon": "EmojiEvents", "color": "accent_purple", "value": "1", "label": "Level"},
+          {"icon": "Star", "color": "accent_orange", "value": "0", "label": "Points"},
+          {"icon": "MenuBook", "color": "accent_green", "value": "3", "label": "Courses"}
+        ]
+      }
+    },
+    {
+      "type": "StatGrid",
+      "props": {
+        "columns": 3,
+        "items": [
+          {"icon": "Book", "color": "accent_green", "value": "Jalal", "label": "Last Lecture"},
+          {"icon": "PlayArrow", "color": "primary", "value": "Jalal", "label": "Continue"},
+          {"icon": "BarChart", "color": "primary", "value": "Schedule", "label": "Timetable"}
+        ]
+      }
+    },
+    {
+      "type": "SectionTitle",
+      "props": {
+        "text": "Courses List"
+      }
+    }
+  ],
+  "bottom_bar": {
+    "type": "FloatingBottomBar",
+    "props": {}
+  }
+}

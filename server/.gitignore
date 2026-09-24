@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.pyo
+*.log
+logs/*.log
+.env
+venv/
+.venv/
+*.bridge.bak
+*.bridge.tmp_*

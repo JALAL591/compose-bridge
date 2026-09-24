@@ -1,0 +1,9 @@
+*.pyc
+__pycache__/
+build/
+.gradle/
+.idea/
+.kotlin/
+*.bak
+*.tmp*
+output/
