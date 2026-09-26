@@ -22,13 +22,13 @@
 - 🧩 **توليد شاشات Compose كاملة** من توصيف JSON
 - 🔍 **التنقل في شجرة وقت التشغيل** — المس العنصر الأب، ثم انزل لأبنائه
 
-> **المعاينة الحيّة فعلاً بدون إعادة بناء.** أما تثبيت التعديل في حزمة APK النهائية فيحتاج إعادة بناء واحدة، ليصبح بعدها المصدر هو الحقيقة.
+> \\\\\\\\\\\\\\\*\\\\\\\\\\\\\\\*المعاينة الحيّة فعلاً بدون إعادة بناء.\\\\\\\\\\\\\\\*\\\\\\\\\\\\\\\* أما تثبيت التعديل في حزمة APK النهائية فيحتاج إعادة بناء واحدة، ليصبح بعدها المصدر هو الحقيقة.
 
 ### 🎬 شاهد الأداة أثناء العمل
 
 اضغط على الصورة لمشاهدة الفيديو التجريبي على YouTube:
 
-[![شاهد العرض الحي — ComposeBridge يعدل جهازاً حقيقياً](https://img.youtube.com/vi/Hywyq7cBdDM/maxresdefault.jpg)](https://youtu.be/Hywyq7cBdDM)
+[![شاهد العرض الحي — ComposeBridge يعدل جهازاً حقيقياً](https://img.youtube.com/vi/Hywyq7cBdDM/hqdefault.jpg)](https://youtu.be/Hywyq7cBdDM)
 
 ---
 
@@ -48,12 +48,19 @@
 ## 📦 هيكل المستودع
 
 ```text
+
 composebridge/
+
 ├── cli/         # مُولّد شاشات Compose من JSON
+
 ├── agent/       # مكتبة Android للـ runtime (:composebridge-agent)
+
 ├── server/      # خادم WebSocket + مُعدّل الكود المصدري الجراحي
+
 ├── examples/    # تطبيق مرجعي كامل (StudentApp)
+
 └── docs/        # التوثيق المعماري وأدلة الإعداد
+
 ```
 
 **ثلاثة مكونات، سير عمل واحد:**
@@ -83,16 +90,23 @@ composebridge/
 ### 1. شغّل السيرفر المحلي
 
 ```bash
+
 cd server
+
 pip install -r requirements.txt
+
 python server.py
+
 ```
 
 ### 2. ولّد مشروع Compose
 
 ```bash
+
 cd cli
+
 python generate.py screens/dashboard.json
+
 ```
 
 سيُنتج الـ CLI مشروعاً كاملاً داخل `output/` يحتوي على:
@@ -110,7 +124,9 @@ python generate.py screens/dashboard.json
 افتح المشروع المُولَّد، ثبّته على جهاز حقيقي، ثم:
 
 ```bash
+
 adb reverse tcp:8711 tcp:8711
+
 ```
 
 اضغط على **الزر العائم 🔧** → يفتح وضع التصميم.
@@ -162,7 +178,7 @@ adb reverse tcp:8711 tcp:8711
 
 ## ⚠️ القيود
 
-- **التحقق من AST**: التعديلات الجراحية محصورة بقيم بسيطة (`integer_literal`, `float_literal`, `string_literal`, `simple_identifier`, `long_literal`) لمنع كسر صحة الملف.
+- **التحقق من AST**: التعديلات الجراحية محصورة بقيم بسيطة (`integer\\\\\\\\\\\\\\\_literal`, `float\\\\\\\\\\\\\\\_literal`, `string\\\\\\\\\\\\\\\_literal`, `simple\\\\\\\\\\\\\\\_identifier`, `long\\\\\\\\\\\\\\\_literal`) لمنع كسر صحة الملف.
 - **المراسلات (Correspondence)**: ~70% على تطبيقات الإنتاج (inline composables قد تنحرف). Compose Compiler plugin على Roadmap.
 - **UTF-16/UTF-8**: حالات حافة مع ملفات مكتظة بالـ emoji قيد المعالجة. الدقة الكاملة على Roadmap.
 - **الكود المُولَّد**: ملفات KSP/Kapt قد تحتاج استثناءً يدوياً اليوم. الاكتشاف التلقائي على Roadmap.

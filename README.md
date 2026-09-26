@@ -28,7 +28,7 @@ Live UI tuning + schema-driven screen compiler + AST-guided source splicing.
 
 Click the preview below to watch ComposeBridge visually edit a running Jetpack Compose UI and persist the change back to Kotlin source.
 
-[![Watch ComposeBridge live demo](https://img.youtube.com/vi/Hywyq7cBdDM/maxresdefault.jpg)](https://youtu.be/Hywyq7cBdDM)
+[![Watch ComposeBridge live demo](https://img.youtube.com/vi/Hywyq7cBdDM/hqdefault.jpg)](https://youtu.be/Hywyq7cBdDM)
 
 ---
 
