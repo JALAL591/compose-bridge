@@ -1,7 +1,7 @@
 # ComposeBridge 🌉
 
-**محرر بصري حي على الجهاز الحقيقي لتطبيقات Jetpack Compose.**
-تعديل الواجهة لحظياً + مُولّد شاشات من JSON + تعديل جراحي في الكود المصدري.
+**Real-time on-device visual editor for Jetpack Compose.**
+Live UI tuning + schema-driven screen compiler + AST-guided source splicing.
 
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1.20+-purple.svg)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-1.7.3+-4285F4.svg)](https://developer.android.com/jetpack/compose)
@@ -14,59 +14,59 @@
 
 ---
 
-**ComposeBridge** هي حزمة أدوات للمطورين تربط تطبيق Android يعمل على جهاز حقيقي بمحرر الأكواد عبر WebSocket محلي. تتيح لك:
+**ComposeBridge** is a developer tooling suite that bridges a running Android app on a physical device with your IDE over a local WebSocket. You can:
 
-- 🎯 **لمس أي عنصر Composable** على الهاتف لفحصه فوراً
-- 🎨 **تعديل الألوان والأبعاد والحواشي لحظياً** بمعدل 60 إطاراً في الثانية — بدون إعادة بناء Gradle
-- 💾 **حفظ التعديلات في كود Kotlin** (`AppDimens.kt`، `AppColors.kt`) عبر استبدال بايتات جراحي يحافظ على تنسيق الملف
-- 🧩 **توليد شاشات Compose كاملة** من توصيف JSON
-- 🔍 **التنقل في شجرة وقت التشغيل** — المس العنصر الأب، ثم انزل لأبنائه
+- 🎯 **Tap any Composable** on the phone to inspect it in real time
+- 🎨 **Tune colors, dimensions, and paddings live** at 60fps — no Gradle build required
+- 💾 **Persist tweaks to your Kotlin source** (`AppDimens.kt`, `AppColors.kt`) via a surgical byte-splice that preserves file formatting
+- 🧩 **Generate full Compose screens** from a declarative JSON schema
+- 🔍 **Navigate the runtime tree** — tap a parent, drill into children
 
-> **المعاينة الحيّة فعلاً بدون إعادة بناء.** أما تثبيت التعديل في حزمة APK النهائية فيحتاج إعادة بناء واحدة، ليصبح بعدها المصدر هو الحقيقة.
+> **Live preview is truly zero-rebuild.** Persisting the change into the final APK artifact still requires one standard rebuild, after which the new value becomes the source of truth.
 
-### 🎬 شاهد الأداة أثناء العمل
+### 🎬 See it in action
 
-اضغط على الصورة لمشاهدة الفيديو التجريبي على YouTube:
+Click the preview below to watch ComposeBridge visually edit a running Jetpack Compose UI and persist the change back to Kotlin source.
 
-[![شاهد العرض الحي — ComposeBridge يعدل جهازاً حقيقياً](https://img.youtube.com/vi/Hywyq7cBdDM/maxresdefault.jpg)](https://youtu.be/Hywyq7cBdDM)
-
----
-
-## 🚀 المميزات الرئيسية
-
-| الميزة | الوصف |
-|--------|-------|
-| **⚡ معاينة بدون إعادة بناء** | عدّل الألوان والحواشي وزوايا الاستدارة وأحجام الخطوط بـ **زمن استجابة أقل من 50 مللي ثانية** أثناء عمل التطبيق. |
-| **🎯 فحص بصري على الجهاز** | المس أي عنصر Composable لترى ملف المصدر ورقم السطر والـ tokens المستخدمة. |
-| **💾 تعديل جراحي مدعوم بـ AST** | يحدد النطاق الحرفي بدقة عبر Tree-sitter، ثم يستبدل البايتات مباشرة مع الحفاظ على **سطر واحد فقط في `git diff`**. |
-| **🧩 مُولّد واجهات ديناميكي** | أعطه توصيف JSON (`dashboard.json`) — ستحصل على شاشة Compose كاملة مع الثيم والمكونات والـ tokens. |
-| **🌳 التنقل في شجرة وقت التشغيل** | تنقّل من الأب إلى الأبناء داخل شجرة الـ composition — بدون XML أو reflection. |
-| **🔌 خادم WebSocket محلي** | جسر Python خفيف بين Agent الهاتف ونظام الملفات. |
+[![Watch ComposeBridge live demo](https://img.youtube.com/vi/Hywyq7cBdDM/hqdefault.jpg)](https://youtu.be/Hywyq7cBdDM)
 
 ---
 
-## 📦 هيكل المستودع
+## 🚀 Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **⚡ Zero-Rebuild Preview** | Tweak colors, paddings, corner radii, and font sizes at **<50ms latency** while the app runs. |
+| **🎯 On-Device Visual Inspector** | Tap any Composable to see its source file, line number, and used design tokens. |
+| **💾 AST-Guided Source Splicing** | Locates the exact byte range via Tree-sitter, then performs a surgical replace that keeps a **single-line `git diff`**. |
+| **🧩 Dynamic UI Compiler** | Feed it a JSON schema (`dashboard.json`) — get a full, production-ready Compose screen with theme, components, and tokens wired up. |
+| **🌳 Runtime Tree Navigation** | Walk the composition tree from parent to children — no XML, no reflection. |
+| **🔌 Local WebSocket Daemon** | A lightweight Python bridge between the runtime agent and your file system. |
+
+---
+
+## 📦 Repository Structure
 
 ```text
 composebridge/
-├── cli/         # مُولّد شاشات Compose من JSON
-├── agent/       # مكتبة Android للـ runtime (:composebridge-agent)
-├── server/      # خادم WebSocket + مُعدّل الكود المصدري الجراحي
-├── examples/    # تطبيق مرجعي كامل (StudentApp)
-└── docs/        # التوثيق المعماري وأدلة الإعداد
+├── cli/         # JSON → Compose screen compiler
+├── agent/       # Android runtime library (:composebridge-agent)
+├── server/      # Python WebSocket daemon + source byte-splicer
+├── examples/    # Complete reference app (StudentApp)
+└── docs/        # Architecture + setup guides
 ```
 
-**ثلاثة مكونات، سير عمل واحد:**
-1. **CLI** — يولّد مشروعاً كاملاً من JSON
-2. **Agent** — يلتقط اللمسات ويبث التحديثات الحيّة على الجهاز
-3. **Server** — ينسّق الرسائل ويكتب التغييرات في ملفات `.kt`
+**Three components, one workflow:**
+1. **CLI** — generates a full project from JSON
+2. **Agent** — captures touches and pushes live updates on the device
+3. **Server** — coordinates messages + writes changes back to `.kt` files
 
 ---
 
-## ✅ التوافق
+## ✅ Compatibility
 
-| المكوّن | الإصدار |
-|---------|---------|
+| Component | Version |
+|-----------|---------|
 | Kotlin | 2.1.20+ |
 | Jetpack Compose | 1.7.3+ |
 | Compose Multiplatform | 1.7.3+ |
@@ -74,13 +74,13 @@ composebridge/
 | Android Gradle Plugin | 8.5+ |
 | Min SDK | 24 |
 | Python | 3.10+ |
-| الجهاز | Android (حقيقي أو محاكي) |
+| Target | Android (real device or emulator) |
 
 ---
 
-## 🛠️ التشغيل السريع
+## 🛠️ Quick Start
 
-### 1. شغّل السيرفر المحلي
+### 1. Start the local server
 
 ```bash
 cd server
@@ -88,110 +88,110 @@ pip install -r requirements.txt
 python server.py
 ```
 
-### 2. ولّد مشروع Compose
+### 2. Generate a Compose project
 
 ```bash
 cd cli
 python generate.py screens/dashboard.json
 ```
 
-سيُنتج الـ CLI مشروعاً كاملاً داخل `output/` يحتوي على:
+The CLI will produce a full Android project under `output/` — including:
 
-- ✅ ملفات الثيم (`AppColors.kt`, `AppDimens.kt`, `AppTypography.kt`, `AppStrings.kt`)
-- ✅ مكونات الواجهة (`HeroCard`, `StatCard`, `DashboardHeader`, ...)
-- ✅ `DashboardPage.kt` كاملة
-- ✅ وحدة `composebridge-agent`
-- ✅ خادم `bridge/` Python مربوطاً بمسار المشروع الجديد
-- ✅ `MainActivity.kt` مع wire-up جاهز
-- ✅ `AndroidManifest.xml` مع صلاحية `INTERNET`
+- ✅ Theme files (`AppColors.kt`, `AppDimens.kt`, `AppTypography.kt`, `AppStrings.kt`)
+- ✅ UI components (`HeroCard`, `StatCard`, `DashboardHeader`, ...)
+- ✅ The full `DashboardPage.kt`
+- ✅ The `composebridge-agent` module
+- ✅ The `bridge/` Python server, wired to the new project's path
+- ✅ `MainActivity.kt` with the agent already wired up
+- ✅ `AndroidManifest.xml` with `INTERNET` permission
 
-### 3. افتح المشروع في Android Studio
+### 3. Open in Android Studio
 
-افتح المشروع المُولَّد، ثبّته على جهاز حقيقي، ثم:
+Open the generated project, deploy it to a physical device, then:
 
 ```bash
 adb reverse tcp:8711 tcp:8711
 ```
 
-اضغط على **الزر العائم 🔧** → يفتح وضع التصميم.
-المس أي عنصر → تفتح اللوحة → اسحب/اضغط للتعديل الحي.
+Tap the **🔧 floating button** → Design Mode ON.
+Tap any element → the panel opens → slide/tap to tune live.
 
 ---
 
-## 🤔 لماذا لا ننتظر Compose Hot Reload الرسمي؟
+## 🤔 Why not just wait for Compose Hot Reload?
 
 | | Compose Hot Reload (JetBrains) | **ComposeBridge** |
 |---|---|---|
-| التوفّر | معاينة / تجريبي | ✅ يعمل اليوم |
-| الجهاز | المحاكي أساساً | ✅ جهاز حقيقي |
-| الحفظ | معاينة فقط | ✅ كتابة في المصدر |
-| التفاعل | نصي | ✅ بصري — لمس العناصر |
-| أمان الكود | إعادة تحميل كاملة | ✅ سطر واحد في `git diff` |
+| Availability | Preview / experimental | ✅ Works today |
+| Target | Emulator-first | ✅ Real device |
+| Persistence | Preview only | ✅ Writes back to source |
+| Interaction | Textual | ✅ Visual — tap elements |
+| Code safety | Full reload | ✅ Single-line `git diff` |
 
 ---
 
-## ⚡ الأداء
+## ⚡ Performance
 
-| المقياس | القيمة |
-|---------|--------|
-| زمن الاستجابة للمعاينة الحيّة | **أقل من 50 مللي ثانية** (WebSocket محلي) |
-| نطاق إعادة التركيب | **موضعي** — فقط الـ Composable المستهدف يُعاد |
-| تعديل AST | **غير متزامن** — لا يحجب UI thread |
-| الفرق في الكود | **سطر واحد** — تعديل بايت-إزاحة عبر Tree-sitter |
+| Metric | Value |
+|--------|-------|
+| Live preview latency | **<50ms** (localhost WebSocket) |
+| Recomposition scope | **Localized** — only targeted Composable re-executes |
+| AST splicing | **Asynchronous** — doesn't block UI thread |
+| Source diff | **Single-line** — byte-offset patch via Tree-sitter |
 
-تعديل وقت التشغيل والحفظ على القرص منفصلان تماماً.
-
----
-
-## 🧠 تحت الغطاء
-
-- **ربط ثنائي الاتجاه بين وقت التشغيل والمصدر** — كل تغيير بصري يمكن تتبعه إلى النطاق الحرفي الدقيق في Kotlin.
-- **فحص مدعوم بـ AST، وتعديل بـ byte-splice** — Tree-sitter يحدد الموقع، ثم Regex + استبدال البايتات. لا يضيع أي تنسيق في الملف.
-- **تجميع حتمي للتخطيطات** — الـ CLI يُنتج كود Compose منظّم وموحّد — بدون هلوسة الذكاء الاصطناعي.
-- **خادم WebSocket منخفض التأخير** — رحلة ذهاب وإياب أقل من 50 مللي ثانية بين الجهاز ونظام الملفات.
+Runtime tuning and disk persistence are fully decoupled.
 
 ---
 
-## 🔒 الأمان
+## 🧠 Under the Hood
 
-- **نسخ Debug فقط**: وحدة ComposeBridge Agent تُضمَّن عبر `debugImplementation`، مما يضمن صفر عبء وإزالة كاملة من نسخ الإنتاج.
-- **مصادقة التوكن**: اتصالات WebSocket تتطلب تحققاً آمناً من توكن عند الاتصال لمنع الاتصالات المحلية غير المصرح بها.
-- **التراجع التلقائي عبر Journal**: يحدث تراجع تلقائي في حال فشل التحقق من سلامة الـ AST بعد التعديل.
-
----
-
-## ⚠️ القيود
-
-- **التحقق من AST**: التعديلات الجراحية محصورة بقيم بسيطة (`integer_literal`, `float_literal`, `string_literal`, `simple_identifier`, `long_literal`) لمنع كسر صحة الملف.
-- **المراسلات (Correspondence)**: ~70% على تطبيقات الإنتاج (inline composables قد تنحرف). Compose Compiler plugin على Roadmap.
-- **UTF-16/UTF-8**: حالات حافة مع ملفات مكتظة بالـ emoji قيد المعالجة. الدقة الكاملة على Roadmap.
-- **الكود المُولَّد**: ملفات KSP/Kapt قد تحتاج استثناءً يدوياً اليوم. الاكتشاف التلقائي على Roadmap.
+- **Bidirectional runtime-to-source mapping** — every visual change is traceable to its exact Kotlin byte range.
+- **AST-guided inspection and byte-splice editing** — Tree-sitter locates the exact edit site; regex and byte replacement update the file without disturbing formatting.
+- **Deterministic layout compilation** — the CLI emits structured, tokenized Compose code with stable output.
+- **Low-latency WebSocket daemon** — sub-50ms round-trip between the device and the local editing server.
 
 ---
 
-## 🤖 قادم قريباً
+## 🔒 Security
 
-- **اقتراحات مدعومة بالذكاء الاصطناعي** (تكامل Qwen) — اكتب التغيير بلغة طبيعية؛ الأداة تجد الـ token الصحيح وتطبّقه.
-- **تعديل باللغة الطبيعية** — "اجعل هذه البطاقة أطول." "استخدم الذهبي هنا."
-- **MCP Server** — تقديم ComposeBridge كأداة لـ Claude Desktop و Cursor وغيرهم من وكلاء AI.
-- **قوالب مكونات إضافية** — تجارة إلكترونية، نماذج، شاشات ملف شخصي.
-- **تعديل كامل للـ Typography tokens**.
+- **Debug Builds Only**: The ComposeBridge Agent is bundled using `debugImplementation`, ensuring zero overhead and complete removal from production release builds.
+- **Token Authentication**: WebSocket connections require secure token verification on handshake to prevent unauthorized local connections.
+- **Journal Rollback**: Automatic rollback via journal occurs if AST syntax validation fails post-splice.
 
 ---
 
-## 🔎 عبارات البحث التي يحلها هذا المشروع
+## ⚠️ Limitations
 
-إذا بحثت يوماً عن أي من هذه، فهذا المشروع لك:
-
-- تعديل Jetpack Compose بدون إعادة تجميع
-- بديل Hot Reload لـ Compose
-- فاحص تخطيط تفاعلي لـ Android
-- تعديل واجهة حي على جهاز Android حقيقي
-- مزامنة design tokens إلى كود Kotlin
-- توليد واجهة Compose من JSON
+- **AST Validation**: Surgical edits are restricted to simple literal values (`integer_literal`, `float_literal`, `string_literal`, `simple_identifier`, `long_literal`) to prevent parser syntax corruption.
+- **Correspondence**: ~70% on production apps (inline composables may misalign). Compose Compiler plugin is on the roadmap.
+- **UTF-16/UTF-8**: Edge cases with emoji-heavy files are still being handled. Full precision on the roadmap.
+- **Generated Code**: Files from KSP/Kapt may need manual exclusion today. Auto-detection is on the roadmap.
 
 ---
 
-## 📜 الترخيص
+## 🤖 Coming Soon
 
-موزّع تحت رخصة [Apache License 2.0](LICENSE).
+- **AI-Powered Suggestions** (Qwen integration) — describe a change in natural language; the tool finds the right token and applies it.
+- **Natural Language Editing** — "Make this card taller." "Use the gold accent here."
+- **MCP Server** — expose ComposeBridge as a tool for Claude Desktop, Cursor, and other AI agents.
+- **More component templates** — e-commerce, forms, profile screens.
+- **Typography tokens** — full typography token live editing.
+
+---
+
+## 🔎 Search Terms This Project Solves
+
+If you've searched for any of these, this project is for you:
+
+- Jetpack Compose edit without recompile
+- Compose hot reload alternative
+- Interactive layout inspector for Android
+- Live UI tweaking on a real Android device
+- Sync design tokens to Kotlin source
+- Generate Compose UI from a JSON schema
+
+---
+
+## 📜 License
+
+Distributed under the [Apache License 2.0](LICENSE).
