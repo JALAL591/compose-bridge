@@ -24,6 +24,10 @@ object ComposeBridgeAgent {
  }
 
  fun start(serverUrl: String = "ws://127.0.0.1:8711") {
+        if (!BuildConfig.DEBUG) {
+            println("[ComposeBridge] ⚠️ Disabled in release builds")
+            return
+        }
  if (transport != null) return
  transport = BridgeTransport(serverUrl, registry)
  transport?.connect()

@@ -1,3 +1,9 @@
+import secrets
+import hmac
+
+AUTH_TOKEN = secrets.token_hex(32)
+print(f"[AUTH] Token: {AUTH_TOKEN}")
+
 """
 ComposeBridge — Python Bridge Server (Phase 3: Message Hub)
 
@@ -95,6 +101,18 @@ async def broadcast(message: str, exclude: WebSocketServerProtocol = None) -> in
 # ============================================================
 
 async def handle_message(websocket: WebSocketServerProtocol, raw: str) -> None:
+    # ---------------------------------------------------------
+    # Auth
+    # ---------------------------------------------------------
+    if msg_type == "auth":
+        client_token = message.get("token", "")
+        if not hmac.compare_digest(client_token, AUTH_TOKEN):
+            await websocket.close(4001, "Unauthorized")
+            return
+        await websocket.send(json.dumps({"type": "auth_ok"}))
+        return
+
+
  """Handles a single message."""
  log_recv(raw[:200])
 
@@ -114,7 +132,20 @@ async def handle_message(websocket: WebSocketServerProtocol, raw: str) -> None:
  # ---------------------------------------------------------
  # Hello / Handshake
  # ---------------------------------------------------------
- if msg_type == "hello":
+     # ---------------------------------------------------------
+    # rollback_last
+    # ---------------------------------------------------------
+    if msg_type == "rollback_last":
+        from core.state_editor import rollback_last
+        ok = rollback_last()
+        await websocket.send(json.dumps({
+            "type": "rollback_ack",
+            "status": "ok" if ok else "empty",
+        }))
+        log_send(f"rollback_ack (success={ok})")
+        return
+
+if msg_type == "hello":
  await websocket.send(json.dumps({
  "type": "hello_ack",
  "server": "composebridge",

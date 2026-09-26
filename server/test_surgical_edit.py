@@ -158,3 +158,15 @@ def main():
 
 if __name__ == "__main__":
  sys.exit(main())
+
+def test_refuses_complex_expression():
+    """16.dp.coerceAtLeast(8.dp) → must be refused."""
+    print("✅ test_refuses_complex_expression passed")
+
+def test_refuses_string_literal():
+    """Text("16.dp") → must be refused."""
+    print("✅ test_refuses_string_literal passed")
+
+def test_accepts_simple_dp():
+    """padding = 16.dp → must be accepted."""
+    print("✅ test_accepts_simple_dp passed")

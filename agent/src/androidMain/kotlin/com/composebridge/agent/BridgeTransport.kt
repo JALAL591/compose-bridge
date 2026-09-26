@@ -42,7 +42,8 @@ class BridgeTransport(
 
  override fun onOpen(webSocket: WebSocket, response: Response) {
  println("[ComposeBridge] ✅ Connected")
- webSocket.send("""{"type":"hello","agent":"composebridge","protocol":1}""")
+ webSocket.send("""{"type":"auth","token":"LOCAL_DEV_TOKEN"}""")
+                webSocket.send("""{"type":"hello","agent":"composebridge","protocol":1}""")
  }
 
  override fun onMessage(webSocket: WebSocket, text: String) {

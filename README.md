@@ -50,3 +50,15 @@ Open the generated project or the provided example at `examples/student-app` in 
 ## 📜 License
 
 Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for details.
+
+---
+
+## 🔒 Security
+
+- **Debug Builds Only**: The ComposeBridge Agent is bundled using `debugImplementation`, ensuring zero overhead and complete removal from production release builds.
+- **Token Authentication**: WebSocket connections require secure token verification on handshake to prevent unauthorized local connections.
+
+## ⚠️ Limitations
+
+- **AST Validation**: Surgical edits are restricted to simple literal values (`integer_literal`, `float_literal`, `string_literal`, `simple_identifier`, `long_literal`) to prevent parser syntax corruption.
+- **Journal Rollback**: Automatic rollback via journal occurs if AST syntax validation fails post-splice.

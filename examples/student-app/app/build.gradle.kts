@@ -44,7 +44,7 @@ dependencies {
  implementation("androidx.compose.material:material-icons-extended")
 
  // ⭐ ComposeBridge Agent
- implementation(project(":composebridge-agent"))
+ debugImplementation(project(":composebridge-agent"))
 
  // ⭐ OkHttp — Agent WebSocket
  implementation(libs.okhttp)

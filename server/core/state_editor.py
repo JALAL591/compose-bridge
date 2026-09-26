@@ -1,3 +1,8 @@
+import time
+
+SPLICE_JOURNAL = []
+MAX_JOURNAL = 50
+
 """
 State Editor — Edits default values in BridgeState.kt
 When user changes a value, we save it to file to persist across rebuilds.
@@ -684,3 +689,28 @@ def update_token_default(token_name: str, value: str) -> tuple:
  f"Updated {token_name}: {old_value} → {clean_display}",
  {"backup": backup_path}
  )
+def _journal_save(file_path, original_content, new_content):
+    SPLICE_JOURNAL.append({
+        "file": str(file_path),
+        "original": original_content,
+        "new": new_content,
+        "timestamp": time.time(),
+    })
+    if len(SPLICE_JOURNAL) > MAX_JOURNAL:
+        SPLICE_JOURNAL.pop(0)
+
+def _validate_after_splice(file_path):
+    from core.ast_finder import validate_file_parses
+    if not validate_file_parses(file_path):
+        if SPLICE_JOURNAL:
+            last = SPLICE_JOURNAL[-1]
+            Path(last["file"]).write_text(last["original"], encoding="utf-8")
+        return False
+    return True
+
+def rollback_last():
+    if not SPLICE_JOURNAL:
+        return False
+    last = SPLICE_JOURNAL.pop()
+    Path(last["file"]).write_text(last["original"], encoding="utf-8")
+    return True
