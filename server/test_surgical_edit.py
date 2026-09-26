@@ -170,3 +170,13 @@ def test_refuses_string_literal():
 def test_accepts_simple_dp():
     """padding = 16.dp → must be accepted."""
     print("✅ test_accepts_simple_dp passed")
+
+def test_refuses_generated_code():
+    """Files with @Generated annotation should be refused."""
+    from core.ignore_rules import get_ignore_rules
+    from pathlib import Path
+    rules = get_ignore_rules(Path("."))
+    assert rules.is_ignored(Path("build/generated/foo.kt"))[0] is True
+    assert rules.is_ignored(Path("app/src/main/java/Foo_Impl.kt"))[0] is True
+    assert rules.is_ignored(Path("app/src/main/java/HeroCard.kt"))[0] is False
+    print("✅ test_refuses_generated_code passed")

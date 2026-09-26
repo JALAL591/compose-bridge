@@ -546,6 +546,8 @@ async def handle_edit_request(websocket: WebSocketServerProtocol, message: dict)
 async def handle_client(websocket: WebSocketServerProtocol) -> None:
  """Handles a single client."""
  CONNECTED_CLIENTS.add(websocket)
+    from core.registry_sync import get_sync_manager
+    get_sync_manager(PROJECT_ROOT).register_client(websocket)
  peer = websocket.remote_address
  log_success(f"Client connected: {peer} (total: {len(CONNECTED_CLIENTS)})")
 
@@ -563,6 +565,7 @@ async def handle_client(websocket: WebSocketServerProtocol) -> None:
  log_error(f"Connection error: {e}")
  finally:
  CONNECTED_CLIENTS.discard(websocket)
+        get_sync_manager(PROJECT_ROOT).unregister_client(websocket)
  log_info(f"Client removed. Total: {len(CONNECTED_CLIENTS)}")
 
 

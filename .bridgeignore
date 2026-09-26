@@ -1,0 +1,17 @@
+# ComposeBridge ignore file
+# Files matching these patterns will never be edited.
+
+# === Build outputs ===
+**/build/generated/**
+**/build/tmp/**
+
+# === KSP / Kapt ===
+**/ksp/**
+**/kapt/**
+
+# === Generated file naming ===
+**/*_Impl.kt
+**/*_Generated.kt
+**/*.generated.kt
+**/R.kt
+**/BuildConfig.kt

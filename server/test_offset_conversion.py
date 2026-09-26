@@ -111,3 +111,22 @@ def main():
 
 if __name__ == "__main__":
  main()
+def test_emoji_roundtrip():
+    """Test emoji offset conversion."""
+    from core.utf_mapper import Utf16Utf8Mapper
+    content = "Hello 😀 World".encode("utf-8")
+    mapper = Utf16Utf8Mapper(content)
+    assert mapper.byte_to_utf16(6) == 6, f"Expected 6, got {mapper.byte_to_utf16(6)}"
+    assert mapper.byte_to_utf16(10) == 8, f"Expected 8, got {mapper.byte_to_utf16(10)}"
+    print("✅ test_emoji_roundtrip passed")
+
+
+def test_arabic_roundtrip():
+    """Test Arabic text offset conversion."""
+    from core.utf_mapper import Utf16Utf8Mapper
+    content = "مرحباً بك".encode("utf-8")
+    mapper = Utf16Utf8Mapper(content)
+    assert mapper.byte_to_utf16(0) == 0
+    assert mapper.byte_to_utf16(2) == 1
+    assert mapper.byte_to_utf16(4) == 2
+    print("✅ test_arabic_roundtrip passed")
