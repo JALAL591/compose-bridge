@@ -17,242 +17,252 @@ import okio.ByteString
 import java.util.concurrent.TimeUnit
 
 class BridgeTransport(
- private val serverUrl: String,
- private val registry: CompositionRegistry
+    private val serverUrl: String,
+    private val registry: CompositionRegistry,
+    private val authToken: String = "",
 ) {
 
- private val client = OkHttpClient.Builder()
- .pingInterval(20, TimeUnit.SECONDS)
- .build()
+    private val client = OkHttpClient.Builder()
+        .pingInterval(20, TimeUnit.SECONDS)
+        .build()
 
- private val mainHandler = Handler(Looper.getMainLooper())
- private val json = Json { ignoreUnknownKeys = true }
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val json = Json { ignoreUnknownKeys = true }
 
- @Volatile
- private var socket: WebSocket? = null
+    @Volatile
+    private var socket: WebSocket? = null
 
- fun connect() {
- val request = Request.Builder()
- .url(serverUrl)
- .build()
+    fun connect() {
+        val request = Request.Builder()
+            .url(serverUrl)
+            .build()
 
- println("[ComposeBridge] Connecting to $serverUrl")
+        println("[ComposeBridge] Connecting to $serverUrl")
 
- socket = client.newWebSocket(request, object : WebSocketListener() {
+        socket = client.newWebSocket(request, object : WebSocketListener() {
 
- override fun onOpen(webSocket: WebSocket, response: Response) {
- println("[ComposeBridge] ✅ Connected")
- webSocket.send("""{"type":"auth","token":"LOCAL_DEV_TOKEN"}""")
-                webSocket.send("""{"type":"hello","agent":"composebridge","protocol":1}""")
- }
+            override fun onOpen(webSocket: WebSocket, response: Response) {
+                println("[ComposeBridge] ✅ Connected")
+                if (authToken.isNotEmpty()) {
+                    println("[ComposeBridge] 🔐 Sending auth...")
+                    webSocket.send("""{"type":"auth","token":"$authToken"}""")
+                } else {
+                    webSocket.send("""{"type":"hello","agent":"composebridge","protocol":1}""")
+                }
+            }
 
- override fun onMessage(webSocket: WebSocket, text: String) {
- println("[ComposeBridge] 📩 Received: $text")
- handleCommand(text) { reply ->
- webSocket.send(reply)
- }
- }
+            override fun onMessage(webSocket: WebSocket, text: String) {
+                println("[ComposeBridge] 📩 Received: $text")
+                handleCommand(text) { reply ->
+                    webSocket.send(reply)
+                }
+            }
 
- override fun onMessage(webSocket: WebSocket, bytes: ByteString) {}
+            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {}
 
- override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
- println("[ComposeBridge] ❌ Failure: ${t.message}")
- socket = null
- }
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                println("[ComposeBridge] ❌ Failure: ${t.message}")
+                socket = null
+            }
 
- override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
- println("[ComposeBridge] Closed: $reason")
- socket = null
- }
- })
- }
+            override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                println("[ComposeBridge] Closed: $reason")
+                socket = null
+            }
+        })
+    }
 
- /**
- * WebSocket.
- */
- fun send(text: String): Boolean {
- val currentSocket = this.socket ?: return false
- return currentSocket.send(text)
- }
+    /**
+     * يُرسل رسالة عبر WebSocket.
+     */
+    fun send(text: String): Boolean {
+        val currentSocket = this.socket ?: return false
+        return currentSocket.send(text)
+    }
 
- private fun handleCommand(text: String, reply: (String) -> Unit) {
- mainHandler.post {
- try {
- println("[BridgeTransport] 📩 Received: ${text.take(200)}")
+    private fun handleCommand(text: String, reply: (String) -> Unit) {
+        mainHandler.post {
+            try {
+                println("[BridgeTransport] 📩 Received: ${text.take(200)}")
 
- // JSON ( )
- val obj = try {
- json.parseToJsonElement(text).jsonObject
- } catch (e: Exception) {
- println("[BridgeTransport] ❌ Invalid JSON: ${e.message}")
- return@post
- }
+                // حلّل JSON بشكل صحيح (لا يعتمد على المسافات)
+                val obj = try {
+                    json.parseToJsonElement(text).jsonObject
+                } catch (e: Exception) {
+                    println("[BridgeTransport] ❌ Invalid JSON: ${e.message}")
+                    return@post
+                }
 
- val type = obj["type"]?.jsonPrimitive?.contentOrNull
- val action = obj["action"]?.jsonPrimitive?.contentOrNull
+                val type = obj["type"]?.jsonPrimitive?.contentOrNull
+                val action = obj["action"]?.jsonPrimitive?.contentOrNull
 
- println("[BridgeTransport] type=$type, action=$action")
+                println("[BridgeTransport] type=$type, action=$action")
 
- // ========================================
- // — 
- // ========================================
- if (type in listOf("hello_ack", "pong", "error", 
- "state_update_ack", "batch_update_ack", "reset_ack")) {
- println("[BridgeTransport] ℹ️ Informational: $type")
- return@post
- }
+                // ========================================
+                // الرسائل الإعلامية — لا رَد
+                // ========================================
+                if (type in listOf("hello_ack", "pong", "error", 
+                                   "state_update_ack", "batch_update_ack", "reset_ack")) {
+                    println("[BridgeTransport] ℹ️ Informational: $type")
+                    return@post
+                }
 
- // ========================================
- // 
- // ========================================
- when {
- action == "snapshot" -> {
- reply(captureSnapshot())
- }
- action == "ping" -> {
- reply("""{"type":"pong"}""")
- }
- }
+                // ========================================
+                // الرسائل التي تحتاج رَد
+                // ========================================
+                when {
+                    action == "snapshot" -> {
+                        reply(captureSnapshot())
+                    }
+                    action == "ping" -> {
+                        reply("""{"type":"pong"}""")
+                    }
+                }
 
- // ========================================
- // 
- // ========================================
- when (type) {
- "state_update" -> {
- val property = obj["property"]?.jsonPrimitive?.contentOrNull
- val value = obj["value"]?.jsonPrimitive?.contentOrNull
- if (property != null && value != null) {
- println("[BridgeTransport] 🔄 $property = $value")
- BridgeState.applyUpdate(property, value)
- } else {
- println("[BridgeTransport] ⚠️ Missing property/value")
- }
- }
+                // ========================================
+                // الرسائل التي تحدّث الحالة
+                // ========================================
+                when (type) {
+                    "auth_ok" -> {
+                        println("[ComposeBridge] ✅ Authenticated")
+                        reply("""{"type":"hello","agent":"composebridge","protocol":1}""")
+                    }
 
- "batch_update" -> {
- println("[BridgeTransport] 🔄 Batch update")
- // updates array
- val updates = obj["updates"]
- if (updates != null) {
- // : applyUpdate
- val arr = updates.toString()
- val regex = Regex("""\{[^{}]*\}""")
- regex.findAll(arr).forEach { match ->
- val item = try {
- json.parseToJsonElement(match.value).jsonObject
- } catch (e: Exception) { null }
- 
- val p = item?.get("property")?.jsonPrimitive?.contentOrNull
- val v = item?.get("value")?.jsonPrimitive?.contentOrNull
- if (p != null && v != null) {
- BridgeState.applyUpdate(p, v)
- }
- }
- }
- }
+                    "state_update" -> {
+                        val property = obj["property"]?.jsonPrimitive?.contentOrNull
+                        val value = obj["value"]?.jsonPrimitive?.contentOrNull
+                        if (property != null && value != null) {
+                            println("[BridgeTransport] 🔄 $property = $value")
+                            BridgeState.applyUpdate(property, value)
+                        } else {
+                            println("[BridgeTransport] ⚠️ Missing property/value")
+                        }
+                    }
 
- "reset_state" -> {
- println("[BridgeTransport] ♻️ Reset applied")
- BridgeState.reset()
- }
+                    "batch_update" -> {
+                        println("[BridgeTransport] 🔄 Batch update")
+                        // اقرأ updates array
+                        val updates = obj["updates"]
+                        if (updates != null) {
+                            // سنبسّطها: نرسل كل عنصر عبر applyUpdate
+                            val arr = updates.toString()
+                            val regex = Regex("""\{[^{}]*\}""")
+                            regex.findAll(arr).forEach { match ->
+                                val item = try {
+                                    json.parseToJsonElement(match.value).jsonObject
+                                } catch (e: Exception) { null }
+                                
+                                val p = item?.get("property")?.jsonPrimitive?.contentOrNull
+                                val v = item?.get("value")?.jsonPrimitive?.contentOrNull
+                                if (p != null && v != null) {
+                                    BridgeState.applyUpdate(p, v)
+                                }
+                            }
+                        }
+                    }
 
- "theme_tokens_response" -> {
- // BridgeState 
- BridgeState.onThemeTokensReceived?.invoke(text)
- println("[BridgeTransport] 🎨 Theme tokens received")
- }
+                    "reset_state" -> {
+                        println("[BridgeTransport] ♻️ Reset applied")
+                        BridgeState.reset()
+                    }
 
- "analyze_element_response" -> {
- println("[BridgeTransport] 📥 analyze_element_response received")
- val callback = BridgeState.onElementAnalyzed
- if (callback != null) {
- callback.invoke(text)
- println("[BridgeTransport] ✅ Callback invoked")
- } else {
- println("[BridgeTransport] ❌ No callback registered!")
- }
- }
+                    "theme_tokens_response" -> {
+                        // أبلغ BridgeState عن القائمة الجديدة
+                        BridgeState.onThemeTokensReceived?.invoke(text)
+                        println("[BridgeTransport] 🎨 Theme tokens received")
+                    }
 
- "toggle_design_mode" -> {
- DesignModeRegistry.toggle()
- println("[BridgeTransport] 🎯 Design Mode toggled from Python")
- }
+                    "analyze_element_response" -> {
+                        println("[BridgeTransport] 📥 analyze_element_response received")
+                        val callback = BridgeState.onElementAnalyzed
+                        if (callback != null) {
+                            callback.invoke(text)
+                            println("[BridgeTransport] ✅ Callback invoked")
+                        } else {
+                            println("[BridgeTransport] ❌ No callback registered!")
+                        }
+                    }
 
- "edit_dimension" -> {
- val file = obj["file"]?.jsonPrimitive?.contentOrNull
- val line = obj["line"]?.jsonPrimitive?.intOrNull
- val newValue = obj["newValue"]?.jsonPrimitive?.contentOrNull
+                    "toggle_design_mode" -> {
+                        DesignModeRegistry.toggle()
+                        println("[BridgeTransport] 🎯 Design Mode toggled from Python")
+                    }
 
- if (file != null && line != null && newValue != null) {
- val dpValue = newValue.replace(".dp", "").toFloatOrNull()
- if (dpValue != null) {
- val key = "$file:$line:padding"
- BridgeState.onDimensionOverride?.invoke(key, dpValue)
- }
- }
- }
+                    "edit_dimension" -> {
+                        val file = obj["file"]?.jsonPrimitive?.contentOrNull
+                        val line = obj["line"]?.jsonPrimitive?.intOrNull
+                        val newValue = obj["newValue"]?.jsonPrimitive?.contentOrNull
 
- "dimension_override" -> {
- val key = obj["key"]?.jsonPrimitive?.contentOrNull
- val value = obj["value"]?.jsonPrimitive?.contentOrNull
- if (key != null && value != null) {
- val dp = value.replace(".dp", "").toFloatOrNull()
- if (dp != null) {
- BridgeState.onDimensionOverride?.invoke(key, dp)
- println("[BridgeTransport] 📏 Override: $key = ${dp}.dp")
- }
- }
- }
+                        if (file != null && line != null && newValue != null) {
+                            val dpValue = newValue.replace(".dp", "").toFloatOrNull()
+                            if (dpValue != null) {
+                                val key = "$file:$line:padding"
+                                BridgeState.onDimensionOverride?.invoke(key, dpValue)
+                            }
+                        }
+                    }
 
- "dimension_reset" -> {
- BridgeState.onDimensionOverride?.invoke("__reset__", 0f)
- println("[BridgeTransport] ♻️ Dimension overrides cleared")
- }
+                    "dimension_override" -> {
+                        val key = obj["key"]?.jsonPrimitive?.contentOrNull
+                        val value = obj["value"]?.jsonPrimitive?.contentOrNull
+                        if (key != null && value != null) {
+                            val dp = value.replace(".dp", "").toFloatOrNull()
+                            if (dp != null) {
+                                BridgeState.onDimensionOverride?.invoke(key, dp)
+                                println("[BridgeTransport] 📏 Override: $key = ${dp}.dp")
+                            }
+                        }
+                    }
 
- "edit_dimension_ack" -> {
- val fileUpdated = obj["file_updated"]
- val ok = fileUpdated?.jsonPrimitive?.contentOrNull == "true" || fileUpdated?.jsonPrimitive?.booleanOrNull == true
- val msg = obj["file_message"]?.jsonPrimitive?.contentOrNull ?: ""
- println("[BridgeTransport] ✅ edit_dimension_ack: $ok ($msg)")
- BridgeState.onEditDimensionAck?.invoke(ok, msg)
- }
- }
- } catch (e: Throwable) {
- println("[BridgeTransport] ❌ Handler error: ${e.message}")
- e.printStackTrace()
- }
- }
- }
+                    "dimension_reset" -> {
+                        BridgeState.onDimensionOverride?.invoke("__reset__", 0f)
+                        println("[BridgeTransport] ♻️ Dimension overrides cleared")
+                    }
 
- private fun captureSnapshot(): String {
- val tables = registry.snapshot()
- println("[ComposeBridge] 📸 Snapshot: ${tables.size} tables")
+                    "edit_dimension_ack" -> {
+                        val fileUpdated = obj["file_updated"]
+                        val ok = fileUpdated?.jsonPrimitive?.contentOrNull == "true" || fileUpdated?.jsonPrimitive?.booleanOrNull == true
+                        val msg = obj["file_message"]?.jsonPrimitive?.contentOrNull ?: ""
+                        println("[BridgeTransport] ✅ edit_dimension_ack: $ok ($msg)")
+                        BridgeState.onEditDimensionAck?.invoke(ok, msg)
+                    }
+                }
+            } catch (e: Throwable) {
+                println("[BridgeTransport] ❌ Handler error: ${e.message}")
+                e.printStackTrace()
+            }
+        }
+    }
 
- val userTrees = mutableListOf<String>()
+    private fun captureSnapshot(): String {
+        val tables = registry.snapshot()
+        println("[ComposeBridge] 📸 Snapshot: ${tables.size} tables")
 
- tables.forEachIndexed { tableIdx, table ->
- val tree = table.toBridgeTree()
- if (tree != null) {
- val filteredTree = tree.toFilteredTree()
- if (filteredTree != null && filteredTree.isUserNode()) {
- val json = filteredTree.toJson()
- userTrees.add(json)
- BridgeDebugPrinter.printFilteredTree(filteredTree, 0, tableIdx)
- }
- }
- }
+        val userTrees = mutableListOf<String>()
 
- val fullJson = """
- {"type":"snapshot","tableCount":${tables.size},"userTrees":${userTrees.size},"trees":[${userTrees.joinToString(",")}]}
- """.trimIndent()
+        tables.forEachIndexed { tableIdx, table ->
+            val tree = table.toBridgeTree()
+            if (tree != null) {
+                val filteredTree = tree.toFilteredTree()
+                if (filteredTree != null && filteredTree.isUserNode()) {
+                    val json = filteredTree.toJson()
+                    userTrees.add(json)
+                    BridgeDebugPrinter.printFilteredTree(filteredTree, 0, tableIdx)
+                }
+            }
+        }
 
- BridgeDebugPrinter.printJson(fullJson, "SNAPSHOT")
+        val fullJson = """
+            {"type":"snapshot","tableCount":${tables.size},"userTrees":${userTrees.size},"trees":[${userTrees.joinToString(",")}]}
+        """.trimIndent()
 
- return fullJson
- }
+        BridgeDebugPrinter.printJson(fullJson, "SNAPSHOT")
 
- fun close() {
- socket?.close(1000, "Agent shutdown")
- socket = null
- }
+        return fullJson
+    }
+
+    fun close() {
+        socket?.close(1000, "Agent shutdown")
+        socket = null
+    }
 }

@@ -34,7 +34,10 @@ class MainActivity : ComponentActivity() {
             BridgeDimensionRegistry.setOverride(key, value.dp)
         }
 
-        ComposeBridgeAgent.start("ws://127.0.0.1:8711")
+        ComposeBridgeAgent.start(
+            serverUrl = "ws://127.0.0.1:8711",
+            authToken = "test-token-local-dev",
+        )
 
         setContent {
             MaterialTheme {
