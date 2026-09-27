@@ -154,10 +154,10 @@ Runtime tuning and disk persistence are fully decoupled.
 
 ## 🔒 Security
 
-- **Debug Builds Only**: The ComposeBridge Agent is bundled using `debugImplementation`, ensuring zero overhead and complete removal from production release builds.
-- **Token Authentication**: WebSocket connections require secure token verification on handshake to prevent unauthorized local connections.
-- **Journal Rollback**: Automatic rollback via journal occurs if AST syntax validation fails post-splice.
-
+- **Debug Builds Only**: Agent bundled with `debugImplementation`
+- **Token Authentication**: WebSocket requires token on handshake
+  - ⚠️ v0.3.0 uses a fixed local token. QR-based pairing planned for v0.4.0.
+- **Journal Rollback**: Auto-rollback on AST validation failure
 ---
 
 ## ⚠️ Limitations
