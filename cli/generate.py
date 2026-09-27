@@ -106,6 +106,31 @@ def copy_android_templates(output_dir, config):
     print(f"  ✅ Copied + adapted {len(files_map)} template files")
 
 
+def copy_gradle_wrapper(output_dir):
+    """نسخ Gradle wrapper كامل."""
+    templates_dir = Path(__file__).parent / "templates"
+    wrapper_src = templates_dir / "gradle" / "wrapper"
+    wrapper_dst = Path(output_dir) / "gradle" / "wrapper"
+
+    if wrapper_src.exists():
+        wrapper_dst.mkdir(parents=True, exist_ok=True)
+        for f in wrapper_src.iterdir():
+            shutil.copy2(f, wrapper_dst / f.name)
+        print(f"  ✅ Copied: Gradle wrapper")
+    else:
+        print(f"  ⚠️ Gradle wrapper not found")
+
+    for name in ["gradlew", "gradlew.bat"]:
+        src = templates_dir / name
+        dst = Path(output_dir) / name
+        if src.exists():
+            shutil.copy2(src, dst)
+            try:
+                dst.chmod(0o755)
+            except Exception:
+                pass
+
+
 def main():
     print()
     print("=" * 60)
@@ -156,6 +181,9 @@ def main():
         "app_name": app_name,
         "project_name": project_name,
     })
+
+    print("  📄 Copying Gradle wrapper...")
+    copy_gradle_wrapper(output)
 
     print()
     print("=" * 60)
