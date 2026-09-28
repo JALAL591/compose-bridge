@@ -9,6 +9,13 @@ Live UI tuning + schema-driven screen compiler + AST-guided source splicing.
 [![Latency](https://img.shields.io/badge/Latency-%3C50ms-success.svg)]()
 [![Engine](https://img.shields.io/badge/Engine-AST--Guided%20Byte--Splice-orange.svg)]()
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+## 📰 Featured In
+
+<p align="left">
+  <a href="https://androidweekly.net/issues/issue-746" title="Android Weekly Issue #746">
+    <img alt="Android Weekly" src="https://androidweekly.net/issues/issue-746/badge" height="24">
+  </a>
+</p>
 
 [English](README.md) | [العربية](README_AR.md)
 
