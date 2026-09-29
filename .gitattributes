@@ -1,29 +1,18 @@
 # GitHub Linguist configuration
-# Controls how languages are calculated in repo stats
+# Excludes non-essential files from language stats
 
-# === Exclude examples from stats ===
-# Examples are demos — not core project code
-examples/ linguist-vendored
+# === Exclude examples (demo copies, not core code) ===
+examples/** linguist-vendored
 
-# === Exclude gradle wrapper ===
-# Generated/vendored files
+# === Exclude Gradle wrapper (generated) ===
 gradlew linguist-vendored
 gradlew.bat linguist-vendored
-gradle/wrapper/* linguist-vendored
-
-# === Exclude generated/binary files ===
+gradle/** linguist-vendored
 *.jar linguist-vendored
-*.bak linguist-vendored
-*.backup linguist-vendored
 
-# === Force .kts as Kotlin ===
+# === Exclude docs ===
+docs/** linguist-documentation
+*.md linguist-documentation
+
+# === Treat .kts as Kotlin ===
 *.kts linguist-language=Kotlin
-*.gradle.kts linguist-language=Kotlin
-
-# === Python files (explicit) ===
-cli/*.py linguist-language=Python
-server/*.py linguist-language=Python
-server/core/*.py linguist-language=Python
-
-# === Kotlin Agent (main library) ===
-agent/**/*.kt linguist-language=Kotlin
