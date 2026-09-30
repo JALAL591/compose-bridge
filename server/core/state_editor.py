@@ -3,6 +3,8 @@ State Editor — يعدّل القيم الافتراضية في BridgeState.kt
 عندما يغيّر المستخدم قيمة، نحفظها في الملف لتبقى بعد إعادة البناء.
 """
 
+import json
+import time
 import sys
 from pathlib import Path
 from typing import Optional
@@ -15,10 +17,12 @@ from core.utils import read_file_as_utf8
 
 
 # ============================================================
-# مسار BridgeState.kt
+# مسار BridgeState.kt وثوابت Journal
 # ============================================================
 
 PROJECT_ROOT = Path(r"C:\Users\thinkpad\StudioProjects\StudentApp")
+JOURNAL_FILE = PROJECT_ROOT / ".composebridge-journal.json"
+MAX_JOURNAL = 50
 BRIDGE_STATE_FILE = (
     PROJECT_ROOT
     / "composebridge-agent"
@@ -332,6 +336,8 @@ def update_theme_color(key: str, new_hex: str) -> tuple:
     except Exception as e:
         return (False, f"Write failed: {e}", None)
 
+    _journal_save(file_path, content, new_content)
+
     return (
         True,
         f"Updated {key}: {old_hex} → {normalized_hex}",
@@ -468,6 +474,8 @@ def update_typography_property(
         os.replace(tmp_path, file_path)
     except Exception as e:
         return (False, f"Write failed: {e}", None)
+
+    _journal_save(file_path, content, new_content)
 
     return (
         True,
@@ -686,26 +694,38 @@ def update_token_default(token_name: str, value: str) -> tuple:
     except Exception as e:
         return (False, f"Write failed: {e}", None)
 
+    _journal_save(file_path, content, new_text)
+
     return (
         True,
         f"Updated {token_name}: {old_value} → {clean_display}",
         {"backup": backup_path}
     )
 
-import time
 
 SPLICE_JOURNAL = []
-MAX_JOURNAL = 50
+
 
 def _journal_save(file_path, original_content, new_content):
-    SPLICE_JOURNAL.append({
+    entry = {
         "file": str(file_path),
         "original": original_content,
         "new": new_content,
         "timestamp": time.time(),
-    })
+    }
+
+    # احفظ في الذاكرة
+    SPLICE_JOURNAL.append(entry)
     if len(SPLICE_JOURNAL) > MAX_JOURNAL:
         SPLICE_JOURNAL.pop(0)
+
+    # احفظ على القرص
+    try:
+        with open(JOURNAL_FILE, "a", encoding="utf-8") as f:
+            f.write(json.dumps(entry) + "\n")
+    except Exception as e:
+        sys.stderr.write(f"[journal] failed to persist: {e}\n")
+
 
 def _validate_after_splice(file_path):
     from core.ast_finder import validate_file_parses
@@ -716,9 +736,39 @@ def _validate_after_splice(file_path):
         return False
     return True
 
+
 def rollback_last():
+    # إذا الذاكرة فارغة — اقرأ من القرص
     if not SPLICE_JOURNAL:
-        return False
+        if not JOURNAL_FILE.exists():
+            return False
+
+        try:
+            with open(JOURNAL_FILE, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+
+            if not lines:
+                return False
+
+            # آخر entry
+            last = json.loads(lines[-1])
+            SPLICE_JOURNAL.append(last)
+        except Exception as e:
+            sys.stderr.write(f"[journal] failed to read: {e}\n")
+            return False
+
+    # تراجع
     last = SPLICE_JOURNAL.pop()
     Path(last["file"]).write_text(last["original"], encoding="utf-8")
+
+    # احذف آخر سطر من الملف
+    try:
+        if JOURNAL_FILE.exists():
+            with open(JOURNAL_FILE, "r", encoding="utf-8") as f:
+                lines = f.readlines()
+            with open(JOURNAL_FILE, "w", encoding="utf-8") as f:
+                f.writelines(lines[:-1])
+    except Exception:
+        pass
+
     return True

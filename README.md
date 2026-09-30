@@ -152,12 +152,116 @@ Runtime tuning and disk persistence are fully decoupled.
 
 ---
 
+## 🤖 MCP Server (AI Agents)
+
+ComposeBridge exposes its tools to AI agents via the Model Context Protocol (MCP).
+
+### 🆕 v0.4.0 — MCP works independently of the phone
+
+> **Important:** As of v0.4.0, the MCP Server operates **standalone** — 
+> it does **not** require the phone, the WebSocket bridge, or `adb reverse`.
+> 
+> Use it directly from Antigravity IDE, Claude Desktop, or any 
+> MCP-compatible client to edit your Compose project files.
+
+### Two Operation Modes
+
+| Mode | Requires Phone? | Use Case |
+|------|-----------------|----------|
+| **Manual (WebSocket)** | ✅ Yes | Live UI tuning on device |
+| **MCP (Standalone)** | ❌ No | AI-driven code edits |
+
+### Supported Clients
+
+- ✅ Antigravity IDE (Gemini)
+- ✅ Claude Desktop
+- ✅ Cursor
+- ✅ Cline / Continue
+
+### Setup
+
+**1. Install dependencies**
+
+```bash
+cd server
+pip install -r requirements.txt
+```
+
+**2. Configure your AI client**
+
+Antigravity IDE — edit `~/.gemini/config/mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "composebridge": {
+      "command": "python",
+      "args": ["C:\path\to\composebridge-en\server\mcp_server.py"]
+    }
+  }
+}
+```
+
+Claude Desktop — edit `%APPDATA%\Claude\claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "composebridge": {
+      "command": "python",
+      "args": ["C:\path\to\composebridge-en\server\mcp_server.py"]
+    }
+  }
+}
+```
+
+**3. Restart your AI client**
+
+### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `find_token_by_color` | Reverse lookup: hex → token name |
+| `set_token` | Surgically edit a token value (single-line diff) |
+| `rollback_last` | Undo last edit (persistent across restarts) |
+
+### Example
+
+In Antigravity chat:
+
+```text
+@composebridge set_token("welcomeCardHeight", "300")
+```
+
+Result in `AppDimens.kt`:
+
+```diff
+- val welcomeCardHeight: Dp get() = BridgeDimensionRegistry.get("welcomeCardHeight", 240.dp)
++ val welcomeCardHeight: Dp get() = BridgeDimensionRegistry.get("welcomeCardHeight", 300.dp)
+```
+
+= Single-line git diff. No phone required.
+
+### Persistent Journal
+
+Every edit is journaled to `.composebridge-journal.json`.
+If your AI client crashes or restarts, `rollback_last` still works.
+
+### Why Standalone MCP Matters
+
+- No need to build & deploy the app to edit code
+- AI can work on Compose projects during design phase
+- Fully local — no network, no telemetry
+
+⚠️ Status: v0.4.0-alpha — under active development.
+
 ## 🔒 Security
 
 - **Debug Builds Only**: Agent bundled with `debugImplementation`
 - **Token Authentication**: WebSocket requires token on handshake
   - ⚠️ v0.3.0 uses a fixed local token. QR-based pairing planned for v0.4.0.
 - **Journal Rollback**: Auto-rollback on AST validation failure
+
 ---
 
 ## ⚠️ Limitations

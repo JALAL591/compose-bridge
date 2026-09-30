@@ -8,3 +8,11 @@ build/
 *.tmp*
 output/
 *.backup
+
+# Temporary backups
+_backup_*/
+
+# ComposeBridge runtime files
+.composebridge-journal.json
+.composebridge-failures.jsonl
+composebridge-mcp.log

@@ -8,3 +8,4 @@ venv/
 .venv/
 *.bridge.bak
 *.bridge.tmp_*
+.composebridge-journal.json
