@@ -1,0 +1,18 @@
+# GitHub Linguist configuration
+# Excludes non-essential files from language stats
+
+# === Exclude examples (demo copies, not core code) ===
+examples/** linguist-vendored
+
+# === Exclude Gradle wrapper (generated) ===
+gradlew linguist-vendored
+gradlew.bat linguist-vendored
+gradle/** linguist-vendored
+*.jar linguist-vendored
+
+# === Exclude docs ===
+docs/** linguist-documentation
+*.md linguist-documentation
+
+# === Treat .kts as Kotlin ===
+*.kts linguist-language=Kotlin
