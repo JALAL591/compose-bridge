@@ -1,7 +1,7 @@
 # ComposeBridge 🌉
 
-**Real-time on-device visual editor for Jetpack Compose.**
-Live UI tuning + schema-driven screen compiler + AST-guided source splicing.
+**Real-time on-device visual editor for Jetpack Compose + MCP Server for AI agents. Live UI tuning, AST-guided surgical source splicing, and standalone AI-driven code edits — no phone needed..**
+
 
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1.20+-purple.svg)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-1.7.3+-4285F4.svg)](https://developer.android.com/jetpack/compose)
