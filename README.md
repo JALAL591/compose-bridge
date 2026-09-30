@@ -163,7 +163,7 @@ Runtime tuning and disk persistence are fully decoupled.
 
 - **Debug Builds Only**: Agent bundled with `debugImplementation`
 - **Token Authentication**: WebSocket requires token on handshake
-  - ⚠️ v0.3.0 uses a fixed local token. QR-based pairing planned for v0.4.0.
+  - ⚠️ v0.1.0 uses a fixed local token. QR-based pairing planned for v0.2.0.
 - **Journal Rollback**: Auto-rollback on AST validation failure
 ---
 
