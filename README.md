@@ -9,6 +9,8 @@
 [![Latency](https://img.shields.io/badge/Latency-%3C50ms-success.svg)]()
 [![Engine](https://img.shields.io/badge/Engine-AST--Guided%20Byte--Splice-orange.svg)]()
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![M8ven Score](https://m8ven.ai/badge/mcp/jalal591/compose-bridge)](https://m8ven.ai/mcp/jalal591/compose-bridge?s=readme)
+
 ## 📰 Featured In
 
 <p align="left">
