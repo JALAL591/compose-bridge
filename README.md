@@ -8,7 +8,7 @@
 [![Latency](https://img.shields.io/badge/Latency-%3C50ms-success.svg)]()
 [![Version](https://img.shields.io/badge/Version-1.0.0-blue.svg)]()
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![M8ven Score](https://m8ven.ai/badge/mcp/jalal591/compose-bridge)](https://m8ven.ai/mcp/jalal591/compose-bridge?s=readme)
+[![M8ven Score](https://m8ven.ai/badge/mcp/jalal591-compose-bridge-rapm1x)](https://m8ven.ai/mcp/jalal591-compose-bridge-rapm1x?s=readme)
 
 ## 📰 Featured In
 
