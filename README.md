@@ -22,6 +22,13 @@
 
 ---
 
+### 📥 Direct Downloads & Quick Install (v1.0.0)
+
+| Package | Asset (.zip / .aar) | Installation |
+|---|---|---|
+| **IDE Plugin (Android Studio / IntelliJ)** | [📥 **ComposeBridgeIntelliJ-1.0.0.zip**](dist/ComposeBridgeIntelliJ-1.0.0.zip?raw=true) | In Android Studio: `Settings` ➔ `Plugins` ➔ `⚙️` ➔ `Install Plugin from Disk...` |
+| **Compose Agent Library** | [📦 **composebridge-agent-release.aar**](dist/composebridge-agent-release.aar?raw=true) | Copy to `app/libs/` or add to project dependencies |
+
 **ComposeBridge** is a developer tooling suite that bridges a running Compose app (KMP/Android) with your IDE or AI Agent.
 
 ### 🎯 What's New in v1.0.0?
@@ -32,11 +39,21 @@
 - **Review & Reject:** A full `git status`-like review in the IDE. Approve to keep, or Reject All for a byte-for-byte rollback.
 - **17+ MCP Tools:** AI agents can now run Gradle builds, detect patterns, and rollback changes autonomously.
 
-### 🎬 See it in action
+### 🎬 See it in action & Screenshots
 
 Click the preview below to watch ComposeBridge visually edit a running Jetpack Compose UI and persist the change back to Kotlin source.
 
-[![Watch ComposeBridge live demo](https://img.youtube.com/vi/Hywyq7cBdDM/hqdefault.jpg)](https://youtu.be/Hywyq7cBdDM)
+<p align="center">
+  <a href="https://youtu.be/Hywyq7cBdDM">
+    <img src="https://img.youtube.com/vi/Hywyq7cBdDM/hqdefault.jpg" alt="Watch ComposeBridge live demo" width="70%" style="border-radius: 8px;" />
+  </a>
+</p>
+
+#### 📸 Studio Plugin & Live Device Integration
+
+| 1. Studio ToolWindow & Token Scanner | 2. Surgical Pattern Refactoring & Diff | 3. Live On-Device Preview & Inspector |
+|:---:|:---:|:---:|
+| <a href="docs/screenshots/1_composebridge_main_ui.jpg"><img src="docs/screenshots/1_composebridge_main_ui.jpg" width="100%" alt="ComposeBridge Main UI" /></a> | <a href="docs/screenshots/2_composebridge_patterns_diff.jpg"><img src="docs/screenshots/2_composebridge_patterns_diff.jpg" width="100%" alt="ComposeBridge Patterns Diff" /></a> | <a href="docs/screenshots/3_composebridge_live_device_sync.jpg"><img src="docs/screenshots/3_composebridge_live_device_sync.jpg" width="100%" alt="ComposeBridge Live Sync" /></a> |
 
 ---
 

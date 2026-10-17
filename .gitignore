@@ -21,6 +21,8 @@ captures/
 *.aar
 *.zip
 *.jar
+!dist/*.aar
+!dist/*.zip
 
 # Python
 __pycache__/
