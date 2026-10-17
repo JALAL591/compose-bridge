@@ -7,7 +7,7 @@
 [![Zero Rebuild](https://img.shields.io/badge/DevEx-Zero--Rebuild%20Preview-brightgreen.svg)]()
 [![Latency](https://img.shields.io/badge/Latency-%3C50ms-success.svg)]()
 [![Version](https://img.shields.io/badge/Version-1.0.0-blue.svg)]()
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/JALAL591/compose-bridge/blob/main/LICENSE)
 [![M8ven Score](https://m8ven.ai/badge/mcp/jalal591-compose-bridge-rapm1x)](https://m8ven.ai/mcp/jalal591-compose-bridge-rapm1x?s=readme)
 
 ## 📰 Featured In
@@ -18,7 +18,7 @@
   </a>
 </p>
 
-[English](README.md) | [العربية](README_AR.md)
+[English](https://github.com/JALAL591/compose-bridge/blob/main/README.md) | [العربية](https://github.com/JALAL591/compose-bridge/blob/main/README_AR.md)
 
 ---
 
@@ -26,8 +26,8 @@
 
 | الحزمة | ملف التثبيت (.zip / .aar) | طريقة التثبيت السريع |
 |---|---|---|
-| **إضافة بيئة التطوير (Android Studio / IntelliJ)** | [📥 **تحميل ComposeBridgeIntelliJ-1.0.0.zip**](dist/ComposeBridgeIntelliJ-1.0.0.zip?raw=true) | في Android Studio: انتقل إلى `Settings` ➔ `Plugins` ➔ `⚙️` ➔ `Install Plugin from Disk...` |
-| **مكتبة أندرويد لـ Jetpack Compose** | [📦 **تحميل composebridge-agent-release.aar**](dist/composebridge-agent-release.aar?raw=true) | انسخ الملف إلى مجلد `app/libs/` في مشروعك |
+| **إضافة بيئة التطوير (Android Studio / IntelliJ)** | [📥 **تحميل ComposeBridgeIntelliJ-1.0.0.zip**](https://github.com/JALAL591/compose-bridge/raw/main/dist/ComposeBridgeIntelliJ-1.0.0.zip) | في Android Studio: انتقل إلى `Settings` ➔ `Plugins` ➔ `⚙️` ➔ `Install Plugin from Disk...` |
+| **مكتبة أندرويد لـ Jetpack Compose** | [📦 **تحميل composebridge-agent-release.aar**](https://github.com/JALAL591/compose-bridge/raw/main/dist/composebridge-agent-release.aar) | انسخ الملف إلى مجلد `app/libs/` في مشروعك |
 
 **ComposeBridge** هي حزمة أدوات للمطورين تربط تطبيق Compose (KMP/Android) بمحرر الأكواد أو وكيل الذكاء الاصطناعي الخاص بك.
 
@@ -53,7 +53,7 @@
 
 | 1. لوحة تحكم الإضافة وفاحص التوكنز | 2. التعديل الجراحي ومراجعة الفروقات (Diff) | 3. المعاينة المباشرة على شاشة الهاتف |
 |:---:|:---:|:---:|
-| <a href="docs/screenshots/1_composebridge_main_ui.jpg"><img src="docs/screenshots/1_composebridge_main_ui.jpg" width="100%" alt="واجهة ComposeBridge الرئيسية" /></a> | <a href="docs/screenshots/2_composebridge_patterns_diff.jpg"><img src="docs/screenshots/2_composebridge_patterns_diff.jpg" width="100%" alt="فروقات التعديل الجراحي" /></a> | <a href="docs/screenshots/3_composebridge_live_device_sync.jpg"><img src="docs/screenshots/3_composebridge_live_device_sync.jpg" width="100%" alt="المزامنة الحية على الهاتف" /></a> |
+| <a href="https://github.com/JALAL591/compose-bridge/blob/main/docs/screenshots/1_composebridge_main_ui.jpg"><img src="https://raw.githubusercontent.com/JALAL591/compose-bridge/main/docs/screenshots/1_composebridge_main_ui.jpg" width="100%" alt="واجهة ComposeBridge الرئيسية" /></a> | <a href="https://github.com/JALAL591/compose-bridge/blob/main/docs/screenshots/2_composebridge_patterns_diff.jpg"><img src="https://raw.githubusercontent.com/JALAL591/compose-bridge/main/docs/screenshots/2_composebridge_patterns_diff.jpg" width="100%" alt="فروقات التعديل الجراحي" /></a> | <a href="https://github.com/JALAL591/compose-bridge/blob/main/docs/screenshots/3_composebridge_live_device_sync.jpg"><img src="https://raw.githubusercontent.com/JALAL591/compose-bridge/main/docs/screenshots/3_composebridge_live_device_sync.jpg" width="100%" alt="المزامنة الحية على الهاتف" /></a> |
 
 ---
 
@@ -189,4 +189,4 @@ Antigravity IDE — قم بتعديل `~/.gemini/config/mcp_config.json`:
 ---
 
 ## 📜 الترخيص
-موزّع تحت رخصة [Apache License 2.0](LICENSE).
+موزّع تحت رخصة [Apache License 2.0](https://github.com/JALAL591/compose-bridge/blob/main/LICENSE).

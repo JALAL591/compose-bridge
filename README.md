@@ -7,7 +7,7 @@
 [![Zero Rebuild](https://img.shields.io/badge/DevEx-Zero--Rebuild%20Preview-brightgreen.svg)]()
 [![Latency](https://img.shields.io/badge/Latency-%3C50ms-success.svg)]()
 [![Version](https://img.shields.io/badge/Version-1.0.0-blue.svg)]()
-[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/JALAL591/compose-bridge/blob/main/LICENSE)
 [![M8ven Score](https://m8ven.ai/badge/mcp/jalal591-compose-bridge-rapm1x)](https://m8ven.ai/mcp/jalal591-compose-bridge-rapm1x?s=readme)
 
 ## 📰 Featured In
@@ -18,7 +18,7 @@
   </a>
 </p>
 
-[English](README.md) | [العربية](README_AR.md)
+[English](https://github.com/JALAL591/compose-bridge/blob/main/README.md) | [العربية](https://github.com/JALAL591/compose-bridge/blob/main/README_AR.md)
 
 ---
 
@@ -26,8 +26,8 @@
 
 | Package | Asset (.zip / .aar) | Installation |
 |---|---|---|
-| **IDE Plugin (Android Studio / IntelliJ)** | [📥 **ComposeBridgeIntelliJ-1.0.0.zip**](dist/ComposeBridgeIntelliJ-1.0.0.zip?raw=true) | In Android Studio: `Settings` ➔ `Plugins` ➔ `⚙️` ➔ `Install Plugin from Disk...` |
-| **Compose Agent Library** | [📦 **composebridge-agent-release.aar**](dist/composebridge-agent-release.aar?raw=true) | Copy to `app/libs/` or add to project dependencies |
+| **IDE Plugin (Android Studio / IntelliJ)** | [📥 **ComposeBridgeIntelliJ-1.0.0.zip**](https://github.com/JALAL591/compose-bridge/raw/main/dist/ComposeBridgeIntelliJ-1.0.0.zip) | In Android Studio: `Settings` ➔ `Plugins` ➔ `⚙️` ➔ `Install Plugin from Disk...` |
+| **Compose Agent Library** | [📦 **composebridge-agent-release.aar**](https://github.com/JALAL591/compose-bridge/raw/main/dist/composebridge-agent-release.aar) | Copy to `app/libs/` or add to project dependencies |
 
 **ComposeBridge** is a developer tooling suite that bridges a running Compose app (KMP/Android) with your IDE or AI Agent.
 
@@ -53,7 +53,7 @@ Click the preview below to watch ComposeBridge visually edit a running Jetpack C
 
 | 1. Studio ToolWindow & Token Scanner | 2. Surgical Pattern Refactoring & Diff | 3. Live On-Device Preview & Inspector |
 |:---:|:---:|:---:|
-| <a href="docs/screenshots/1_composebridge_main_ui.jpg"><img src="docs/screenshots/1_composebridge_main_ui.jpg" width="100%" alt="ComposeBridge Main UI" /></a> | <a href="docs/screenshots/2_composebridge_patterns_diff.jpg"><img src="docs/screenshots/2_composebridge_patterns_diff.jpg" width="100%" alt="ComposeBridge Patterns Diff" /></a> | <a href="docs/screenshots/3_composebridge_live_device_sync.jpg"><img src="docs/screenshots/3_composebridge_live_device_sync.jpg" width="100%" alt="ComposeBridge Live Sync" /></a> |
+| <a href="https://github.com/JALAL591/compose-bridge/blob/main/docs/screenshots/1_composebridge_main_ui.jpg"><img src="https://raw.githubusercontent.com/JALAL591/compose-bridge/main/docs/screenshots/1_composebridge_main_ui.jpg" width="100%" alt="ComposeBridge Main UI" /></a> | <a href="https://github.com/JALAL591/compose-bridge/blob/main/docs/screenshots/2_composebridge_patterns_diff.jpg"><img src="https://raw.githubusercontent.com/JALAL591/compose-bridge/main/docs/screenshots/2_composebridge_patterns_diff.jpg" width="100%" alt="ComposeBridge Patterns Diff" /></a> | <a href="https://github.com/JALAL591/compose-bridge/blob/main/docs/screenshots/3_composebridge_live_device_sync.jpg"><img src="https://raw.githubusercontent.com/JALAL591/compose-bridge/main/docs/screenshots/3_composebridge_live_device_sync.jpg" width="100%" alt="ComposeBridge Live Sync" /></a> |
 
 ---
 
@@ -189,4 +189,4 @@ Antigravity IDE — edit `~/.gemini/config/mcp_config.json`:
 ---
 
 ## 📜 License
-Distributed under the [Apache License 2.0](LICENSE).
+Distributed under the [Apache License 2.0](https://github.com/JALAL591/compose-bridge/blob/main/LICENSE).
