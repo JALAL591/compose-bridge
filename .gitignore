@@ -1,18 +1,43 @@
-*.pyc
-__pycache__/
-build/
-.gradle/
-.idea/
-.kotlin/
+# General
+*.log
+*.tmp
 *.bak
-*.tmp*
-output/
 *.backup
+*.bak*
+*.backup*
+*backup*
+.DS_Store
 
-# Temporary backups
-_backup_*/
+# Gradle
+.gradle/
+build/
+output/
+local.properties
+*.hprof
+*.cxx/
+captures/
 
-# ComposeBridge runtime files
+# Artifacts
+*.aar
+*.zip
+*.jar
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env/
+
+# IDE
+.idea/
+*.iml
+.kotlin/
+
+# ComposeBridge Runtime
+.composebridge/
+.composebridge-state/
 .composebridge-journal.json
 .composebridge-failures.jsonl
 composebridge-mcp.log
+_backup_*/

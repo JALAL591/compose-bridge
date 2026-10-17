@@ -1,0 +1,40 @@
+<idea-plugin>
+    <id>com.composebridge.plugin</id>
+    <name>ComposeBridge</name>
+    <vendor>ComposeBridge</vendor>
+
+    <description><![CDATA[
+        Live UI tuning for Jetpack Compose.
+        Scan your project for design tokens, detect hardcoded values,
+        analyze impact, and suggest splits - all from Android Studio.
+    ]]></description>
+
+    <idea-version since-build="241" />
+
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.java</depends>
+    <depends>org.jetbrains.kotlin</depends>
+
+    <extensions defaultExtensionNs="org.jetbrains.kotlin">
+        <supportsKotlinPluginMode supportsK2="true" />
+    </extensions>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow
+            id="ComposeBridge"
+            anchor="right"
+            factoryClass="com.composebridge.plugin.toolwindow.ComposeBridgeToolWindowFactory"
+            icon="/icons/composebridge.svg" />
+        <intentionAction>
+            <className>com.composebridge.plugin.actions.ConvertToTokenAction</className>
+            <category>ComposeBridge</category>
+        </intentionAction>
+        <projectService serviceImplementation="com.composebridge.plugin.settings.ComposeBridgeSettings" />
+        <projectConfigurable
+            instance="com.composebridge.plugin.settings.ComposeBridgeConfigurable"
+            id="com.composebridge.plugin.settings"
+            displayName="ComposeBridge"
+            parentId="tools" />
+    </extensions>
+</idea-plugin>

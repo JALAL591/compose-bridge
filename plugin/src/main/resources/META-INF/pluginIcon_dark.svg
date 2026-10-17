@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" width="40" height="40">
+  <defs>
+    <linearGradient id="wandGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#a855f7" />
+      <stop offset="100%" stop-color="#3b82f6" />
+    </linearGradient>
+    <linearGradient id="sparkleGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#fbbf24" />
+      <stop offset="100%" stop-color="#f59e0b" />
+    </linearGradient>
+  </defs>
+  <!-- Wand Stick -->
+  <path d="M8 32 L28 12 L32 16 L12 36 Z" fill="url(#wandGradient)" rx="2" />
+  <!-- Wand Handle Details -->
+  <path d="M6 34 L10 38" stroke="#6b7280" stroke-width="2" stroke-linecap="round" />
+  <!-- Magic Sparkles -->
+  <path d="M28 6 L29.5 9.5 L33 11 L29.5 12.5 L28 16 L26.5 12.5 L23 11 L26.5 9.5 Z" fill="url(#sparkleGradient)" />
+  <path d="M36 18 L36.8 19.2 L38 20 L36.8 20.8 L36 22 L35.2 20.8 L34 20 L35.2 19.2 Z" fill="#fbbf24" />
+  <path d="M20 6 L20.8 7.2 L22 8 L20.8 8.8 L20 10 L19.2 8.8 L18 8 L19.2 7.2 Z" fill="#fbbf24" />
+</svg>
