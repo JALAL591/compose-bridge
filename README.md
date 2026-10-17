@@ -157,7 +157,7 @@ Antigravity IDE — edit `~/.gemini/config/mcp_config.json`:
 | **IDE Plugin (5 Tabs)** | ✅ | ✅ | ✅ |
 | **Phone Live Editing** | ✅ | ❌ | ❌ |
 
-*Desktop and iOS on-device overlays are planned for v1.0.0.*
+*Desktop and iOS on-device overlays are planned for v1.1.0.*
 
 ---
 
