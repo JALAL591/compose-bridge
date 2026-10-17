@@ -1,12 +1,15 @@
 # ComposeBridge 🌉
 
-**Real-time on-device visual editor for Jetpack Compose + MCP Server for AI agents. Live UI tuning, AST-guided surgical source splicing, and standalone AI-driven code edits.**
+**Real-time on-device visual editor for Jetpack Compose + MCP Server for AI agents. Live UI tuning, AST-guided surgical source splicing, and standalone AI-driven code edits — no phone needed..**
+
 
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1.20+-purple.svg)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-1.7.3+-4285F4.svg)](https://developer.android.com/jetpack/compose)
-[![Version](https://img.shields.io/badge/Version-1.0.0-blue.svg)]()
+[![Zero Rebuild](https://img.shields.io/badge/DevEx-Zero--Rebuild%20Preview-brightgreen.svg)]()
+[![Latency](https://img.shields.io/badge/Latency-%3C50ms-success.svg)]()
+[![Engine](https://img.shields.io/badge/Engine-AST--Guided%20Byte--Splice-orange.svg)]()
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![M8ven Score](https://m8ven.ai/badge/mcp/jalal591/compose-bridge)](https://m8ven.ai/mcp/jalal591/compose-bridge)
+[![M8ven Score](https://m8ven.ai/badge/mcp/jalal591/compose-bridge)](https://m8ven.ai/mcp/jalal591/compose-bridge?s=readme)
 
 ## 📰 Featured In
 
@@ -20,15 +23,21 @@
 
 ---
 
-**ComposeBridge** is a developer tooling suite that bridges a running Compose app (KMP/Android) with your IDE or AI Agent. 
+**ComposeBridge** is a developer tooling suite that bridges a running Android app on a physical device with your IDE over a local WebSocket. You can:
 
-### 🎯 What's New in v1.0.0?
-- **Focus Mode:** The BottomSheet now shows **only** the colors and dimensions of the tapped element.
-- **Global vs. Split:** Change a value across the whole project, or create an isolated token just for this element.
-- **Pending Edits Queue:** Batch multiple UI tweaks locally and hit **Sync** once.
-- **Dimensions Support:** Live-edit heights, widths, paddings, and font sizes — not just colors.
-- **Review & Reject:** A full `git status`-like review in the IDE. Approve to keep, or Reject All for a byte-for-byte rollback.
-- **17+ MCP Tools:** AI agents can now run Gradle builds, detect patterns, and rollback changes autonomously.
+- 🎯 **Tap any Composable** on the phone to inspect it in real time
+- 🎨 **Tune colors, dimensions, and paddings live** at 60fps — no Gradle build required
+- 💾 **Persist tweaks to your Kotlin source** (`AppDimens.kt`, `AppColors.kt`) via a surgical byte-splice that preserves file formatting
+- 🧩 **Generate full Compose screens** from a declarative JSON schema
+- 🔍 **Navigate the runtime tree** — tap a parent, drill into children
+
+> **Live preview is truly zero-rebuild.** Persisting the change into the final APK artifact still requires one standard rebuild, after which the new value becomes the source of truth.
+
+### 🎬 See it in action
+
+Click the preview below to watch ComposeBridge visually edit a running Jetpack Compose UI and persist the change back to Kotlin source.
+
+[![Watch ComposeBridge live demo](https://img.youtube.com/vi/Hywyq7cBdDM/hqdefault.jpg)](https://youtu.be/Hywyq7cBdDM)
 
 ---
 
@@ -36,12 +45,12 @@
 
 | Feature | Description |
 |---------|-------------|
-| **⚡ Live Preview** | Tweak colors and dimensions at **<50ms latency**. Changes reflect instantly on the phone (after one initial rebuild). |
-| **🎯 Focus Mode** | Smart BottomSheet shows **only** the properties of the selected element (e.g., `c1`, `c2`, `padding`). No more digging through long lists. |
-| **🧠 Semantic Intelligence** | Automatically detects if a color/dimension is shared across the app. Offers a **Split** (isolate to this card) or **Global** (change everywhere) option. |
-| **💾 Safe Refactoring** | AST-Guided Source Splicing. Changes are tracked in a `PatternJournal`. **Reject All** reverts files byte-for-byte. |
-| **🔌 IDE Plugin (5 Tabs)** | Scan, Impact, Split, Patterns, and **Changes** (Approve/Reject UI). |
-| **🤖 Standalone MCP Server** | Works entirely without the phone. AI agents can scan, refactor, and build the project. |
+| **⚡ Zero-Rebuild Preview** | Tweak colors, paddings, corner radii, and font sizes at **<50ms latency** while the app runs. |
+| **🎯 On-Device Visual Inspector** | Tap any Composable to see its source file, line number, and used design tokens. |
+| **💾 AST-Guided Source Splicing** | Locates the exact byte range via Tree-sitter, then performs a surgical replace that keeps a **single-line `git diff`**. |
+| **🧩 Dynamic UI Compiler** | Feed it a JSON schema (`dashboard.json`) — get a full, production-ready Compose screen with theme, components, and tokens wired up. |
+| **🌳 Runtime Tree Navigation** | Walk the composition tree from parent to children — no XML, no reflection. |
+| **🔌 Local WebSocket Daemon** | A lightweight Python bridge between the runtime agent and your file system. |
 
 ---
 
@@ -49,95 +58,253 @@
 
 ```text
 composebridge/
-├── agent/       # Compose runtime library (:composebridge-agent)
-├── server/      # Python WebSocket daemon + MCP server + AST splicer
-├── plugin/      # Android Studio Plugin (5 Tabs)
+├── cli/         # JSON → Compose screen compiler
+├── agent/       # Android runtime library (:composebridge-agent)
+├── server/      # Python WebSocket daemon + source byte-splicer
+├── examples/    # Complete reference app (StudentApp)
 └── docs/        # Architecture + setup guides
 ```
 
+**Three components, one workflow:**
+1. **CLI** — generates a full project from JSON
+2. **Agent** — captures touches and pushes live updates on the device
+3. **Server** — coordinates messages + writes changes back to `.kt` files
+
 ---
 
-## 🛠️ Quick Start (Android / KMP)
+## ✅ Compatibility
+
+| Component | Version |
+|-----------|---------|
+| Kotlin | 2.1.20+ |
+| Jetpack Compose | 1.7.3+ |
+| Compose Multiplatform | 1.7.3+ |
+| Gradle | 8.5+ |
+| Android Gradle Plugin | 8.5+ |
+| Min SDK | 24 |
+| Python | 3.10+ |
+| Target | Android (real device or emulator) |
+
+---
+
+## 🛠️ Quick Start
 
 ### 1. Start the local server
+
 ```bash
 cd server
 pip install -r requirements.txt
 python server.py
 ```
 
-### 2. Add the Agent to your project
-```kotlin
-// build.gradle.kts
-debugImplementation("com.composebridge:agent:1.0.0")
+### 2. Generate a Compose project
+
+```bash
+cd cli
+python generate.py screens/dashboard.json
 ```
 
-### 3. Initialize in MainActivity
-```kotlin
-override fun onCreate(savedInstanceState: Bundle?) {
-    super.onCreate(savedInstanceState)
-    ComposeBridgeAgent.start(serverUrl = "ws://127.0.0.1:8711")
-    setContent {
-        ComposeBridgeAgent.Root {
-            App()
-        }
-    }
-}
-```
+The CLI will produce a full Android project under `output/` — including:
 
-### 4. Connect & Tune
+- ✅ Theme files (`AppColors.kt`, `AppDimens.kt`, `AppTypography.kt`, `AppStrings.kt`)
+- ✅ UI components (`HeroCard`, `StatCard`, `DashboardHeader`, ...)
+- ✅ The full `DashboardPage.kt`
+- ✅ The `composebridge-agent` module
+- ✅ The `bridge/` Python server, wired to the new project's path
+- ✅ `MainActivity.kt` with the agent already wired up
+- ✅ `AndroidManifest.xml` with `INTERNET` permission
+
+### 3. Open in Android Studio
+
+Open the generated project, deploy it to a physical device, then:
+
 ```bash
 adb reverse tcp:8711 tcp:8711
 ```
-1. Deploy the app to your Android device.
-2. Tap the **🔧 FAB** → Design Mode ON.
-3. Tap any Composable → Focus Mode opens.
-4. Tweak colors/dimensions → Hit **Sync**.
 
-> **Note on Live Preview:** Changing a hardcoded value or applying a new token requires **one rebuild** to update the compiled bytecode. After this, all future tweaks via the Registry are instant.
+Tap the **🔧 floating button** → Design Mode ON.
+Tap any element → the panel opens → slide/tap to tune live.
+
+---
+
+## 🤔 Why not just wait for Compose Hot Reload?
+
+| | Compose Hot Reload (JetBrains) | **ComposeBridge** |
+|---|---|---|
+| Availability | Preview / experimental | ✅ Works today |
+| Target | Emulator-first | ✅ Real device |
+| Persistence | Preview only | ✅ Writes back to source |
+| Interaction | Textual | ✅ Visual — tap elements |
+| Code safety | Full reload | ✅ Single-line `git diff` |
+
+---
+
+## ⚡ Performance
+
+| Metric | Value |
+|--------|-------|
+| Live preview latency | **<50ms** (localhost WebSocket) |
+| Recomposition scope | **Localized** — only targeted Composable re-executes |
+| AST splicing | **Asynchronous** — doesn't block UI thread |
+| Source diff | **Single-line** — byte-offset patch via Tree-sitter |
+
+Runtime tuning and disk persistence are fully decoupled.
+
+---
+
+## 🧠 Under the Hood
+
+- **Bidirectional runtime-to-source mapping** — every visual change is traceable to its exact Kotlin byte range.
+- **AST-guided inspection and byte-splice editing** — Tree-sitter locates the exact edit site; regex and byte replacement update the file without disturbing formatting.
+- **Deterministic layout compilation** — the CLI emits structured, tokenized Compose code with stable output.
+- **Low-latency WebSocket daemon** — sub-50ms round-trip between the device and the local editing server.
 
 ---
 
 ## 🤖 MCP Server (AI Agents)
 
-ComposeBridge exposes its tools to AI agents via the Model Context Protocol (MCP). **No phone is required for MCP.**
+ComposeBridge exposes its tools to AI agents via the Model Context Protocol (MCP).
+
+### 🆕 v0.4.0 — MCP works independently of the phone
+
+> **Important:** As of v0.4.0, the MCP Server operates **standalone** — 
+> it does **not** require the phone, the WebSocket bridge, or `adb reverse`.
+> 
+> Use it directly from Antigravity IDE, Claude Desktop, or any 
+> MCP-compatible client to edit your Compose project files.
+
+### Two Operation Modes
+
+| Mode | Requires Phone? | Use Case |
+|------|-----------------|----------|
+| **Manual (WebSocket)** | ✅ Yes | Live UI tuning on device |
+| **MCP (Standalone)** | ❌ No | AI-driven code edits |
 
 ### Supported Clients
+
 - ✅ Antigravity IDE (Gemini)
 - ✅ Claude Desktop
 - ✅ Cursor
 - ✅ Cline / Continue
 
-### Available Tools (17+)
+### Setup
 
-| Category | Tools |
-|----------|-------|
-| **Discovery** | `list_tokens`, `find_token_by_color`, `get_token_impact`, `get_token_siblings`, `get_naming_convention` |
-| **Editing** | `set_token`, `add_token`, `rollback_last` |
-| **Refactoring** | `detect_conditional_variants`, `replace_pattern`, `rollback_pattern`, `global_color_edit`, `split_token_for_element` |
-| **Build** | `run_gradle_build`, `list_allowed_gradle_tasks` |
-| **Change Mgmt**| `list_modified_files`, `approve_all_files`, `reject_all_files` |
+**1. Install dependencies**
+
+```bash
+cd server
+pip install -r requirements.txt
+```
+
+**2. Configure your AI client**
+
+Antigravity IDE — edit `~/.gemini/config/mcp_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "composebridge": {
+      "command": "python",
+      "args": ["C:\path\to\composebridge-en\server\mcp_server.py"]
+    }
+  }
+}
+```
+
+Claude Desktop — edit `%APPDATA%\Claude\claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "composebridge": {
+      "command": "python",
+      "args": ["C:\path\to\composebridge-en\server\mcp_server.py"]
+    }
+  }
+}
+```
+
+**3. Restart your AI client**
+
+### Available Tools
+
+| Tool | Description |
+|------|-------------|
+| `find_token_by_color` | Reverse lookup: hex → token name |
+| `set_token` | Surgically edit a token value (single-line diff) |
+| `rollback_last` | Undo last edit (persistent across restarts) |
 
 ### Example
+
+In Antigravity chat:
+
 ```text
-@composebridge detect_conditional_variants()
-@composebridge replace_pattern("dark_Primary_Color.White")
-@composebridge run_gradle_build()
+@composebridge set_token("welcomeCardHeight", "300")
 ```
+
+Result in `AppDimens.kt`:
+
+```diff
+- val welcomeCardHeight: Dp get() = BridgeDimensionRegistry.get("welcomeCardHeight", 240.dp)
++ val welcomeCardHeight: Dp get() = BridgeDimensionRegistry.get("welcomeCardHeight", 300.dp)
+```
+
+= Single-line git diff. No phone required.
+
+### Persistent Journal
+
+Every edit is journaled to `.composebridge-journal.json`.
+If your AI client crashes or restarts, `rollback_last` still works.
+
+### Why Standalone MCP Matters
+
+- No need to build & deploy the app to edit code
+- AI can work on Compose projects during design phase
+- Fully local — no network, no telemetry
+
+⚠️ Status: v0.4.0-alpha — under active development.
+
+## 🔒 Security
+
+- **Debug Builds Only**: Agent bundled with `debugImplementation`
+- **Token Authentication**: WebSocket requires token on handshake
+  - ⚠️ v0.4.0 uses a fixed local token. QR-based pairing planned for v0.5.0.
+- **Journal Rollback**: Auto-rollback on AST validation failure
 
 ---
 
-## ⚠️ Platform Support (v1.0.0)
+## ⚠️ Limitations
 
-| Feature | Android | Desktop | iOS |
-|---------|:-------:|:-------:|:---:|
-| **MCP Server (AI)** | ✅ | ✅ | ✅ |
-| **IDE Plugin (5 Tabs)** | ✅ | ✅ | ✅ |
-| **Phone Live Editing** | ✅ | ❌ | ❌ |
+- **AST Validation**: Surgical edits are restricted to simple literal values (`integer_literal`, `float_literal`, `string_literal`, `simple_identifier`, `long_literal`) to prevent parser syntax corruption.
+- **Correspondence**: ~70% on production apps (inline composables may misalign). Compose Compiler plugin is on the roadmap.
+- **UTF-16/UTF-8**: Edge cases with emoji-heavy files are still being handled. Full precision on the roadmap.
+- **Generated Code**: Files from KSP/Kapt may need manual exclusion today. Auto-detection is on the roadmap.
 
-*Desktop and iOS on-device overlays are planned for v1.0.0.*
+---
 
+## 🤖 Coming Soon
+
+- **AI-Powered Suggestions** (Qwen integration) — describe a change in natural language; the tool finds the right token and applies it.
+- **Natural Language Editing** — "Make this card taller." "Use the gold accent here."
+- **MCP Server** — expose ComposeBridge as a tool for Claude Desktop, Cursor, and other AI agents.
+- **More component templates** — e-commerce, forms, profile screens.
+- **Typography tokens** — full typography token live editing.
+
+---
+
+## 🔎 Search Terms This Project Solves
+
+If you've searched for any of these, this project is for you:
+
+- Jetpack Compose edit without recompile
+- Compose hot reload alternative
+- Interactive layout inspector for Android
+- Live UI tweaking on a real Android device
+- Sync design tokens to Kotlin source
+- Generate Compose UI from a JSON schema
+
+---
 
 ## 📜 License
+
 Distributed under the [Apache License 2.0](LICENSE).
-```
