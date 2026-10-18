@@ -73,6 +73,10 @@ object ComposeBridgeAgent {
         transport = null
     }
 
+    fun reconnect() {
+        transport?.reconnect()
+    }
+
     /**
      * Attaches Overlay to Activity (called from onResume)
      */

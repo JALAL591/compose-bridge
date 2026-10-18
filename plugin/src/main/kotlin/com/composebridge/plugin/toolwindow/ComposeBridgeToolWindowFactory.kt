@@ -30,7 +30,14 @@ class ComposeBridgeToolWindowFactory : ToolWindowFactory, DumbAware {
         val panel = ComposeBridgePanel(project)
         val content = ContentFactory.getInstance().createContent(panel, "", false)
         toolWindow.contentManager.addContent(content)
+        val statusTimer = javax.swing.Timer(2000) {
+            val running = BridgeServerManager.isRunning()
+            panel.updateBridgeStatus(running)
+        }
+        statusTimer.start()
+
         Disposer.register(toolWindow.disposable) {
+            statusTimer.stop()
             BridgeServerManager.stopServer()
         }
     }
@@ -464,6 +471,7 @@ class ComposeBridgePanel(private val project: Project) : JPanel(BorderLayout()) 
     }
 
 
+    fun updateBridgeStatus(running: Boolean) { updateBridgeStatusUi(running) }
     private fun updateBridgeStatusUi(running: Boolean) {
         if (running) {
             startBridgeButton.isVisible = false

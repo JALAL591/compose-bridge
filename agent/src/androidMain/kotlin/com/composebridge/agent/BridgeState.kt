@@ -30,6 +30,11 @@ object BridgeState {
     var snackbarMessage: String? by mutableStateOf(null)
     var batchMessage: String? by mutableStateOf(null)
 
+    // ═══ WebSocket Connection Status ═══
+    var isConnected: Boolean by mutableStateOf(false)
+    var isReconnecting: Boolean by mutableStateOf(false)
+    var connectionStatusText: String by mutableStateOf("Disconnected")
+
     val pendingCount: Int get() = pendingEdits.size
 
     fun showSnackbar(msg: String) {

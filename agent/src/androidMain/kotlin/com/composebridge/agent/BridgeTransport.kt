@@ -2,6 +2,7 @@ package com.composebridge.agent
 
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.contentOrNull
@@ -35,42 +36,145 @@ class BridgeTransport(
     @Volatile
     private var socket: WebSocket? = null
 
+    private val TAG = "ComposeBridge"
+    private val RECONNECT_DELAY_MS = 3000L
+    private val HEARTBEAT_INTERVAL_MS = 5000L
+    private val HEARTBEAT_TIMEOUT_MS = 10000L
+
+    @Volatile
+    private var isClosedByUser = false
+
+    @Volatile
+    private var lastHeartbeatResponse = 0L
+
+    private val reconnectRunnable = Runnable {
+        if (!isClosedByUser) {
+            Log.d(TAG, "🔄 Auto-reconnect triggered: attempting to reconnect to $serverUrl...")
+            connect()
+        }
+    }
+
+    private val heartbeatRunnable = object : Runnable {
+        override fun run() {
+            val ws = socket
+            if (ws != null && !isClosedByUser) {
+                val now = System.currentTimeMillis()
+                if (lastHeartbeatResponse > 0 && (now - lastHeartbeatResponse) > HEARTBEAT_TIMEOUT_MS) {
+                    Log.w(TAG, "⚠️ Heartbeat timeout: no server response for >10s. Triggering reconnect...")
+                    try {
+                        ws.cancel()
+                    } catch (_: Exception) {}
+                    socket = null
+                    scheduleReconnect()
+                    return
+                }
+
+                val pingSent = ws.send("""{"type":"ping","t":$now}""")
+                if (!pingSent) {
+                    Log.w(TAG, "⚠️ Failed to send heartbeat ping. Triggering reconnect...")
+                    try {
+                        ws.cancel()
+                    } catch (_: Exception) {}
+                    socket = null
+                    scheduleReconnect()
+                    return
+                }
+
+                mainHandler.postDelayed(this, HEARTBEAT_INTERVAL_MS)
+            }
+        }
+    }
+
+    @Synchronized
+    fun scheduleReconnect() {
+        if (isClosedByUser) return
+        mainHandler.post {
+            BridgeState.isConnected = false
+            BridgeState.isReconnecting = true
+            BridgeState.connectionStatusText = "Reconnecting..."
+        }
+        mainHandler.removeCallbacks(reconnectRunnable)
+        mainHandler.removeCallbacks(heartbeatRunnable)
+        Log.d(TAG, "⏱️ Reconnection scheduled in 3s...")
+        mainHandler.postDelayed(reconnectRunnable, RECONNECT_DELAY_MS)
+    }
+
+    fun reconnect() {
+        Log.d(TAG, "🔄 Manual reconnect requested")
+        isClosedByUser = false
+        mainHandler.removeCallbacks(reconnectRunnable)
+        connect()
+    }
+
+    @Synchronized
     fun connect() {
+        if (socket != null) {
+            try {
+                socket?.cancel()
+            } catch (_: Exception) {}
+            socket = null
+        }
+
+        isClosedByUser = false
+        mainHandler.removeCallbacks(reconnectRunnable)
+
         val request = Request.Builder()
             .url(serverUrl)
             .build()
 
-        println("[ComposeBridge] Connecting to $serverUrl")
+        Log.d(TAG, "🔌 Connecting to $serverUrl...")
+        mainHandler.post {
+            BridgeState.isReconnecting = true
+            BridgeState.connectionStatusText = "Connecting..."
+        }
 
         socket = client.newWebSocket(request, object : WebSocketListener() {
 
             override fun onOpen(webSocket: WebSocket, response: Response) {
-                println("[ComposeBridge] ✅ Connected")
+                Log.d(TAG, "✅ Connected to $serverUrl")
+                lastHeartbeatResponse = System.currentTimeMillis()
+
+                mainHandler.post {
+                    BridgeState.isConnected = true
+                    BridgeState.isReconnecting = false
+                    BridgeState.connectionStatusText = "Connected"
+                }
+
                 if (authToken.isNotEmpty()) {
-                    println("[ComposeBridge] 🔐 Sending auth...")
+                    Log.d(TAG, "🔐 Sending auth token...")
                     webSocket.send("""{"type":"auth","token":"$authToken"}""")
                 } else {
                     webSocket.send("""{"type":"hello","agent":"composebridge","protocol":1}""")
                 }
+
+                // Start active heartbeat loop
+                mainHandler.removeCallbacks(heartbeatRunnable)
+                mainHandler.postDelayed(heartbeatRunnable, HEARTBEAT_INTERVAL_MS)
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
-                println("[ComposeBridge] 📩 Received: $text")
+                lastHeartbeatResponse = System.currentTimeMillis()
                 handleCommand(text) { reply ->
                     webSocket.send(reply)
                 }
             }
 
-            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {}
+            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+                lastHeartbeatResponse = System.currentTimeMillis()
+            }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                println("[ComposeBridge] ❌ Failure: ${t.message}")
+                Log.w(TAG, "❌ Failure: ${t.message}")
                 socket = null
+                scheduleReconnect()
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                println("[ComposeBridge] Closed: $reason")
+                Log.d(TAG, "🔌 Closed: $reason (code=$code)")
                 socket = null
+                if (!isClosedByUser) {
+                    scheduleReconnect()
+                }
             }
         })
     }
@@ -717,7 +821,18 @@ class BridgeTransport(
     }
 
     fun close() {
-        socket?.close(1000, "Agent shutdown")
+        Log.d(TAG, "🛑 Closing BridgeTransport")
+        isClosedByUser = true
+        mainHandler.removeCallbacks(reconnectRunnable)
+        mainHandler.removeCallbacks(heartbeatRunnable)
+        try {
+            socket?.close(1000, "Agent shutdown")
+        } catch (_: Exception) {}
         socket = null
+        mainHandler.post {
+            BridgeState.isConnected = false
+            BridgeState.isReconnecting = false
+            BridgeState.connectionStatusText = "Disconnected"
+        }
     }
 }

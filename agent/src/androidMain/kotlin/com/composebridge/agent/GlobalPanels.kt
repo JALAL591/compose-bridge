@@ -1812,13 +1812,36 @@ private fun dimensionLabel(property: String): String = when (property) {
 fun AgentStatusBar() {
     val agentBusy = BridgeState.agentBusy
     val queueCount = BridgeState.queueCount
+    val isConnected = BridgeState.isConnected
+    val isReconnecting = BridgeState.isReconnecting
 
     LaunchedEffect(Unit) {
         ComposeBridgeAgent.requestQueueStatus()
     }
 
+    val statusBg = when {
+        isReconnecting -> Color(0xFFFFF8E1)
+        !isConnected -> Color(0xFFFFEBEE)
+        agentBusy -> Color(0xFFFFF3E0)
+        else -> Color(0xFFE8F5E9)
+    }
+
+    val statusText = when {
+        isReconnecting -> "🔄 Reconnecting..."
+        !isConnected -> "🔴 Disconnected"
+        agentBusy -> "🤖 Agent busy..."
+        else -> "🟢 Bridge Running"
+    }
+
+    val statusColor = when {
+        isReconnecting -> Color(0xFFF59E0B)
+        !isConnected -> Color(0xFFEF4444)
+        agentBusy -> Color(0xFFE65100)
+        else -> Color(0xFF2E7D32)
+    }
+
     Surface(
-        color = if (agentBusy) Color(0xFFFFF3E0) else Color(0xFFE8F5E9),
+        color = statusBg,
         shape = RoundedCornerShape(8.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -1831,10 +1854,10 @@ fun AgentStatusBar() {
         ) {
             Column {
                 Text(
-                    text = if (agentBusy) "🤖 Agent busy..." else "✅ Ready",
+                    text = statusText,
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (agentBusy) Color(0xFFE65100) else Color(0xFF2E7D32)
+                    color = statusColor
                 )
                 if (queueCount > 0) {
                     Text(
