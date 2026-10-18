@@ -618,6 +618,8 @@ class TokenMigrator:
         elif token_type == "color":
             if "import androidx.compose.ui.graphics.Color" not in reg_content:
                 reg_content = self._add_import(reg_content, "import androidx.compose.ui.graphics.Color")
+            if "import com.composebridge.agent.BridgeThemeRegistry" not in reg_content:
+                reg_content = self._add_import(reg_content, "import com.composebridge.agent.BridgeThemeRegistry")
         return reg_content
 
     CONTEXT_RULES = {
