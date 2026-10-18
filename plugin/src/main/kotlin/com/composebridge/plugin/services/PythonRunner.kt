@@ -30,7 +30,7 @@ class PythonRunner(private val project: Project) {
             if (cfg.exists()) {
                 try {
                     val text = cfg.readText(Charsets.UTF_8)
-                    val match = Regex(""server"\s*:\s*"([^"]+)"").find(text)
+                    val match = Regex(""""server"\s*:\s*"([^"]+)"""").find(text)
                     if (match != null) {
                         val serverRel = match.groupValues[1]
                         val serverDir = File(projectRoot, serverRel)

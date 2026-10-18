@@ -123,6 +123,7 @@ class ComposeBridgePanel(private val project: Project) : JPanel(BorderLayout()) 
     private val changesTable = JBTable(changesTableModel)
     private val changesSummaryLabel = JLabel(" ")
     private val changesFilesList = mutableListOf<String>()
+    private val changesLinesList = mutableListOf<Int>()
     private val changesBadgeLabel = JLabel("").apply {
         isOpaque = true
         background = badgeRed
@@ -189,6 +190,10 @@ class ComposeBridgePanel(private val project: Project) : JPanel(BorderLayout()) 
         styleTable(splitTable)
         styleTable(patternTable)
         styleTable(changesTable)
+        changesTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
+        changesTable.rowSelectionAllowed = true
+        changesTable.columnSelectionAllowed = false
+        changesTable.cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
         styleTable(sharedTokensTable)
 
         // 3. Scan Tab
@@ -320,20 +325,26 @@ class ComposeBridgePanel(private val project: Project) : JPanel(BorderLayout()) 
             border = BorderFactory.createEmptyBorder(4, 8, 4, 8)
         }
         val viewDiffBtn = createStyledButton("View Diff", accentBlue, Color.WHITE)
+        viewDiffBtn.toolTipText = "Inspect before vs current diff for selected file"
         viewDiffBtn.addActionListener { onViewDiffSelectedFile() }
-        val approveAllBtn = createStyledButton("Approve All", btnGreen, Color.WHITE)
+        val approveBtn = createStyledButton("Approve", btnGreen, Color.WHITE)
+        approveBtn.toolTipText = "Approve changes for selected file"
+        approveBtn.addActionListener { onApproveSelectedFile() }
+        val rejectBtn = createStyledButton("Reject", btnRed, Color.WHITE)
+        rejectBtn.toolTipText = "Revert changes for selected file"
+        rejectBtn.addActionListener { onRejectSelectedFile() }
+        val approveAllBtn = createStyledButton("Approve All", Color(0x15, 0x80, 0x3D), Color.WHITE)
         approveAllBtn.addActionListener { onApproveAllFiles() }
-        val rejectAllBtn = createStyledButton("Reject All", btnRed, Color.WHITE)
+        val rejectAllBtn = createStyledButton("Reject All", Color(0xB9, 0x1C, 0x1C), Color.WHITE)
         rejectAllBtn.addActionListener { onRejectAllFiles() }
-        val rejectForceBtn = createStyledButton("Force Reject", Color(0xFFB91C1C.toInt()), Color.WHITE)
-        rejectForceBtn.addActionListener { onForceRejectAll() }
         val refreshBtn = createStyledButton("Refresh", btnGray, Color.WHITE)
         refreshBtn.addActionListener { refreshChanges() }
 
         changesBottom.add(viewDiffBtn)
+        changesBottom.add(approveBtn)
+        changesBottom.add(rejectBtn)
         changesBottom.add(approveAllBtn)
         changesBottom.add(rejectAllBtn)
-        changesBottom.add(rejectForceBtn)
         changesBottom.add(refreshBtn)
         changesPanel.add(changesBottom, BorderLayout.SOUTH)
 
@@ -353,11 +364,15 @@ class ComposeBridgePanel(private val project: Project) : JPanel(BorderLayout()) 
             tabbedPane.setTabComponentAt(changesTabIndex, tabTitlePanel)
         }
 
-        // Double-click row in Changes -> open Diff preview
+        // Single or Double-click row in Changes -> open file directly in Editor at modified line
         changesTable.addMouseListener(object : java.awt.event.MouseAdapter() {
             override fun mouseClicked(e: java.awt.event.MouseEvent) {
-                if (e.clickCount == 2) {
-                    onViewDiffSelectedFile()
+                val row = changesTable.rowAtPoint(e.point)
+                if (row >= 0 && row < changesFilesList.size) {
+                    changesTable.setRowSelectionInterval(row, row)
+                    val file = changesFilesList[row]
+                    val line = if (row < changesLinesList.size) changesLinesList[row] else 1
+                    openFileAtLine(file, line)
                 }
             }
         })
@@ -1148,6 +1163,7 @@ class ComposeBridgePanel(private val project: Project) : JPanel(BorderLayout()) 
         changesSummaryLabel.text = "Loading modified files..."
         changesTableModel.rowCount = 0
         changesFilesList.clear()
+        changesLinesList.clear()
 
         Thread {
             val json = pythonRunner.listModifiedFiles()
@@ -1206,7 +1222,7 @@ class ComposeBridgePanel(private val project: Project) : JPanel(BorderLayout()) 
                 changesBadgeLabel.isVisible = false
                 return
             }
-            changesSummaryLabel.text = "$count file(s) modified on disk — Review to Approve or Revert"
+            changesSummaryLabel.text = "$count file(s) modified on disk — Click to open in editor"
             changesBadgeLabel.text = "$count"
             changesBadgeLabel.isVisible = true
 
@@ -1224,9 +1240,14 @@ class ComposeBridgePanel(private val project: Project) : JPanel(BorderLayout()) 
                         }
                         pList.joinToString(", ")
                     } else ""
+                    val firstLine = if (obj.has("first_line") && !obj.get("first_line").isJsonNull) obj.get("first_line").asInt else 1
                     changesFilesList.add(file)
+                    changesLinesList.add(if (firstLine > 0) firstLine else 1)
                     val changesStr = if (changeCount == 1) "1 change" else "$changeCount changes"
                     changesTableModel.addRow(arrayOf(file, changesStr, patterns))
+                }
+                if (changesTable.rowCount > 0 && changesTable.selectedRow < 0) {
+                    changesTable.setRowSelectionInterval(0, 0)
                 }
             }
         } catch (e: Exception) {
@@ -1235,13 +1256,25 @@ class ComposeBridgePanel(private val project: Project) : JPanel(BorderLayout()) 
         }
     }
 
-    private fun onViewDiffSelectedFile() {
-        val row = changesTable.selectedRow
+    private fun getSelectedOrFirstFile(): Pair<String, Int>? {
+        if (changesFilesList.isEmpty()) return null
+        var row = changesTable.selectedRow
         if (row < 0 || row >= changesFilesList.size) {
-            Messages.showWarningDialog("Please select a file to view diff", "ComposeBridge")
-            return
+            row = 0
+            changesTable.setRowSelectionInterval(0, 0)
         }
         val file = changesFilesList[row]
+        val line = if (row < changesLinesList.size) changesLinesList[row] else 1
+        return Pair(file, line)
+    }
+
+    private fun onViewDiffSelectedFile() {
+        val target = getSelectedOrFirstFile()
+        if (target == null) {
+            Messages.showInfoMessage("No pending file changes on disk to view diff.", "ComposeBridge")
+            return
+        }
+        val file = target.first
         Thread {
             val json = pythonRunner.getFileDiff(file)
             SwingUtilities.invokeLater {
@@ -1272,6 +1305,72 @@ class ComposeBridgePanel(private val project: Project) : JPanel(BorderLayout()) 
                 } catch (e: Exception) {
                     Messages.showErrorDialog("Error loading diff: ${e.message}", "ComposeBridge")
                 }
+            }
+        }.start()
+    }
+
+    private fun onApproveSelectedFile() {
+        val target = getSelectedOrFirstFile()
+        if (target == null) {
+            Messages.showInfoMessage("No pending file changes to approve.", "ComposeBridge")
+            return
+        }
+        val file = target.first
+        val fileName = java.io.File(file).name
+        val choice = Messages.showYesNoDialog(
+            "Approve changes for '$fileName'?\n\nThis will mark modifications in this file as accepted and remove it from the pending journal.",
+            "ComposeBridge — Approve File",
+            Messages.getQuestionIcon()
+        )
+        if (choice != Messages.YES) return
+
+        Thread {
+            val json = pythonRunner.approveFileChanges(file)
+            SwingUtilities.invokeLater {
+                try {
+                    val root = gson.fromJson(extractJson(json), JsonObject::class.java)
+                    if (root.get("success")?.asBoolean == true) {
+                        Messages.showInfoMessage("Changes approved for '$fileName'.", "ComposeBridge")
+                    } else {
+                        val err = root.get("error")?.asString ?: "Failed to approve changes"
+                        Messages.showErrorDialog(err, "ComposeBridge Error")
+                    }
+                } catch (_: Exception) {}
+                refreshChanges()
+            }
+        }.start()
+    }
+
+    private fun onRejectSelectedFile() {
+        val target = getSelectedOrFirstFile()
+        if (target == null) {
+            Messages.showInfoMessage("No pending file changes to reject.", "ComposeBridge")
+            return
+        }
+        val file = target.first
+        val fileName = java.io.File(file).name
+        val choice = Messages.showYesNoDialog(
+            "Revert changes for '$fileName'?\n\nThis will restore this file to its original content before patterns were applied.",
+            "ComposeBridge — Reject File",
+            Messages.getWarningIcon()
+        )
+        if (choice != Messages.YES) return
+
+        Thread {
+            val json = pythonRunner.rejectFileChanges(file)
+            SwingUtilities.invokeLater {
+                try {
+                    val root = gson.fromJson(extractJson(json), JsonObject::class.java)
+                    if (root.get("success")?.asBoolean == true) {
+                        Messages.showInfoMessage("Changes reverted for '$fileName'.", "ComposeBridge")
+                    } else {
+                        val err = root.get("error")?.asString ?: "Failed to revert changes"
+                        Messages.showErrorDialog(err, "ComposeBridge Error")
+                    }
+                } catch (_: Exception) {}
+                refreshChanges()
+                val projectRoot = project.basePath ?: return@invokeLater
+                refreshPatterns(projectRoot)
             }
         }.start()
     }
