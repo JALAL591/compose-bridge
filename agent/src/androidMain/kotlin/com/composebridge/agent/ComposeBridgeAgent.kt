@@ -14,7 +14,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import kotlinx.serialization.json.*
 
 @OptIn(InternalComposeApi::class)
@@ -25,8 +24,6 @@ object ComposeBridgeAgent {
 
     @Composable
     fun Root(content: @Composable () -> Unit) {
-        val themeVersion by BridgeThemeRegistry.version
-        val dimVersion by BridgeDimensionRegistry.version
         currentComposer.collectParameterInformation()
         registry.register(currentComposer.compositionData)
         val context = androidx.compose.ui.platform.LocalContext.current
@@ -42,9 +39,7 @@ object ComposeBridgeAgent {
             LocalInspectionTables provides registry.tables
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
-                key(themeVersion, dimVersion) {
-                    content()
-                }
+                content()
                 DesignModeButton(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
