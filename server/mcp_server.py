@@ -1,3 +1,4 @@
+import re
 # -*- coding: utf-8 -*-
 """
 ComposeBridge MCP Server — Diagnostic Version
@@ -18,6 +19,25 @@ from pathlib import Path
 from datetime import datetime
 import websockets
 from core.state_manager import StateManager
+
+# ============================================================
+# Security: Gradle Tasks Allowlist
+# ============================================================
+ALLOWED_GRADLE_TASKS = {"assembleDebug", "assembleRelease", "test", "lint", "clean"}
+
+def is_gradle_task_allowed(task: str) -> bool:
+    """Strictly validate task to prevent arbitrary execution or injection."""
+    if not task or not isinstance(task, str):
+        return False
+    # Reject shell metacharacters, spaces, options/flags
+    if not re.match(r"^:?[a-zA-Z0-9_\-]+(?::[a-zA-Z0-9_\-]+)*$", task.strip()):
+        return False
+    if task in ALLOWED_GRADLE_TASKS:
+        return True
+    parts = task.strip(":").split(":")
+    base_task = parts[-1] if parts else ""
+    return base_task in ALLOWED_GRADLE_TASKS
+
 
 # === DIAGNOSTIC LOGGING ===
 LOG_FILE = Path.home() / "composebridge-mcp.log"
@@ -693,7 +713,7 @@ def detect_conditional_variants(token_name: str = None) -> str:
 
 
 @app.tool()
-def replace_pattern(pattern_id: str) -> str:
+def replace_pattern(pattern_id: str, dry_run: bool = False) -> str:
     """
     Replace all occurrences of a detected pattern.
     Creates the suggested token + replaces all usages.
@@ -713,6 +733,36 @@ def replace_pattern(pattern_id: str) -> str:
         pattern = next((p for p in patterns if p.pattern_id == pattern_id), None)
         if not pattern:
             return json.dumps({"success": False, "error": f"Pattern '{pattern_id}' not found"})
+
+        if dry_run:
+            planned = []
+            for idx, occ in enumerate(pattern.occurrences):
+                if idx == 0:
+                    planned.append({
+                        "file": occ.file,
+                        "line": occ.line,
+                        "action": "create_and_replace",
+                        "token_name": pattern.suggested_token_name,
+                        "token_value": pattern.suggested_token_value,
+                        "new_usage": f"AppColors.{pattern.suggested_token_name}"
+                    })
+                else:
+                    planned.append({
+                        "file": occ.file,
+                        "line": occ.line,
+                        "action": "replace_usage",
+                        "old_value": occ.value_if_dark,
+                        "new_usage": f"AppColors.{pattern.suggested_token_name}"
+                    })
+            return json.dumps({
+                "success": True,
+                "dry_run": True,
+                "pattern_id": pattern_id,
+                "token_name": pattern.suggested_token_name,
+                "token_value": pattern.suggested_token_value,
+                "replacements_count": len(planned),
+                "planned_replacements": planned,
+            }, indent=2, ensure_ascii=False)
 
         with acquire_write_lock():
             from core.pattern_journal import PatternJournal
@@ -995,7 +1045,7 @@ def get_file_diff(file_path: str) -> str:
 
 @app.tool()
 def run_gradle_build(
-    task: str = "compileDebugKotlin",
+    task: str = "assembleDebug",
     timeout_seconds: int = 300,
 ) -> str:
     """
@@ -1005,12 +1055,18 @@ def run_gradle_build(
     before continuing with more changes.
     
     Args:
-        task: gradle task to run (whitelist enforced).
+        task: gradle task to run (whitelist enforced: assembleDebug, assembleRelease, test, lint, clean).
         timeout_seconds: max execution time (default 5 min).
     
     Returns:
         JSON with {success, exit_code, duration_ms, errors, warnings}.
     """
+    if not is_gradle_task_allowed(task):
+        return json.dumps({
+            "success": False,
+            "error": f"Task '{task}' is not allowed. Allowed tasks: {sorted(ALLOWED_GRADLE_TASKS)}"
+        }, indent=2, ensure_ascii=False)
+
     from core.gradle_runner import run_gradle_build as _run
     
     try:
@@ -1023,10 +1079,9 @@ def run_gradle_build(
 @app.tool()
 def list_allowed_gradle_tasks() -> str:
     """List gradle tasks that can be run via run_gradle_build."""
-    from core.gradle_runner import ALLOWED_TASKS
     return json.dumps({
         "success": True,
-        "tasks": sorted(ALLOWED_TASKS),
+        "tasks": sorted(ALLOWED_GRADLE_TASKS),
     }, indent=2, ensure_ascii=False)
 
 

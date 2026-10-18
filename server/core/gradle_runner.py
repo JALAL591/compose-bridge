@@ -16,23 +16,27 @@ from typing import Dict, Optional
 
 
 # ⚠️ قائمة المهام المسموحة فقط
+import re
+
 ALLOWED_TASKS = {
-    ":composeApp:compileDebugKotlinAndroid",
-    ":composeApp:compileDebugKotlin",
-    ":composeApp:compileKotlinDesktop",
-    ":composeApp:assembleDebug",
-    ":app:compileDebugKotlin",
-    ":app:compileDebugKotlinAndroid",
-    ":app:assembleDebug",
-    "compileDebugKotlin",
-    "compileDebugKotlinAndroid",
-    "compileKotlin",
-    "compileKotlinDesktop",
-    "build",
     "assembleDebug",
-    "clean",
+    "assembleRelease",
     "test",
+    "lint",
+    "clean",
 }
+
+def is_task_allowed(task: str) -> bool:
+    """Strict validation for safe Gradle task execution."""
+    if not task or not isinstance(task, str):
+        return False
+    if not re.match(r"^:?[a-zA-Z0-9_\-]+(?::[a-zA-Z0-9_\-]+)*$", task.strip()):
+        return False
+    if task in ALLOWED_TASKS:
+        return True
+    parts = task.strip(":").split(":")
+    base_task = parts[-1] if parts else ""
+    return base_task in ALLOWED_TASKS
 
 
 def _find_gradlew(project_root: Path) -> Optional[Path]:
@@ -72,7 +76,7 @@ def run_gradle_build(
             "output_tail": str,    # آخر 30 سطر
         }
     """
-    if task not in ALLOWED_TASKS:
+    if not is_task_allowed(task):
         return {
             "success": False,
             "task": task,
