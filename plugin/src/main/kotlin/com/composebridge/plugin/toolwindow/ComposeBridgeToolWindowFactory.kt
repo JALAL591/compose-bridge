@@ -3,6 +3,10 @@ package com.composebridge.plugin.toolwindow
 import com.composebridge.plugin.services.BridgeServerManager
 import com.composebridge.plugin.settings.ComposeBridgeSettings
 import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.Disposable
+import com.intellij.openapi.vfs.VirtualFileManager
+import com.intellij.openapi.vfs.newvfs.BulkFileListener
+import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 
 import com.composebridge.plugin.services.PythonRunner
 import com.composebridge.plugin.settings.ComposeBridgeConfigurable
@@ -27,7 +31,7 @@ import javax.swing.table.DefaultTableModel
 class ComposeBridgeToolWindowFactory : ToolWindowFactory, DumbAware {
 
     override fun createToolWindowContent(project: Project, toolWindow: ToolWindow) {
-        val panel = ComposeBridgePanel(project)
+        val panel = ComposeBridgePanel(project, toolWindow.disposable)
         val content = ContentFactory.getInstance().createContent(panel, "", false)
         toolWindow.contentManager.addContent(content)
         val statusTimer = javax.swing.Timer(2000) {
@@ -47,10 +51,14 @@ class ComposeBridgeToolWindowFactory : ToolWindowFactory, DumbAware {
 
 data class SharedToken(val name: String, val value: String, val usage: Int)
 
-class ComposeBridgePanel(private val project: Project) : JPanel(BorderLayout()) {
+class ComposeBridgePanel(private val project: Project, private val parentDisposable: Disposable = project) : JPanel(BorderLayout()) {
 
     private val pythonRunner = PythonRunner(project)
     private val gson = Gson()
+
+    private val changesDebounceTimer = javax.swing.Timer(600) {
+        refreshChanges()
+    }.apply { isRepeats = false }
 
     // Color Palette matching design
     private val bgMain = Color(0x2B, 0x2D, 0x30)
@@ -376,6 +384,66 @@ class ComposeBridgePanel(private val project: Project) : JPanel(BorderLayout()) 
             }
             tabbedPane.setTabComponentAt(changesTabIndex, tabTitlePanel)
         }
+
+        // Auto-refresh Changes tab whenever user selects it
+        tabbedPane.addChangeListener {
+            val cIdx = tabbedPane.indexOfTab("Changes")
+            if (cIdx != -1 && tabbedPane.selectedIndex == cIdx) {
+                refreshChanges()
+            }
+        }
+
+        // Virtual File Watcher: Monitor .kt modifications, backups (.bridge.bak) and journal files
+        val connection = project.messageBus.connect(parentDisposable)
+        connection.subscribe(VirtualFileManager.VFS_CHANGES, object : BulkFileListener {
+            override fun after(events: List<VFileEvent>) {
+                var shouldRefresh = false
+                for (event in events) {
+                    val path = (event.path ?: "").replace('\\', '/')
+                    val file = event.file
+                    val name = file?.name ?: java.io.File(path).name
+
+                    if (name.endsWith(".kt")) {
+                        // Check if a .bridge.bak exists next to it
+                        val bakFile = java.io.File(path + ".bridge.bak")
+                        val parentPath = file?.parent?.path ?: java.io.File(path).parent
+                        val altBak = if (parentPath != null) java.io.File(parentPath, "$name.bridge.bak") else null
+                        if (bakFile.exists() || (altBak != null && altBak.exists())) {
+                            shouldRefresh = true
+                            break
+                        }
+                        // Check if mentioned in journal files
+                        val bPath = project.basePath ?: ""
+                        val journalFile = java.io.File(bPath, ".composebridge-state/pattern_journal.jsonl")
+                        val pendingFile = java.io.File(bPath, ".composebridge-state/pending_edits.json")
+                        val rootPending = java.io.File(bPath, "pending_edits.json")
+                        if (journalFile.exists() && journalFile.readText().contains(name)) {
+                            shouldRefresh = true
+                            break
+                        }
+                        if (pendingFile.exists() && pendingFile.readText().contains(name)) {
+                            shouldRefresh = true
+                            break
+                        }
+                        if (rootPending.exists() && rootPending.readText().contains(name)) {
+                            shouldRefresh = true
+                            break
+                        }
+                    } else if (name.endsWith(".bridge.bak") ||
+                               name == "pattern_journal.jsonl" ||
+                               name == "pending_edits.json" ||
+                               name == ".composebridge-journal.json") {
+                        shouldRefresh = true
+                        break
+                    }
+                }
+
+                if (shouldRefresh) {
+                    changesDebounceTimer.restart()
+                }
+            }
+        })
+
 
         // Single or Double-click row in Changes -> open file directly in Editor at modified line
         changesTable.addMouseListener(object : java.awt.event.MouseAdapter() {
@@ -1188,6 +1256,12 @@ class ComposeBridgePanel(private val project: Project) : JPanel(BorderLayout()) 
         changesTableModel.rowCount = 0
         changesFilesList.clear()
         changesLinesList.clear()
+
+        try {
+            com.intellij.openapi.vfs.VirtualFileManager.getInstance().asyncRefresh()
+        } catch (e: Exception) {
+            // ignore
+        }
 
         Thread {
             val json = pythonRunner.listModifiedFiles()

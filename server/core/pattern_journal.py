@@ -1,3 +1,4 @@
+import shutil
 # -*- coding: utf-8 -*-
 """
 Pattern Journal — حفظ كل تعديلات replace_pattern للسماح بالتراجع الكامل وإدارة التغييرات (Changes Tab).
@@ -267,38 +268,128 @@ class PatternJournal:
                     continue
         return list(patterns.values())
 
+
+    def _clean_pending_edits(self, file_path: str):
+        target_name = Path(file_path).name
+        pending_candidates = [
+            self.project_root / ".composebridge-state" / "pending_edits.json",
+            self.project_root / "pending_edits.json"
+        ]
+        for pfile in pending_candidates:
+            if pfile.exists():
+                try:
+                    with open(pfile, "r", encoding="utf-8") as pf:
+                        p_entries = json.load(pf)
+                    if isinstance(p_entries, list):
+                        remaining = [
+                            pe for pe in p_entries
+                            if pe.get("file") != file_path and Path(pe.get("file", "")).name != target_name
+                        ]
+                        with open(pfile, "w", encoding="utf-8") as pf:
+                            json.dump(remaining, pf, indent=2, ensure_ascii=False)
+                except Exception:
+                    pass
+
     def list_modified_files(self) -> List[Dict]:
         """
         Aggregate changes by file.
         Returns list of {file, change_count, pattern_ids, first_line}.
         """
-        if not self.journal_file.exists():
-            return []
-        
         files: Dict[str, Dict] = {}
-        with open(self.journal_file, "r", encoding="utf-8") as f:
-            for line in f:
+        if self.journal_file.exists():
+            with open(self.journal_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        entry = json.loads(line.strip())
+                        if entry.get("type") == "token_added":
+                            continue
+                        file_path = entry.get("file")
+                        if not file_path:
+                            continue
+                        if file_path not in files:
+                            files[file_path] = {
+                                "file": file_path,
+                                "change_count": 0,
+                                "pattern_ids": set(),
+                                "first_line": entry.get("line", 0),
+                            }
+                        files[file_path]["change_count"] += 1
+                        pid = entry.get("pattern_id")
+                        if pid:
+                            files[file_path]["pattern_ids"].add(pid)
+                    except Exception:
+                        continue
+
+        # Also check pending_edits.json
+        pending_candidates = [
+            self.project_root / ".composebridge-state" / "pending_edits.json",
+            self.project_root / "pending_edits.json"
+        ]
+        for pfile in pending_candidates:
+            if pfile.exists():
                 try:
-                    entry = json.loads(line.strip())
-                    if entry.get("type") == "token_added":
-                        continue
-                    file_path = entry.get("file")
-                    if not file_path:
-                        continue
-                    if file_path not in files:
-                        files[file_path] = {
-                            "file": file_path,
-                            "change_count": 0,
-                            "pattern_ids": set(),
-                            "first_line": entry.get("line", 0),
-                        }
-                    files[file_path]["change_count"] += 1
-                    pid = entry.get("pattern_id")
-                    if pid:
-                        files[file_path]["pattern_ids"].add(pid)
+                    with open(pfile, "r", encoding="utf-8") as pf:
+                        p_entries = json.load(pf)
+                    if isinstance(p_entries, list):
+                        for pe in p_entries:
+                            p_path = pe.get("file")
+                            if not p_path:
+                                continue
+                            if p_path not in files:
+                                files[p_path] = {
+                                    "file": p_path,
+                                    "change_count": 0,
+                                    "pattern_ids": set(),
+                                    "first_line": pe.get("line", 1),
+                                }
+                            files[p_path]["change_count"] += 1
+                            files[p_path]["pattern_ids"].add("pending_cli_edit")
                 except Exception:
+                    pass
+
+        # Also scan disk for any *.bridge.bak files!
+        try:
+            for bak in self.project_root.rglob("*.bridge.bak"):
+                parts = bak.parts
+                if any(ign in parts for ign in ["build", ".gradle", ".git", ".composebridge-state"]):
                     continue
-        
+                orig_str = str(bak)[:-len(".bridge.bak")]
+                orig_path = Path(orig_str)
+                if orig_path.exists():
+                    try:
+                        rel = str(orig_path.relative_to(self.project_root)).replace("\\", "/")
+                    except Exception:
+                        rel = str(orig_path).replace("\\", "/")
+                    
+                    matched_key = None
+                    for k in files:
+                        if k == rel or Path(k).name == orig_path.name:
+                            matched_key = k
+                            break
+                    
+                    if not matched_key:
+                        first_line = 1
+                        try:
+                            orig_lines = bak.read_text(encoding="utf-8", errors="replace").splitlines()
+                            curr_lines = orig_path.read_text(encoding="utf-8", errors="replace").splitlines()
+                            for idx, (l1, l2) in enumerate(zip(orig_lines, curr_lines)):
+                                if l1 != l2:
+                                    first_line = idx + 1
+                                    break
+                        except Exception:
+                            first_line = 1
+                        
+                        files[rel] = {
+                            "file": rel,
+                            "change_count": 1,
+                            "pattern_ids": {"external_edit"},
+                            "first_line": first_line,
+                        }
+                    else:
+                        files[matched_key]["pattern_ids"].add("external_edit")
+        except Exception:
+            pass
+
         result = []
         for f in files.values():
             f["pattern_ids"] = list(f["pattern_ids"])
@@ -327,9 +418,6 @@ class PatternJournal:
     def reject_file_changes(self, file_path: str) -> Dict:
         """Revert all changes for a specific file."""
         changes = self.get_file_changes(file_path)
-        if not changes:
-            return {"success": False, "error": f"No changes found for {file_path}"}
-        
         full_path = self.project_root / file_path
         if not full_path.exists():
             matches = [m for m in self.project_root.rglob(Path(file_path).name) if "build" not in str(m) and ".composebridge-state" not in str(m)]
@@ -338,8 +426,24 @@ class PatternJournal:
             else:
                 return {"success": False, "error": f"File '{file_path}' not found"}
 
+        backup_path = Path(str(full_path) + ".bridge.bak")
+        if not backup_path.exists():
+            alt_matches = [m for m in self.project_root.rglob(full_path.name + ".bridge.bak") if "build" not in str(m) and ".composebridge-state" not in str(m)]
+            if alt_matches:
+                backup_path = alt_matches[0]
+
         reverted = 0
         errors = []
+
+        if backup_path.exists():
+            try:
+                shutil.copy2(str(backup_path), str(full_path))
+                backup_path.unlink()
+                reverted += 1
+            except Exception as e:
+                errors.append({"file": file_path, "error": f"Failed to restore backup: {e}"})
+        elif not changes:
+            return {"success": False, "error": f"No changes or backup found for {file_path}"}
         for change in reversed(changes):
             try:
                 content = full_path.read_text(encoding="utf-8")
@@ -413,19 +517,21 @@ class PatternJournal:
         # Remove reverted entries from journal
         target_name = Path(file_path).name
         remaining = []
-        with open(self.journal_file, "r", encoding="utf-8") as f:
-            for line in f:
-                try:
-                    entry = json.loads(line.strip())
-                    efile = entry.get("file", "")
-                    if efile != file_path and Path(efile).name != target_name:
-                        remaining.append(line)
-                except Exception:
-                    continue
+        if self.journal_file.exists():
+            with open(self.journal_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        entry = json.loads(line.strip())
+                        efile = entry.get("file", "")
+                        if efile != file_path and Path(efile).name != target_name:
+                            remaining.append(line)
+                    except Exception:
+                        continue
 
-        with open(self.journal_file, "w", encoding="utf-8") as f:
-            f.writelines(remaining)
+            with open(self.journal_file, "w", encoding="utf-8") as f:
+                f.writelines(remaining)
 
+        self._clean_pending_edits(file_path)
         return {
             "success": len(errors) == 0,
             "file": file_path,
@@ -439,25 +545,65 @@ class PatternJournal:
         changes = self.get_file_changes(file_path)
         count = len(changes)
         
+        full_path = self.project_root / file_path
+        if not full_path.exists():
+            matches = [m for m in self.project_root.rglob(Path(file_path).name) if "build" not in str(m) and ".composebridge-state" not in str(m)]
+            if matches:
+                full_path = matches[0]
+
+        backup_path = Path(str(full_path) + ".bridge.bak")
+        if not backup_path.exists() and full_path.exists():
+            alt_matches = [m for m in self.project_root.rglob(full_path.name + ".bridge.bak") if "build" not in str(m) and ".composebridge-state" not in str(m)]
+            if alt_matches:
+                backup_path = alt_matches[0]
+
+        if backup_path.exists():
+            try:
+                backup_path.unlink()
+                if count == 0:
+                    count = 1
+            except Exception:
+                pass
+
         target_name = Path(file_path).name
         remaining = []
-        with open(self.journal_file, "r", encoding="utf-8") as f:
-            for line in f:
-                try:
-                    entry = json.loads(line.strip())
-                    efile = entry.get("file", "")
-                    if efile != file_path and Path(efile).name != target_name:
-                        remaining.append(line)
-                except Exception:
-                    continue
+        if self.journal_file.exists():
+            with open(self.journal_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        entry = json.loads(line.strip())
+                        efile = entry.get("file", "")
+                        if efile != file_path and Path(efile).name != target_name:
+                            remaining.append(line)
+                    except Exception:
+                        continue
+            with open(self.journal_file, "w", encoding="utf-8") as f:
+                f.writelines(remaining)
         
-        with open(self.journal_file, "w", encoding="utf-8") as f:
-            f.writelines(remaining)
-        
+        self._clean_pending_edits(file_path)
         return {"success": True, "file": file_path, "approved_count": count}
 
     def approve_all_files(self) -> Dict:
         """Approve all pending changes only if files were not modified externally."""
+        # Delete any *.bridge.bak files on disk
+        try:
+            for bak in list(self.project_root.rglob("*.bridge.bak")):
+                if any(ign in bak.parts for ign in ["build", ".gradle", ".git", ".composebridge-state"]):
+                    continue
+                try:
+                    bak.unlink()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # Clean pending_edits.json
+        for pfile in [self.project_root / ".composebridge-state" / "pending_edits.json", self.project_root / "pending_edits.json"]:
+            if pfile.exists():
+                try:
+                    pfile.unlink()
+                except Exception:
+                    pass
         files = self.list_modified_files()
         errors = []
         
@@ -531,11 +677,36 @@ class PatternJournal:
         Revert all pending changes in REVERSE order (latest edit first).
         """
         try:
+            # 1. Restore any *.bridge.bak files on disk
+            disk_reverted = 0
+            try:
+                for bak in list(self.project_root.rglob("*.bridge.bak")):
+                    if any(ign in bak.parts for ign in ["build", ".gradle", ".git", ".composebridge-state"]):
+                        continue
+                    orig_str = str(bak)[:-len(".bridge.bak")]
+                    orig_path = Path(orig_str)
+                    try:
+                        shutil.copy2(str(bak), str(orig_path))
+                        bak.unlink()
+                        disk_reverted += 1
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+            # Clean pending_edits.json
+            for pfile in [self.project_root / ".composebridge-state" / "pending_edits.json", self.project_root / "pending_edits.json"]:
+                if pfile.exists():
+                    try:
+                        pfile.unlink()
+                    except Exception:
+                        pass
+
             if not self.journal_file.exists():
                 return {
                     "success": True,
-                    "reverted_count": 0,
-                    "message": "No journal file — nothing to revert",
+                    "reverted_count": disk_reverted,
+                    "message": f"Reverted {disk_reverted} file(s) from disk backup",
                 }
 
             entries = self._read_entries()
@@ -693,21 +864,30 @@ class PatternJournal:
                 return {"success": False, "error": f"File '{file_path}' not found"}
 
         current_content = full_path.read_text(encoding="utf-8")
-        
-        # Reconstruct original content
-        original_content = current_content
-        for change in reversed(changes):
-            target_new = change.get("new", "")
-            target_old = change.get("old", "")
-            if target_old == "":
-                for line_cand in [target_new.strip() + "\r\n", target_new.strip() + "\n"]:
-                    if line_cand in original_content:
-                        original_content = original_content.replace(line_cand, "", 1)
-                        break
-            elif target_new and target_new in original_content:
-                original_content = original_content.replace(target_new, target_old, 1)
-            elif target_new and target_new.strip() in original_content:
-                original_content = original_content.replace(target_new.strip(), target_old.strip(), 1)
+
+        backup_path = Path(str(full_path) + ".bridge.bak")
+        if not backup_path.exists():
+            alt_matches = [m for m in self.project_root.rglob(full_path.name + ".bridge.bak") if "build" not in str(m) and ".composebridge-state" not in str(m)]
+            if alt_matches:
+                backup_path = alt_matches[0]
+
+        if backup_path.exists():
+            original_content = backup_path.read_text(encoding="utf-8", errors="replace")
+        else:
+            # Reconstruct original content
+            original_content = current_content
+            for change in reversed(changes):
+                target_new = change.get("new", "")
+                target_old = change.get("old", "")
+                if target_old == "":
+                    for line_cand in [target_new.strip() + "\r\n", target_new.strip() + "\n"]:
+                        if line_cand in original_content:
+                            original_content = original_content.replace(line_cand, "", 1)
+                            break
+                elif target_new and target_new in original_content:
+                    original_content = original_content.replace(target_new, target_old, 1)
+                elif target_new and target_new.strip() in original_content:
+                    original_content = original_content.replace(target_new.strip(), target_old.strip(), 1)
 
         import difflib
         diff_lines = list(difflib.unified_diff(

@@ -272,6 +272,13 @@ def apply_state_update(property_name: str, value: str) -> tuple:
     except Exception as e:
         return (False, f"Write failed: {e}", None)
 
+    try:
+        _journal_save(file_path, source.decode("utf-8", errors="replace"), new_source.decode("utf-8", errors="replace"))
+    except Exception:
+        pass
+
+    return (False, f"Write failed: {e}", None)
+
     return (
         True,
         f"Updated {property_name}: '{old_value}' → '{new_value_text}'",
@@ -668,6 +675,11 @@ def edit_dimension_in_source(
     except Exception as e:
         return (False, f"Write failed: {e}", None)
 
+    try:
+        _journal_save(full_path, content, new_text)
+    except Exception:
+        pass
+
     return (
         True,
         f"Updated {source_file}:{line_number}: {old_value} → {new_value}",
@@ -790,17 +802,83 @@ def _journal_save(file_path, original_content, new_content):
         "timestamp": time.time(),
     }
 
-    # احفظ في الذاكرة
+    # In-memory
     SPLICE_JOURNAL.append(entry)
     if len(SPLICE_JOURNAL) > MAX_JOURNAL:
         SPLICE_JOURNAL.pop(0)
 
-    # احفظ على القرص
+    # Disk (.composebridge-journal.json)
     try:
         with open(JOURNAL_FILE, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry) + "\n")
     except Exception as e:
         sys.stderr.write(f"[journal] failed to persist: {e}\n")
+
+    # Line number & difference
+    old_lines = original_content.splitlines()
+    new_lines = new_content.splitlines()
+    changed_line = 1
+    old_line_text = ""
+    new_line_text = ""
+    for idx, (l1, l2) in enumerate(zip(old_lines, new_lines)):
+        if l1 != l2:
+            changed_line = idx + 1
+            old_line_text = l1
+            new_line_text = l2
+            break
+
+    rel_path = str(file_path)
+    try:
+        rel_path = str(Path(file_path).relative_to(PROJECT_ROOT)).replace("\\", "/")
+    except Exception:
+        rel_path = str(file_path).replace("\\", "/")
+
+    # 1. Record in PatternJournal for IDE
+    try:
+        from core.pattern_journal import PatternJournal
+        pj = PatternJournal(PROJECT_ROOT)
+        pj.record_change(
+            file=rel_path,
+            line=changed_line,
+            old_line=old_line_text,
+            new_line=new_line_text,
+            pattern_id="cli_edit",
+        )
+    except Exception as e:
+        sys.stderr.write(f"[journal] failed to record in PatternJournal: {e}\n")
+
+    # 2. Record in pending_edits.json
+    try:
+        pending_paths = [
+            PROJECT_ROOT / ".composebridge-state" / "pending_edits.json",
+            PROJECT_ROOT / "pending_edits.json",
+        ]
+        for ppath in pending_paths:
+            ppath.parent.mkdir(parents=True, exist_ok=True)
+            existing = []
+            if ppath.exists():
+                try:
+                    with open(ppath, "r", encoding="utf-8") as pf:
+                        existing = json.load(pf)
+                except Exception:
+                    existing = []
+            if not isinstance(existing, list):
+                existing = []
+
+            filtered = [item for item in existing if item.get("file") != rel_path and Path(item.get("file", "")).name != Path(file_path).name]
+            filtered.append({
+                "file": rel_path,
+                "backup": str(file_path) + ".bridge.bak",
+                "timestamp": time.time(),
+                "line": changed_line,
+                "old": old_line_text,
+                "new": new_line_text,
+            })
+            with open(ppath, "w", encoding="utf-8") as pf:
+                json.dump(filtered, pf, indent=2, ensure_ascii=False)
+    except Exception as e:
+        sys.stderr.write(f"[journal] failed to save pending_edits: {e}\n")
+
 
 
 def _validate_after_splice(file_path):
@@ -859,3 +937,45 @@ def update_color(token_name: str, value: str) -> tuple:
     """
     res = update_theme_color(token_name, value)
     return res[0], res[1]
+
+
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser(description="ComposeBridge State Editor CLI")
+    parser.add_argument("action", nargs="?", default="update_theme_color",
+                        choices=["update_theme_color", "update_color", "update_dimension", "rollback", "apply_state"],
+                        help="Action to perform")
+    parser.add_argument("--key", type=str, help="Color or Token key (e.g. GoldPrimary or Primary)")
+    parser.add_argument("--value", type=str, help="New value (e.g. #FFD700 or 150)")
+    parser.add_argument("--file", type=str, help="Source file relative path")
+    parser.add_argument("--line", type=int, default=1, help="Line number")
+    parser.add_argument("--old", type=str, help="Old value")
+    parser.add_argument("--new", type=str, help="New value")
+
+    args = parser.parse_args()
+
+    if args.action in ("update_theme_color", "update_color"):
+        if not args.key or not args.value:
+            print("Error: --key and --value required for " + args.action)
+            sys.exit(1)
+        res = update_theme_color(args.key, args.value)
+        print(json.dumps({"success": res[0], "message": res[1], "info": res[2]}, indent=2, ensure_ascii=False))
+        sys.exit(0 if res[0] else 1)
+    elif args.action == "rollback":
+        res = rollback_last()
+        print(json.dumps({"success": res, "message": "Rollback completed" if res else "Rollback failed"}))
+        sys.exit(0 if res else 1)
+    elif args.action == "apply_state":
+        if not args.key or not args.value:
+            print("Error: --key and --value required for apply_state")
+            sys.exit(1)
+        res = apply_state_update(args.key, args.value)
+        print(json.dumps({"success": res[0], "message": res[1], "info": res[2]}, indent=2, ensure_ascii=False))
+        sys.exit(0 if res[0] else 1)
+    elif args.action == "update_dimension":
+        if not args.file or not args.old or not args.new:
+            print("Error: --file, --old, and --new required for update_dimension")
+            sys.exit(1)
+        res = edit_dimension_in_source(args.file, args.line, 0, 0, args.old, args.new)
+        print(json.dumps({"success": res[0], "message": res[1], "info": res[2]}, indent=2, ensure_ascii=False))
+        sys.exit(0 if res[0] else 1)
