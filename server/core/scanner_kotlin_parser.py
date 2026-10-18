@@ -18,7 +18,7 @@ from typing import List, Tuple, Set, Dict
 # ═══════════════════════════════════════════════════════════
 
 DIMENSION_REGISTRY = re.compile(
-    r'BridgeDimensionRegistry\.get\(\s*"(\w+)"\s*,\s*([\d.]+)\.dp',
+    r'BridgeDimensionRegistry\.get\(\s*["\'](\w+)["\']\s*,\s*([\d.]+)\.(dp|sp|f)\b',
     re.MULTILINE
 )
 
@@ -28,7 +28,7 @@ COLOR_REGISTRY = re.compile(
 )
 
 STANDARD_DIMENSION = re.compile(
-    r'(?<!private\s)\bval\s+(\w+)\s*(?::\s*Dp)?\s*(?:get\(\)\s*=\s*|=)\s*(\d+(?:\.\d+)?)\.dp',
+    r'(?<!private\s)\bval\s+(\w+)\s*(?::\s*(?:Dp|TextUnit|Float))?\s*(?:get\(\)\s*=\s*|=)\s*(\d+(?:\.\d+)?)\s*\.(dp|sp|f)\b(?!\s*\.\s*(?:toPx|value))',
     re.MULTILINE
 )
 
@@ -104,47 +104,108 @@ def suggest_token_name(category: str, value: str, kind: str) -> str:
     return f"custom_{category}"
 
 
+
+def get_file_line_scopes(content: str) -> List[dict]:
+    """Precompute scope hierarchy per line to accurately distinguish local vs member declarations."""
+    lines = content.splitlines()
+    obj_re = re.compile(r'\bobject\s+(\w+)')
+    cls_re = re.compile(r'\b(?:class|interface)\s+(\w+)')
+    fun_re = re.compile(r'\bfun\s+(?:<[^>]+>\s+)?(\w+)')
+    
+    stack = []
+    pending = None
+    scopes = []
+    
+    for raw_line in lines:
+        line = re.sub(r'//.*', '', raw_line)
+        line = re.sub(r'"[^"]*"', '', line)
+        
+        obj_m = obj_re.search(line)
+        cls_m = cls_re.search(line)
+        fun_m = fun_re.search(line)
+        
+        if fun_m:
+            pending = ('fun', fun_m.group(1))
+        elif obj_m:
+            pending = ('object', obj_m.group(1))
+        elif cls_m:
+            pending = ('class', cls_m.group(1))
+            
+        for ch in line:
+            if ch == '{':
+                if pending:
+                    stack.append(pending)
+                    pending = None
+                else:
+                    stack.append(('block', ''))
+            elif ch == '}':
+                if stack:
+                    stack.pop()
+                    
+        is_in_fun = any(s[0] == 'fun' for s in stack)
+        enc_obj = next((s[1] for s in reversed(stack) if s[0] == 'object'), None)
+        enc_cls = next((s[1] for s in reversed(stack) if s[0] == 'class'), None)
+        scopes.append({
+            "is_inside_function": is_in_fun,
+            "enclosing_object": enc_obj,
+            "enclosing_class": enc_cls,
+        })
+    return scopes
+
+
 def scan_file_dimensions(content: str) -> List[dict]:
     """Scan for registered dimensions."""
+    scopes = get_file_line_scopes(content)
     results = []
     for match in DIMENSION_REGISTRY.finditer(content):
         name = match.group(1)
         value = match.group(2)
+        suffix = match.group(3) if match.lastindex >= 3 else "dp"
         line_num = content[:match.start()].count("\n") + 1
         line_start = content.rfind("\n", 0, match.start()) + 1
         column = match.start() - line_start + 1
+        scope_obj = scopes[line_num - 1]["enclosing_object"] if line_num <= len(scopes) else None
         
         results.append({
             "name": name,
             "kind": "dimension",
             "value": value,
-            "raw_value": f"{value}.dp",
+            "raw_value": f"{value}.{suffix}",
             "line": line_num,
             "column": column,
             "registry": "BridgeDimensionRegistry",
+            "scope_object": scope_obj,
         })
     if not results:
         for match in STANDARD_DIMENSION.finditer(content):
+            line_num = content[:match.start()].count("\n") + 1
+            # Ignore local variables declared inside functions/composables/lambdas
+            if line_num <= len(scopes) and scopes[line_num - 1]["is_inside_function"]:
+                continue
+            
             name = match.group(1)
             value = match.group(2)
-            line_num = content[:match.start()].count("\n") + 1
+            suffix = match.group(3) if match.lastindex >= 3 else "dp"
             line_start = content.rfind("\n", 0, match.start()) + 1
             column = match.start() - line_start + 1
+            scope_obj = scopes[line_num - 1]["enclosing_object"] if line_num <= len(scopes) else None
             
             results.append({
                 "name": name,
                 "kind": "dimension",
                 "value": value,
-                "raw_value": f"{value}.dp",
+                "raw_value": f"{value}.{suffix}",
                 "line": line_num,
                 "column": column,
                 "registry": "StandardTheme",
+                "scope_object": scope_obj,
             })
     return results
 
 
 def scan_file_colors(content: str) -> List[dict]:
     """Scan for registered colors."""
+    scopes = get_file_line_scopes(content)
     results = []
     for match in COLOR_REGISTRY.finditer(content):
         name = match.group(1)
@@ -152,6 +213,7 @@ def scan_file_colors(content: str) -> List[dict]:
         line_num = content[:match.start()].count("\n") + 1
         line_start = content.rfind("\n", 0, match.start()) + 1
         column = match.start() - line_start + 1
+        scope_obj = scopes[line_num - 1]["enclosing_object"] if line_num <= len(scopes) else None
         
         raw_val = value if (value.startswith("Color(") or value.startswith("Color.")) else f"Color({value})"
         results.append({
@@ -162,14 +224,20 @@ def scan_file_colors(content: str) -> List[dict]:
             "line": line_num,
             "column": column,
             "registry": "BridgeThemeRegistry",
+            "scope_object": scope_obj,
         })
     if not results:
         for match in STANDARD_COLOR.finditer(content):
+            line_num = content[:match.start()].count("\n") + 1
+            # Ignore local variables inside functions/composables/lambdas
+            if line_num <= len(scopes) and scopes[line_num - 1]["is_inside_function"]:
+                continue
+                
             name = match.group(1)
             value = match.group(2)
-            line_num = content[:match.start()].count("\n") + 1
             line_start = content.rfind("\n", 0, match.start()) + 1
             column = match.start() - line_start + 1
+            scope_obj = scopes[line_num - 1]["enclosing_object"] if line_num <= len(scopes) else None
             
             raw_val = value if (value.startswith("Color(") or value.startswith("Color.")) else f"Color({value})"
             results.append({
@@ -180,6 +248,7 @@ def scan_file_colors(content: str) -> List[dict]:
                 "line": line_num,
                 "column": column,
                 "registry": "StandardTheme",
+                "scope_object": scope_obj,
             })
     return results
 
@@ -423,37 +492,46 @@ def find_enclosing_composable(content: str, line_number: int) -> Tuple[str, int]
     return (composables[0][0], composables[0][1])
 
 
-def scan_file_usages(content: str, token_names: Set[str]) -> List[dict]:
+def scan_file_usages(
+    content: str,
+    token_names: Set[str],
+    token_scopes: Optional[Dict[str, Optional[str]]] = None,
+) -> List[dict]:
     """
-    Scan file for all usages of the given tokens.
+    Scan file for qualified usages of the given tokens.
     
-    Returns list of:
-    {
-        "token_name": "welcomeCardHeight",
-        "line": 45,
-        "column": 30,
-        "line_content": "...",
-        "enclosing_composable": "HeroCard",
-        "enclosing_line": 42,
-        "hierarchy_path": ["HeroCard", "Box"],
-        "depth": 2,
-    }
+    Prevents false positives by strictly requiring qualified references
+    (e.g. AppColors.token, DesignSystem.token) or direct registry access.
+    Does NOT search for bare variable names project-wide.
     """
     usages = []
     lines = content.splitlines()
     
-    # Fast candidate check: skip any token that isn't even in the file content
     candidate_tokens = [t for t in token_names if t in content]
     if not candidate_tokens:
         return []
 
-    # Pattern: BridgeDimensionRegistry.get("name", AppDimens.name, AppColors.name, or direct reference
+    token_scopes = token_scopes or {}
     patterns = []
     for token in candidate_tokens:
+        # 1. Registry access
         patterns.append((token, re.compile(rf'BridgeDimensionRegistry\.get\(\s*"{re.escape(token)}"')))
-        patterns.append((token, re.compile(rf'BridgeThemeRegistry\.getColor\(\s*"{re.escape(token)}"')))
-        patterns.append((token, re.compile(rf'\bAppDimens\.{re.escape(token)}\b')))
-        patterns.append((token, re.compile(rf'\b{re.escape(token)}\b')))
+        patterns.append((token, re.compile(rf'BridgeThemeRegistry\.getColor\(\s*["\']{re.escape(token)}["\']')))
+        
+        # 2. Scope-qualified references: e.g. AppColors.token or DesignSystem.token
+        scope_obj = token_scopes.get(token)
+        if scope_obj:
+            patterns.append((token, re.compile(rf'\b{re.escape(scope_obj)}\.{re.escape(token)}\b')))
+        
+        # Common design system prefixes
+        patterns.append((token, re.compile(rf'\b(?:AppColors|AppDimens|AppDesign|DesignSystem|Theme|Tokens|AppTheme|AppTokens|Dimensions|Spacing|AppSpacing)\.{re.escape(token)}\b')))
+        
+        # 3. If file has a direct static import of the token, allow unqualified reference
+        # (NOT matching named parameter assignments like "strokeWidth = 2.dp")
+        has_direct_import = bool(re.search(rf'import\s+[\w.]+\.{re.escape(token)}\b', content))
+        has_wildcard_import = bool(scope_obj and re.search(rf'import\s+[\w.]+\.{re.escape(scope_obj)}\.\*', content))
+        if has_direct_import or has_wildcard_import:
+            patterns.append((token, re.compile(rf'(?<!\.)\b{re.escape(token)}\b(?!\s*=)')))
     
     seen = set()
     for token_name, pattern in patterns:
@@ -468,16 +546,14 @@ def scan_file_usages(content: str, token_names: Set[str]) -> List[dict]:
             if re.search(rf'\bval\s+{re.escape(token_name)}\b', line_text):
                 continue
 
-            # تخطي إذا كان في تعليق
+            # Ignore comments
             line_before_match = content[line_start:match.start()]
-            if '//' in line_before_match:
-                continue
-            if '/*' in line_before_match:
+            if '//' in line_before_match or '/*' in line_before_match:
                 continue
             if line_text.startswith("//") or line_text.startswith("*") or line_text.startswith("/*"):
                 continue
 
-            # تخطي إذا كان في string
+            # Ignore strings
             if not ("BridgeDimensionRegistry" in match.group() or "BridgeThemeRegistry" in match.group()):
                 raw_line = lines[line_num - 1] if line_num <= len(lines) else ""
                 if '"' in raw_line:
@@ -495,7 +571,6 @@ def scan_file_usages(content: str, token_names: Set[str]) -> List[dict]:
                 continue
             seen.add(key)
             
-            # ابحث عن الـ composable الحاوي والمسار الهرمي
             comp_name, comp_line = find_enclosing_composable(content, line_num)
             hierarchy_path = get_hierarchy_path(content, line_num)
             

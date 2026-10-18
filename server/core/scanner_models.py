@@ -20,7 +20,8 @@ class Token:
     line: int              # 16
     column: int            # 40
     usage_count: int = 0   # كم مرة استُخدم
-    registry: str = ""     # "BridgeDimensionRegistry" | "BridgeThemeRegistry"
+    registry: str = ""
+    scope_object: Optional[str] = None     # "BridgeDimensionRegistry" | "BridgeThemeRegistry"
 
 
 @dataclass

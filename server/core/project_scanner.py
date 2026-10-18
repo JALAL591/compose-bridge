@@ -190,6 +190,7 @@ class ProjectScanner:
                         line=d["line"],
                         column=d["column"],
                         registry=d["registry"],
+                        scope_object=d.get("scope_object"),
                     ))
                 for c in res["colors"]:
                     registered_tokens.append(Token(
@@ -202,6 +203,7 @@ class ProjectScanner:
                         line=c["line"],
                         column=c["column"],
                         registry=c["registry"],
+                        scope_object=c.get("scope_object"),
                     ))
                 for h in res["hardcoded"]:
                     hardcoded_values.append(HardcodedValue(
@@ -367,10 +369,11 @@ class ProjectScanner:
         from .scanner_kotlin_parser import scan_file_usages
         
         token_names = {t.name for t in registered_tokens}
+        token_scopes = {t.name: t.scope_object for t in registered_tokens}
         
         all_usages = []
         for kt_file, content in file_contents.items():
-            usages = scan_file_usages(content, token_names)
+            usages = scan_file_usages(content, token_names, token_scopes)
             for u in usages:
                 u["file"] = kt_file.name
                 u["enclosing_file"] = kt_file.name
