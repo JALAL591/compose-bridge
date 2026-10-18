@@ -84,6 +84,11 @@ class ComposeBridgePanel(private val project: Project) : JPanel(BorderLayout()) 
         arrayOf("Name", "Value", "Location", "Type"), 0
     )
     private val scanTable = JBTable(scanTableModel)
+    private val scanSummaryLabel = JLabel("Press 'Scan Project' to analyze design tokens").apply {
+        foreground = statusGreen
+        font = Font("Segoe UI", Font.BOLD, 13)
+        border = BorderFactory.createEmptyBorder(10, 16, 8, 16)
+    }
     private val siblingsPanel = JPanel(FlowLayout(FlowLayout.LEFT))
     private val siblingsTitleLabel = JLabel("🔗 Related tokens: ")
 
@@ -198,6 +203,7 @@ class ComposeBridgePanel(private val project: Project) : JPanel(BorderLayout()) 
 
         // 3. Scan Tab
         val scanPanel = JPanel(BorderLayout()).apply { background = bgMain }
+        scanPanel.add(scanSummaryLabel, BorderLayout.NORTH)
         scanPanel.add(JBScrollPane(scanTable).apply { border = BorderFactory.createEmptyBorder() }, BorderLayout.CENTER)
         siblingsPanel.apply {
             background = bgDark
@@ -719,6 +725,8 @@ class ComposeBridgePanel(private val project: Project) : JPanel(BorderLayout()) 
             return
         }
         val projectRoot = project.basePath ?: return
+        scanSummaryLabel.text = "Scanning project..."
+        scanSummaryLabel.foreground = Color(0xFB, 0xBF, 0x24)
         scanTableModel.rowCount = 0
         scanTableModel.addRow(arrayOf("Scanning...", "", "", ""))
 
@@ -834,6 +842,9 @@ class ComposeBridgePanel(private val project: Project) : JPanel(BorderLayout()) 
             val registered = root.getAsJsonArray("registered_tokens")
             val hardcoded = root.getAsJsonArray("hardcoded_values")
 
+            val regCount = registered?.size() ?: 0
+            val hardCount = hardcoded?.size() ?: 0
+
             if (registered != null) {
                 for (elem in registered) {
                     val obj = elem.asJsonObject
@@ -857,7 +868,12 @@ class ComposeBridgePanel(private val project: Project) : JPanel(BorderLayout()) 
                     ))
                 }
             }
+
+            scanSummaryLabel.text = "Found $regCount tokens, $hardCount hardcoded values"
+            scanSummaryLabel.foreground = statusGreen
         } catch (e: Exception) {
+            scanSummaryLabel.text = "Scan error: ${e.message}"
+            scanSummaryLabel.foreground = Color(0xF8, 0x71, 0x71)
             scanTableModel.addRow(arrayOf("Error", e.message ?: "", "", ""))
         }
     }
