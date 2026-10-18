@@ -88,20 +88,48 @@ composebridge/
 
 ## 🛠️ Quick Start (Android / KMP)
 
-### 1. Start the local server
-```bash
-cd server
-pip install -r requirements.txt
-python server.py
-```
+You can launch and connect ComposeBridge in two ways depending on your workflow:
 
-### 2. Add the Agent to your project
+### 🔹 Option 1: Using the Android Studio Plugin (Recommended)
+
+No manual terminal commands are needed. The IDE plugin manages the background server and ADB reverse forwarding automatically.
+
+1. **Open the ToolWindow**: In Android Studio, open the **ComposeBridge** tool window on the right sidebar.
+2. **Start the Server**: Click **▶ Start Bridge**.
+   - The plugin launches `server.py` in the background and executes `adb reverse tcp:8711 tcp:8711` automatically.
+   - The status updates to `🟢 Bridge Running`.
+   - *(Optional)* In **Settings → ComposeBridge**, check **Auto-start Bridge Server** to launch automatically when you open your project.
+3. **Add the Agent** to your app's dependencies and initialize (see steps below).
+
+---
+
+### 🔹 Option 2: Standalone Server / AI Agents (MCP)
+
+Ideal for AI coding assistants (Claude Desktop, Cursor, Antigravity IDE) or terminal workflows:
+
+1. **Start the local server**:
+   ```bash
+   cd server
+   pip install -r requirements.txt
+   python server.py
+   ```
+2. **Setup ADB reverse port forwarding** (for Android phone connection):
+   ```bash
+   adb reverse tcp:8711 tcp:8711
+   ```
+*(Note: If you are solely using AI Agents via MCP tools, no phone or ADB reverse is needed — see the [MCP Server](#-mcp-server-ai-agents) section below).*
+
+---
+
+### 📲 App Integration Steps
+
+#### 1. Add the Agent to your project
 ```kotlin
-// build.gradle.kts
+// build.gradle.kts (Android or commonMain)
 debugImplementation("com.composebridge:agent:1.0.0")
 ```
 
-### 3. Initialize in MainActivity
+#### 2. Initialize in MainActivity
 ```kotlin
 override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -114,16 +142,13 @@ override fun onCreate(savedInstanceState: Bundle?) {
 }
 ```
 
-### 4. Connect & Tune
-```bash
-adb reverse tcp:8711 tcp:8711
-```
-1. Deploy the app to your Android device.
+#### 3. Connect & Tune
+1. Deploy and run the app on your Android device (or emulator).
 2. Tap the **🔧 FAB** → Design Mode ON.
 3. Tap any Composable → Focus Mode opens.
-4. Tweak colors/dimensions → Hit **Sync**.
+4. Tweak colors/dimensions live → Hit **Sync**.
 
-> **Note on Live Preview:** Changing a hardcoded value or applying a new token requires **one rebuild** to update the compiled bytecode. After this, all future tweaks via the Registry are instant.
+> **Note on Live Preview:** Changing a hardcoded value or creating a new token requires **one rebuild** to update the compiled bytecode. After this, all future tweaks via the Registry are instant.
 
 ---
 

@@ -88,20 +88,48 @@ composebridge/
 
 ## 🛠️ التشغيل السريع (Android / KMP)
 
-### 1. شغّل السيرفر المحلي
-```bash
-cd server
-pip install -r requirements.txt
-python server.py
-```
+يمكنك تشغيل ComposeBridge والاتصال به بطريقتين حسب بيئة عملك:
 
-### 2. أضف الـ Agent إلى مشروعك
+### 🔹 الخيار الأول: استخدام إضافة Android Studio Plugin (موصى به للمطورين)
+
+لا حاجة لفتح الـ Terminal أو تشغيل أوامر يدوياً؛ تتكفل إضافة بيئة التطوير بإدارة الخادم وتوجيه المنافذ تلقائياً بنقرة زر واحدة.
+
+1. **افتح نافذة الأدوات (ToolWindow)**: في Android Studio، افتح نافذة **ComposeBridge** من الشريط الجانبي الأيمن.
+2. **شغّل السيرفر**: اضغط على زر **▶ Start Bridge**.
+   - تقوم الإضافة بتشغيل `server.py` في الخلفية وتطبيق أمر `adb reverse tcp:8711 tcp:8711` تلقائياً.
+   - تتغير الحالة مباشرة إلى `🟢 Bridge Running`.
+   - *(اختياري)* يمكنك تفعيل **Auto-start Bridge Server** من **Settings → ComposeBridge** لتشغيل السيرفر تلقائياً بمجرد فتح المشروع.
+3. **أضف الـ Agent** إلى مشروعك وقم بتهيئته (انظر الخطوات بالأسفل).
+
+---
+
+### 🔹 الخيار الثاني: التشغيل المستقل / وكلاء الذكاء الاصطناعي (Standalone MCP)
+
+هذا الخيار مخصص لمساعدي البرمجة بالذكاء الاصطناعي (Claude Desktop، Cursor، Antigravity IDE، Cline) أو في حال أردت تشغيل الخادم يدوياً عبر الطرفية:
+
+1. **تشغيل الخادم المحلي يدوياً**:
+   ```bash
+   cd server
+   pip install -r requirements.txt
+   python server.py
+   ```
+2. **توجيه المنفذ للهاتف عبر ADB**:
+   ```bash
+   adb reverse tcp:8711 tcp:8711
+   ```
+*(ملاحظة: إذا كنت تستخدم وكلاء الذكاء الاصطناعي عبر بروتوكول MCP فقط، فلا تحتاج لهاتف أو لأمر adb reverse؛ راجع قسم [خادم MCP](#-خادم-mcp-لوكلاء-الذكاء-الاصطناعي) أدناه).*
+
+---
+
+### 📲 خطوات دمج الـ Agent في تطبيقك
+
+#### 1. أضف الـ Agent إلى مشروعك
 ```kotlin
 // build.gradle.kts
 debugImplementation("com.composebridge:agent:1.0.0")
 ```
 
-### 3. قم بتهيئته في MainActivity
+#### 2. قم بتهيئته في MainActivity
 ```kotlin
 override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -114,14 +142,11 @@ override fun onCreate(savedInstanceState: Bundle?) {
 }
 ```
 
-### 4. الاتصال والتعديل
-```bash
-adb reverse tcp:8711 tcp:8711
-```
-1. ثبّت التطبيق على جهاز Android الخاص بك.
+#### 3. الاتصال والتعديل
+1. ثبّت التطبيق وشغّله على جهاز Android (أو المحاكي).
 2. اضغط على **الزر العائم 🔧** → وضع التصميم مفعل.
 3. المس أي عنصر Composable → يفتح وضع التركيز.
-4. عدّل الألوان/الأبعاد → اضغط **Sync**.
+4. عدّل الألوان/الأبعاد مباشرة → اضغط **Sync**.
 
 > **ملاحظة حول المعاينة الحية:** تغيير قيمة ثابتة أو تطبيق "توكن" جديد يتطلب **إعادة بناء واحدة** لتحديث الكود المترجم. بعد ذلك، ستكون جميع التعديلات المستقبلية عبر الـ Registry فورية.
 

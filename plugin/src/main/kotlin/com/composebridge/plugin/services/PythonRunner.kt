@@ -19,8 +19,30 @@ class PythonRunner(private val project: Project) {
         val saved = settings.state.bridgePath.trim()
         if (saved.isNotBlank() && File(saved).exists()) return saved
 
-        // fallback: auto-detect within the project root
         val projectRoot = project.basePath ?: "."
+
+        // 1. Check composebridge.json in project root
+        val configCandidates = listOf(
+            File(projectRoot, "composebridge.json"),
+            File(projectRoot, ".composebridge/config.json")
+        )
+        for (cfg in configCandidates) {
+            if (cfg.exists()) {
+                try {
+                    val text = cfg.readText(Charsets.UTF_8)
+                    val match = Regex(""server"\s*:\s*"([^"]+)"").find(text)
+                    if (match != null) {
+                        val serverRel = match.groupValues[1]
+                        val serverDir = File(projectRoot, serverRel)
+                        if (serverDir.exists() && (File(serverDir, "server.py").exists() || File(serverDir, "mcp_server.py").exists())) {
+                            return serverDir.absolutePath
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+
+        // 2. Fallback: auto-detect within the project root
         val candidates = listOf(
             "$projectRoot/bridge",
             "$projectRoot/server",
