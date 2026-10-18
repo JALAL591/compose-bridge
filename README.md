@@ -31,13 +31,17 @@
 
 **ComposeBridge** is a developer tooling suite that bridges a running Compose app (KMP/Android) with your IDE or AI Agent.
 
+> [!NOTE]
+> **KMP / Desktop Support Status**: KMP/Desktop support is currently in **Beta**. Focus is on **Android stability** for v1.0.0.
+
+
 ### 🎯 What's New in v1.0.0?
 - **Focus Mode:** The BottomSheet now shows **only** the colors and dimensions of the tapped element. No more digging through long lists.
 - **Global vs. Split:** Change a value across the whole project, or create an isolated token just for this element.
 - **Pending Edits Queue:** Batch multiple UI tweaks locally and hit **Sync** once.
 - **Dimensions Support:** Live-edit heights, widths, paddings, and font sizes — not just colors.
 - **Review & Reject:** A full `git status`-like review in the IDE. Approve to keep, or Reject All for a byte-for-byte rollback.
-- **17+ MCP Tools:** AI agents can now run Gradle builds, detect patterns, and rollback changes autonomously.
+- **17+ MCP Tools:** AI agents can now run Gradle builds, detect patterns, and rollback changes autonomously. See the full [**MCP Tools Reference**](docs/mcp-tools-reference.md).
 
 ### 🎬 See it in action & Screenshots
 
