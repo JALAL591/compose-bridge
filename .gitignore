@@ -23,6 +23,7 @@ captures/
 *.jar
 !dist/*.aar
 !dist/*.zip
+!**/gradle-wrapper.jar
 
 # Python
 __pycache__/
