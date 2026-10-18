@@ -436,9 +436,7 @@ def set_token(token_name: str, value: str) -> str:
             except Exception as e:
                 print(f"[MCP] agent_start failed: {e}", file=sys.stderr)
             
-            # Hold agent session window for race coordination
-            import time
-            time.sleep(0.8)
+            # Agent session active (coordinated via state_queue)
             
             # ═══ 2. Apply surgical edit ═══
             ok, msg, info = update_token_default(token_name, value)
@@ -820,6 +818,8 @@ def replace_pattern(pattern_id: str, dry_run: bool = False) -> str:
                     new_content=new_line,
                 )
 
+            from core.ast_finder import surgical_edit
+
             replacements = [{"file": pattern.occurrences[0].file, "line": pattern.occurrences[0].line}]
             for occ in pattern.occurrences[1:]:
                 fp = None
@@ -829,33 +829,89 @@ def replace_pattern(pattern_id: str, dry_run: bool = False) -> str:
                         break
                 if not fp:
                     continue
-                content = fp.read_text(encoding="utf-8")
-                lines = content.splitlines()
 
-                # Find line with occ.value_if_dark: check occ.line - 1 first, or scan file if shifted
-                target_idx = -1
+                source_bytes = fp.read_bytes()
+                source_text = source_bytes.decode("utf-8", errors="replace")
+                lines = source_text.splitlines()
+
+                target_line_idx = -1
                 if occ.line <= len(lines) and occ.value_if_dark in lines[occ.line - 1]:
-                    target_idx = occ.line - 1
+                    target_line_idx = occ.line - 1
                 else:
                     for idx, line_str in enumerate(lines):
                         if occ.value_if_dark in line_str and f"AppColors.{pattern.suggested_token_name}" not in line_str:
-                            target_idx = idx
+                            target_line_idx = idx
                             break
 
-                if target_idx != -1:
-                    old = lines[target_idx]
-                    new = old.replace(occ.value_if_dark, f"AppColors.{pattern.suggested_token_name}")
-                    if new != old:
-                        lines[target_idx] = new
-                        replacements.append({"file": occ.file, "line": target_idx + 1})
-                        fp.write_text("\n".join(lines) + "\n", encoding="utf-8")
-                        journal.record(
-                            pattern_id=pattern.pattern_id,
-                            file=occ.file,
-                            line=target_idx + 1,
-                            old_content=old,
-                            new_content=new,
-                        )
+                if target_line_idx == -1:
+                    # Occurrence target not found - rollback everything
+                    journal.rollback_pattern(pattern.pattern_id)
+                    return json.dumps({
+                        "success": False,
+                        "error": f"Failed to locate target pattern value '{occ.value_if_dark}' in {occ.file}. Rolled back all changes.",
+                        "pattern_id": pattern.pattern_id,
+                    })
+
+                old_line = lines[target_line_idx]
+                col_in_line = old_line.find(occ.value_if_dark)
+                if col_in_line == -1:
+                    journal.rollback_pattern(pattern.pattern_id)
+                    return json.dumps({
+                        "success": False,
+                        "error": f"Value '{occ.value_if_dark}' not found in target line in {occ.file}. Rolled back all changes.",
+                        "pattern_id": pattern.pattern_id,
+                    })
+
+                # Calculate precise byte offsets
+                line_byte_start = len("\n".join(lines[:target_line_idx]).encode("utf-8")) + (1 if target_line_idx > 0 else 0)
+                byte_start = line_byte_start + len(old_line[:col_in_line].encode("utf-8"))
+                byte_end = byte_start + len(occ.value_if_dark.encode("utf-8"))
+
+                # Validate byte boundaries
+                if not (0 <= byte_start < byte_end <= len(source_bytes)):
+                    journal.rollback_pattern(pattern.pattern_id)
+                    return json.dumps({
+                        "success": False,
+                        "error": f"Invalid byte range [{byte_start}:{byte_end}] in {occ.file}. Rolled back all changes.",
+                        "pattern_id": pattern.pattern_id,
+                    })
+
+                actual_bytes_val = source_bytes[byte_start:byte_end].decode("utf-8", errors="replace")
+                if actual_bytes_val != occ.value_if_dark:
+                    journal.rollback_pattern(pattern.pattern_id)
+                    return json.dumps({
+                        "success": False,
+                        "error": f"Byte mismatch at {byte_start}..{byte_end} in {occ.file}: expected '{occ.value_if_dark}', found '{actual_bytes_val}'. Rolled back all changes.",
+                        "pattern_id": pattern.pattern_id,
+                    })
+
+                # Apply atomic surgical edit
+                new_usage = f"AppColors.{pattern.suggested_token_name}"
+                s_ok, s_msg, s_backup = surgical_edit(
+                    file_path=str(fp),
+                    byte_start=byte_start,
+                    byte_end=byte_end,
+                    expected_old_value=occ.value_if_dark,
+                    new_value=new_usage,
+                )
+
+                if not s_ok:
+                    journal.rollback_pattern(pattern.pattern_id)
+                    return json.dumps({
+                        "success": False,
+                        "error": f"Surgical edit failed on {occ.file}: {s_msg}. Rolled back all changes.",
+                        "pattern_id": pattern.pattern_id,
+                    })
+
+                new_line = old_line[:col_in_line] + new_usage + old_line[col_in_line + len(occ.value_if_dark):]
+                replacements.append({"file": occ.file, "line": target_line_idx + 1})
+                journal.record(
+                    pattern_id=pattern.pattern_id,
+                    file=occ.file,
+                    line=target_line_idx + 1,
+                    old_content=old_line,
+                    new_content=new_line,
+                )
 
             if len(replacements) == 0:
                 return json.dumps({

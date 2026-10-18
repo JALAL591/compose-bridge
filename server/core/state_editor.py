@@ -32,68 +32,110 @@ def with_write_lock(func):
 # مسار BridgeState.kt وثوابت Journal
 # ============================================================
 
-PROJECT_ROOT = Path(os.environ.get("COMPOSEBRIDGE_ROOT", "."))
+from core.project_root import get_project_root
+PROJECT_ROOT = get_project_root()
 JOURNAL_FILE = PROJECT_ROOT / ".composebridge-journal.json"
 MAX_JOURNAL = 50
-BRIDGE_STATE_FILE = (
-    PROJECT_ROOT
-    / "composebridge-agent"
-    / "src"
-    / "androidMain"
-    / "kotlin"
-    / "com"
-    / "composebridge"
-    / "agent"
-    / "BridgeState.kt"
-)
-
-APP_COLORS_FILE = (
-    PROJECT_ROOT
-    / "app"
-    / "src"
-    / "main"
-    / "java"
-    / "com"
-    / "student"
-    / "app"
-    / "ui"
-    / "theme"
-    / "AppColors.kt"
-)
-
-APP_TYPOGRAPHY_FILE = (
-    PROJECT_ROOT
-    / "app"
-    / "src"
-    / "main"
-    / "java"
-    / "com"
-    / "student"
-    / "app"
-    / "ui"
-    / "theme"
-    / "AppTypography.kt"
-)
+def get_config_paths() -> dict:
+    """Load path mappings from composebridge.json if available."""
+    root = get_project_root()
+    for candidate in [
+        root / "composebridge.json",
+        Path.cwd() / "composebridge.json",
+    ]:
+        if candidate.exists():
+            try:
+                data = json.loads(candidate.read_text(encoding="utf-8"))
+                return data.get("paths", {})
+            except Exception:
+                pass
+    return {}
 
 
-# ============================================================
-# خريطة: اسم الخاصية → نمط البحث في الملف
-# ============================================================
+def get_bridge_state_file() -> Path:
+    """Resolve BridgeState.kt dynamically from config or project structure."""
+    cfg_paths = get_config_paths()
+    if "bridge_state" in cfg_paths:
+        p = PROJECT_ROOT / cfg_paths["bridge_state"]
+        if p.exists():
+            return p
+    for candidate in [
+        PROJECT_ROOT / "agent" / "src" / "androidMain" / "kotlin" / "com" / "composebridge" / "agent" / "BridgeState.kt",
+        PROJECT_ROOT / "composebridge-agent" / "src" / "androidMain" / "kotlin" / "com" / "composebridge" / "agent" / "BridgeState.kt",
+        PROJECT_ROOT / "composebridge-agent" / "src" / "commonMain" / "kotlin" / "com" / "composebridge" / "agent" / "BridgeState.kt",
+    ]:
+        if candidate.exists():
+            return candidate
+    for f in PROJECT_ROOT.rglob("BridgeState.kt"):
+        s = str(f)
+        if ".bak" not in s and "build" not in s:
+            return f
+    return PROJECT_ROOT / "agent" / "src" / "androidMain" / "kotlin" / "com" / "composebridge" / "agent" / "BridgeState.kt"
 
-PROPERTY_PATTERNS = {
-    # نطابق: (mutableStateOf\() (أي شيء حتى آخر )) ) (\))
 
-    "cardPadding": r'(var\s+cardPadding[^\n]*?mutableStateOf\()(.+?)(\)\s*$)',
-    "cardCornerRadius": r'(var\s+cardCornerRadius[^\n]*?mutableStateOf\()(.+?)(\)\s*$)',
-    "cardBackgroundColor": r'(var\s+cardBackgroundColor[^\n]*?mutableStateOf\()(.+?)(\)\s*$)',
-    "userNameFontSize": r'(var\s+userNameFontSize[^\n]*?mutableStateOf\()(.+?)(\)\s*$)',
-    "userNameColor": r'(var\s+userNameColor[^\n]*?mutableStateOf\()(.+?)(\)\s*$)',
-    "titleText": r'(var\s+titleText[^\n]*?mutableStateOf\()(.+?)(\)\s*$)',
-    "titleFontSize": r'(var\s+titleFontSize[^\n]*?mutableStateOf\()(.+?)(\)\s*$)',
-    "titleColor": r'(var\s+titleColor[^\n]*?mutableStateOf\()(.+?)(\)\s*$)',
-    "columnPadding": r'(var\s+columnPadding[^\n]*?mutableStateOf\()(.+?)(\)\s*$)',
-    "spacerHeight": r'(var\s+spacerHeight[^\n]*?mutableStateOf\()(.+?)(\)\s*$)',
-}
+def get_app_colors_file() -> Path:
+    """Resolve AppColors.kt dynamically."""
+    cfg_paths = get_config_paths()
+    if "app_colors" in cfg_paths:
+        p = PROJECT_ROOT / cfg_paths["app_colors"]
+        if p.exists():
+            return p
+    for f in PROJECT_ROOT.rglob("AppColors.kt"):
+        s = str(f)
+        if ".bak" not in s and "build" not in s:
+            return f
+    return PROJECT_ROOT / "app" / "src" / "main" / "java" / "com" / "student" / "app" / "ui" / "theme" / "AppColors.kt"
+
+
+def get_app_typography_file() -> Path:
+    """Resolve AppTypography.kt dynamically."""
+    cfg_paths = get_config_paths()
+    if "app_typography" in cfg_paths:
+        p = PROJECT_ROOT / cfg_paths["app_typography"]
+        if p.exists():
+            return p
+    for f in PROJECT_ROOT.rglob("AppTypography.kt"):
+        s = str(f)
+        if ".bak" not in s and "build" not in s:
+            return f
+    return PROJECT_ROOT / "app" / "src" / "main" / "java" / "com" / "student" / "app" / "ui" / "theme" / "AppTypography.kt"
+
+
+BRIDGE_STATE_FILE = get_bridge_state_file()
+APP_COLORS_FILE = get_app_colors_file()
+APP_TYPOGRAPHY_FILE = get_app_typography_file()
+
+
+
+def find_mutable_state_property(tree, source_bytes: bytes, target_prop: str):
+    """
+    Dynamically locate 'var <target_prop> by mutableStateOf(...)' using Tree-sitter.
+    Returns: (val_byte_start, val_byte_end, old_value_str) or None
+    """
+    def _search(node):
+        if node.type == "property_declaration":
+            var_decl = next((c for c in node.children if c.type == "variable_declaration"), None)
+            prop_del = next((c for c in node.children if c.type == "property_delegate"), None)
+            if var_decl and prop_del:
+                var_id = next((c for c in var_decl.children if c.type in ("identifier", "simple_identifier")), None)
+                if var_id:
+                    name = source_bytes[var_id.start_byte:var_id.end_byte].decode("utf-8")
+                    if name == target_prop:
+                        call = next((c for c in prop_del.children if c.type == "call_expression"), None)
+                        if call:
+                            args = next((c for c in call.children if c.type == "value_arguments"), None)
+                            if args:
+                                val_node = next((c for c in args.children if c.type not in ("(", ")", ",")), None)
+                                if val_node:
+                                    old_val = source_bytes[val_node.start_byte:val_node.end_byte].decode("utf-8")
+                                    return val_node.start_byte, val_node.end_byte, old_val
+        for child in node.children:
+            res = _search(child)
+            if res:
+                return res
+        return None
+
+    return _search(tree.root_node)
 
 
 # ============================================================
@@ -142,44 +184,26 @@ def normalize_value(property_name: str, value: str) -> str:
 
 def update_bridge_state(property_name: str, value: str) -> tuple:
     """
-    يعدّل قيمة في BridgeState.kt.
+    Dynamically locate and update property in BridgeState.kt using Tree-sitter.
 
     Returns:
-        (success, message, byte_range)
+        (success, message, byte_range_dict)
     """
-    import re
-
-    if property_name not in PROPERTY_PATTERNS:
-        return (False, f"Unknown property: {property_name}", None)
-
-    file_path = BRIDGE_STATE_FILE
+    file_path = get_bridge_state_file()
     if not file_path.exists():
         return (False, f"File not found: {file_path}", None)
 
-    # اقرأ المحتوى كـ bytes (لأننا سنعدّل)
-    with open(file_path, "rb") as f:
-        source_bytes = f.read()
+    try:
+        tree, source_bytes = parse_file(str(file_path))
+    except Exception as e:
+        return (False, f"Failed to parse {file_path}: {e}", None)
 
-    source_text = source_bytes.decode("utf-8")
-    pattern = PROPERTY_PATTERNS[property_name]
+    prop_info = find_mutable_state_property(tree, source_bytes, property_name)
+    if not prop_info:
+        return (False, f"Property '{property_name}' with mutableStateOf not found in {file_path.name}", None)
+
+    byte_start, byte_end, old_value = prop_info
     new_value = normalize_value(property_name, value)
-
-    # ابحث عن النمط (مع re.MULTILINE للتعامل مع نهايات الأسطر $)
-    match = re.search(pattern, source_text, flags=re.MULTILINE)
-    if not match:
-        return (False, f"Pattern not found for {property_name}", None)
-
-    # النطاق: المجموعة الأولى = البداية، الثانية = القيمة الحالية، الثالثة = النهاية
-    old_value = match.group(2)
-    full_match_start = match.start()
-
-    # احسب نطاق bytes للقيمة الحالية
-    prefix = match.group(1)
-    value_start_in_match = len(prefix)
-    value_end_in_match = value_start_in_match + len(old_value)
-
-    byte_start = len(source_text[:full_match_start + value_start_in_match].encode("utf-8"))
-    byte_end = len(source_text[:full_match_start + value_end_in_match].encode("utf-8"))
 
     return (True, new_value, {
         "file_path": str(file_path),

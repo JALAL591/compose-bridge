@@ -13,9 +13,12 @@ import tree_sitter_kotlin
 # إعداد Tree-sitter
 # ============================================================
 
+import threading
+
 try:
     KOTLIN_LANGUAGE = Language(tree_sitter_kotlin.language())
     PARSER = Parser(KOTLIN_LANGUAGE)
+    PARSER_LOCK = threading.Lock()
 except Exception as e:
     raise RuntimeError(f"Failed to initialize tree-sitter-kotlin: {e}")
 
@@ -98,7 +101,8 @@ def parse_file(file_path: str) -> tuple:
     with open(path, "rb") as f:
         source_bytes = f.read()
 
-    tree = PARSER.parse(source_bytes)
+    with PARSER_LOCK:
+        tree = PARSER.parse(source_bytes)
 
     if tree.root_node.has_error:
         # نطبع تحذيراً لكن نكمل
@@ -449,3 +453,9 @@ def surgical_edit(
         f"Edited {byte_start}-{byte_end}: '{expected_old_value}' → '{new_value}'",
         backup_path
     )
+
+
+def parse_bytes(source_bytes: bytes):
+    """Thread-safe parse of raw Kotlin bytes."""
+    with PARSER_LOCK:
+        return PARSER.parse(source_bytes)

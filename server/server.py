@@ -597,7 +597,6 @@ async def handle_message(websocket: WebSocketServerProtocol, raw: str) -> None:
                 # استخرج اسم الـ token من "AppColors.Primary"
                 token_name = property_name.replace("AppColors.", "").strip()
 
-                # ⭐ NEW: Remove old queued edit for same color
                 removed = STATE_MANAGER.queue.remove_by_token(token_name)
                 if removed > 0:
                     log_forward(f"🗑️ Removed {removed} queued edit(s) for {token_name} (superseded)")
@@ -607,7 +606,6 @@ async def handle_message(websocket: WebSocketServerProtocol, raw: str) -> None:
                         source="user",
                     )
 
-                # ⭐ أضف للـ Queue مع kind="color"
                 edit = STATE_MANAGER.queue.add(
                     token=token_name,
                     value=value,
@@ -620,18 +618,23 @@ async def handle_message(websocket: WebSocketServerProtocol, raw: str) -> None:
                     source="user",
                 )
                 STATE_MANAGER.save_all()
+                log_forward(f"📥 Queued in state_queue: {token_name} = {value}")
 
-                log_forward(f"📥 Queued (agent busy) COLOR: {token_name} = {value}")
+                # Reactive wait for agent session to finish
+                wait_t0 = time.time()
+                while STATE_MANAGER.agent_busy and (time.time() - wait_t0) < 2.5:
+                    await asyncio.sleep(0.05)
 
-                await safe_send(websocket, {
-                    "type": "state_update_ack",
-                    "status": "queued",
-                    "property": property_name,
-                    "value": value,
-                    "queue_position": STATE_MANAGER.queue.count(),
-                    "agent_busy": True,
-                })
-                return
+                if STATE_MANAGER.agent_busy:
+                    await safe_send(websocket, {
+                        "type": "state_update_ack",
+                        "status": "queued",
+                        "property": property_name,
+                        "value": value,
+                        "queue_position": STATE_MANAGER.queue.count(),
+                        "agent_busy": True,
+                    })
+                    return
 
             else:
                 # ⭐ حفظ في الملف المصدر
@@ -1310,7 +1313,6 @@ async def handle_message(websocket: WebSocketServerProtocol, raw: str) -> None:
         with acquire_write_lock():
             # ⭐ Check if Agent is busy
             if STATE_MANAGER.agent_busy:
-                # ⭐ NEW: Remove old queued edit for same token
                 removed = STATE_MANAGER.queue.remove_by_token(token_name)
                 if removed > 0:
                     log_forward(f"🗑️ Removed {removed} queued edit(s) for {token_name} (superseded)")
@@ -1320,7 +1322,6 @@ async def handle_message(websocket: WebSocketServerProtocol, raw: str) -> None:
                         source="user",
                     )
 
-                # ثم أضف الجديد
                 edit = STATE_MANAGER.queue.add(
                     token=token_name,
                     value=value,
@@ -1333,19 +1334,24 @@ async def handle_message(websocket: WebSocketServerProtocol, raw: str) -> None:
                     source="user",
                 )
                 STATE_MANAGER.save_all()
+                log_forward(f"📥 Queued in state_queue: {token_name} = {value}")
 
-                log_forward(f"📥 Queued (agent busy): {token_name} = {value}")
+                # Reactive wait for agent session to finish
+                wait_t0 = time.time()
+                while STATE_MANAGER.agent_busy and (time.time() - wait_t0) < 2.5:
+                    await asyncio.sleep(0.05)
 
-                await safe_send(websocket, {
-                    "type": "update_token_default_ack",
-                    "status": "queued",
-                    "token": token_name,
-                    "value": value,
-                    "queue_position": STATE_MANAGER.queue.count(),
-                    "agent_busy": True,
-                })
-                log_send(f"update_token_default_ack (queued, pos={STATE_MANAGER.queue.count()})")
-                return
+                if STATE_MANAGER.agent_busy:
+                    await safe_send(websocket, {
+                        "type": "update_token_default_ack",
+                        "status": "queued",
+                        "token": token_name,
+                        "value": value,
+                        "queue_position": STATE_MANAGER.queue.count(),
+                        "agent_busy": True,
+                    })
+                    log_send(f"update_token_default_ack (queued, pos={STATE_MANAGER.queue.count()})")
+                    return
 
             # ⭐ NEW: Remove queued edits for the SAME token
             # (User's new direct edit supersedes old queued intent)

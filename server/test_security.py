@@ -101,5 +101,64 @@ class TestSecurity(unittest.TestCase):
         self.assertIn("not found", result["error"])
 
 
+
+    def test_parser_thread_safety(self):
+        """AST Parser is protected with PARSER_LOCK for thread safety."""
+        import threading
+        from core.ast_finder import PARSER_LOCK, parse_bytes
+
+        self.assertIsNotNone(PARSER_LOCK)
+        errors = []
+
+        def worker():
+            try:
+                for _ in range(20):
+                    tree = parse_bytes(b'val x = 1')
+                    self.assertIsNotNone(tree)
+            except Exception as e:
+                errors.append(e)
+
+        threads = [threading.Thread(target=worker) for _ in range(5)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        self.assertEqual(len(errors), 0, f"Parser thread safety errors: {errors}")
+
+    def test_dynamic_property_resolution_tree_sitter(self):
+        """BridgeState properties are extracted dynamically via Tree-sitter without hardcoded patterns."""
+        import core.state_editor as se
+        self.assertFalse(hasattr(se, 'PROPERTY_PATTERNS'), 'PROPERTY_PATTERNS must be deleted')
+        
+        ok, new_val, info = se.update_bridge_state('cardPadding', '16.dp')
+        self.assertTrue(ok)
+        self.assertEqual(info['old_value'], '16.dp')
+        self.assertTrue(info['byte_start'] < info['byte_end'])
+
+    def test_composebridge_json_config(self):
+        """composebridge.json configuration file exists and contains path mappings."""
+        import core.state_editor as se
+        cfg_paths = se.get_config_paths()
+        self.assertIsInstance(cfg_paths, dict)
+        self.assertIn('bridge_state', cfg_paths)
+
+    def test_no_sleep_in_mcp_server(self):
+        """time.sleep(0.8) must be removed from mcp_server.py."""
+        server_path = Path(__file__).parent / 'mcp_server.py'
+        text = server_path.read_text(encoding='utf-8')
+        self.assertNotIn('time.sleep(0.8)', text)
+
+    def test_atomic_write_helper_token_migrator(self):
+        """_atomic_write_text in token_migrator writes atomically."""
+        from core.token_migrator import _atomic_write_text
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            target = Path(td) / 'test.txt'
+            _atomic_write_text(target, 'atomic content')
+            self.assertTrue(target.exists())
+            self.assertEqual(target.read_text(encoding='utf-8'), 'atomic content')
+
+
 if __name__ == "__main__":
     unittest.main()

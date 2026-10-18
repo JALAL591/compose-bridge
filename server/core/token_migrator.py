@@ -19,6 +19,18 @@ from datetime import datetime
 from .write_lock import acquire_write_lock
 
 
+
+def _atomic_write_text(file_path: Path, text: str):
+    """Write text to file atomically using a temporary file in the same directory."""
+    import tempfile
+    import os
+    file_path = Path(file_path)
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False, dir=file_path.parent) as tf:
+        tf.write(text)
+        temp_name = tf.name
+    os.replace(temp_name, file_path)
+
 class TokenMigrator:
     """Migrate hardcoded value to a design token."""
     
@@ -138,138 +150,139 @@ class TokenMigrator:
         - Validate token_name (Kotlin identifier)
         """
         try:
-            # ⭐ 1. Validate token_name — Kotlin identifier
-            if not re.match(r'^[A-Za-z][A-Za-z0-9_]*$', token_name):
-                return {
-                    "success": False,
-                    "error": f"Invalid token name: '{token_name}' (must be a valid Kotlin identifier)",
-                }
+            with acquire_write_lock():
+                # ⭐ 1. Validate token_name — Kotlin identifier
+                if not re.match(r'^[A-Za-z][A-Za-z0-9_]*$', token_name):
+                    return {
+                        "success": False,
+                        "error": f"Invalid token name: '{token_name}' (must be a valid Kotlin identifier)",
+                    }
             
-            # ⭐ 2. Normalize values
-            def _normalize(val: str) -> str:
-                """Return clean 'Color(0xAARRGGBB)' or 'Color.Name'."""
-                if not val:
-                    return "Color.Transparent"
-                val = val.strip()
-                
-                # Already clean
-                if val.startswith("Color."):
-                    return val
-                
-                # Color(0x...) — ensure single parens
-                if val.startswith("Color("):
-                    match = re.search(r'0x([0-9A-Fa-f]+)', val)
-                    if not match:
+                # ⭐ 2. Normalize values
+                def _normalize(val: str) -> str:
+                    """Return clean 'Color(0xAARRGGBB)' or 'Color.Name'."""
+                    if not val:
                         return "Color.Transparent"
-                    hex_str = match.group(1).upper()
-                elif val.startswith("0x") or val.startswith("0X"):
-                    hex_str = val[2:].upper()
-                elif val.startswith("#"):
-                    hex_str = val[1:].upper()
-                else:
-                    hex_str = val.upper()
+                    val = val.strip()
                 
-                # Ensure 8 chars (ARGB)
-                if len(hex_str) == 6:
-                    hex_str = "FF" + hex_str
-                elif len(hex_str) == 3:
-                    hex_str = "FF" + "".join(c * 2 for c in hex_str)
-                elif len(hex_str) != 8:
-                    return "Color.Transparent"
+                    # Already clean
+                    if val.startswith("Color."):
+                        return val
                 
-                return f"Color(0x{hex_str})"
+                    # Color(0x...) — ensure single parens
+                    if val.startswith("Color("):
+                        match = re.search(r'0x([0-9A-Fa-f]+)', val)
+                        if not match:
+                            return "Color.Transparent"
+                        hex_str = match.group(1).upper()
+                    elif val.startswith("0x") or val.startswith("0X"):
+                        hex_str = val[2:].upper()
+                    elif val.startswith("#"):
+                        hex_str = val[1:].upper()
+                    else:
+                        hex_str = val.upper()
+                
+                    # Ensure 8 chars (ARGB)
+                    if len(hex_str) == 6:
+                        hex_str = "FF" + hex_str
+                    elif len(hex_str) == 3:
+                        hex_str = "FF" + "".join(c * 2 for c in hex_str)
+                    elif len(hex_str) != 8:
+                        return "Color.Transparent"
+                
+                    return f"Color(0x{hex_str})"
             
-            default_expr = _normalize(original_value) if original_value else _normalize(value_expr)
-            override_expr = _normalize(value_expr)
+                default_expr = _normalize(original_value) if original_value else _normalize(value_expr)
+                override_expr = _normalize(value_expr)
             
-            # ⭐ 3. Find DesignSystem.kt
-            design_system = self._find_design_system()
-            if not design_system or not design_system.exists():
-                return {"success": False, "error": "DesignSystem.kt not found"}
+                # ⭐ 3. Find DesignSystem.kt
+                design_system = self._find_design_system()
+                if not design_system or not design_system.exists():
+                    return {"success": False, "error": "DesignSystem.kt not found"}
             
-            content = design_system.read_text(encoding="utf-8")
+                content = design_system.read_text(encoding="utf-8")
             
-            # ⭐ 4. Check if token exists
-            if re.search(rf'\bval\s+{re.escape(token_name)}\b', content):
+                # ⭐ 4. Check if token exists
+                if re.search(rf'\bval\s+{re.escape(token_name)}\b', content):
+                    return {
+                        "success": True,
+                        "already_existed": True,
+                        "token_name": token_name,
+                        "default_value": default_expr,
+                        "override_value": override_expr,
+                        "file": str(design_system.relative_to(self.project_root)),
+                    }
+            
+                # ⭐ 5. Find object AppColors
+                match = re.search(r'object\s+AppColors\s*\{', content)
+                if not match:
+                    return {"success": False, "error": "object AppColors not found"}
+            
+                # ⭐ 6. Build CLEAN token line
+                token_line = (
+                    f'    val {token_name}: Color get() = '
+                    f'BridgeThemeRegistry.getColor("{token_name}", {default_expr})'
+                )
+            
+                # ⭐ 7. Validate token_line with helper
+                is_valid, error = self._validate_kotlin_syntax(token_line)
+                if not is_valid:
+                    return {
+                        "success": False,
+                        "error": f"Generated invalid Kotlin: {error}",
+                        "generated_line": token_line,
+                    }
+            
+                # ⭐ 8. Insert after object AppColors {
+                insert_pos = match.end()
+                newline_pos = content.find('\n', insert_pos)
+                if newline_pos < 0:
+                    return {"success": False, "error": "Invalid DesignSystem structure"}
+            
+                # ⭐ 9. Build new content
+                new_content = (
+                    content[:newline_pos + 1]
+                    + token_line + '\n'
+                    + content[newline_pos + 1:]
+                )
+            
+                # ⭐ 10. VALIDATE final syntax
+                if ')))' in new_content:
+                    return {
+                        "success": False,
+                        "error": "Generated content has malformed parens",
+                        "generated_line": token_line,
+                    }
+            
+                # ⭐ 11. Journal (for rollback)
+                try:
+                    try:
+                        from core.pattern_journal import PatternJournal
+                    except ImportError:
+                        from .pattern_journal import PatternJournal
+                    journal = PatternJournal(self.project_root)
+                    journal.record_change(
+                        file=str(design_system.relative_to(self.project_root)),
+                        line=content[:newline_pos + 1].count('\n') + 1,
+                        old_line="",
+                        new_line=token_line,
+                        pattern_id=f"create_token_{token_name}",
+                    )
+                except Exception as e:
+                    import logging
+                    logging.error(f"[TOKEN_MIGRATOR] Journal record failed: {e}")
+            
+                # ⭐ 12. Write
+                _atomic_write_text(design_system, new_content)
+            
                 return {
                     "success": True,
-                    "already_existed": True,
                     "token_name": token_name,
                     "default_value": default_expr,
                     "override_value": override_expr,
+                    "token_line": token_line,
                     "file": str(design_system.relative_to(self.project_root)),
                 }
-            
-            # ⭐ 5. Find object AppColors
-            match = re.search(r'object\s+AppColors\s*\{', content)
-            if not match:
-                return {"success": False, "error": "object AppColors not found"}
-            
-            # ⭐ 6. Build CLEAN token line
-            token_line = (
-                f'    val {token_name}: Color get() = '
-                f'BridgeThemeRegistry.getColor("{token_name}", {default_expr})'
-            )
-            
-            # ⭐ 7. Validate token_line with helper
-            is_valid, error = self._validate_kotlin_syntax(token_line)
-            if not is_valid:
-                return {
-                    "success": False,
-                    "error": f"Generated invalid Kotlin: {error}",
-                    "generated_line": token_line,
-                }
-            
-            # ⭐ 8. Insert after object AppColors {
-            insert_pos = match.end()
-            newline_pos = content.find('\n', insert_pos)
-            if newline_pos < 0:
-                return {"success": False, "error": "Invalid DesignSystem structure"}
-            
-            # ⭐ 9. Build new content
-            new_content = (
-                content[:newline_pos + 1]
-                + token_line + '\n'
-                + content[newline_pos + 1:]
-            )
-            
-            # ⭐ 10. VALIDATE final syntax
-            if ')))' in new_content:
-                return {
-                    "success": False,
-                    "error": "Generated content has malformed parens",
-                    "generated_line": token_line,
-                }
-            
-            # ⭐ 11. Journal (for rollback)
-            try:
-                try:
-                    from core.pattern_journal import PatternJournal
-                except ImportError:
-                    from .pattern_journal import PatternJournal
-                journal = PatternJournal(self.project_root)
-                journal.record_change(
-                    file=str(design_system.relative_to(self.project_root)),
-                    line=content[:newline_pos + 1].count('\n') + 1,
-                    old_line="",
-                    new_line=token_line,
-                    pattern_id=f"create_token_{token_name}",
-                )
-            except Exception as e:
-                import logging
-                logging.error(f"[TOKEN_MIGRATOR] Journal record failed: {e}")
-            
-            # ⭐ 12. Write
-            design_system.write_text(new_content, encoding="utf-8")
-            
-            return {
-                "success": True,
-                "token_name": token_name,
-                "default_value": default_expr,
-                "override_value": override_expr,
-                "token_line": token_line,
-                "file": str(design_system.relative_to(self.project_root)),
-            }
         
         except Exception as e:
             import traceback
@@ -1450,7 +1463,26 @@ class TokenMigrator:
                         new_content = re.sub(pattern, "", new_content)
                     
                     if new_content != content:
-                        f.write_text(new_content, encoding="utf-8")
+                        # ⭐ Journal save before modification (for rollback)
+                        try:
+                            try:
+                                from core.pattern_journal import PatternJournal
+                            except ImportError:
+                                from .pattern_journal import PatternJournal
+                            journal = PatternJournal(self.project_root)
+                            rel_file = str(f.relative_to(self.project_root)) if f.is_relative_to(self.project_root) else f.name
+                            journal.record_change(
+                                file=rel_file,
+                                line=1,
+                                old_line=content,
+                                new_line=new_content,
+                                pattern_id=f"remove_token_{token_name}",
+                            )
+                        except Exception as jerr:
+                            import logging
+                            logging.error(f"[TOKEN_MIGRATOR] Journal record failed in remove_token: {jerr}")
+                        
+                        _atomic_write_text(f, new_content)
                         return True
                 except Exception as e:
                     continue
