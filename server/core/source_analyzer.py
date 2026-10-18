@@ -1,3 +1,4 @@
+import os
 # -*- coding: utf-8 -*-
 """
 Source Analyzer — يحلل نطاق الكود المصدري للعنصر.

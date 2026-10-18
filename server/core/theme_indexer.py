@@ -1,3 +1,4 @@
+import os
 """
 Theme Indexer — يفهرس AppColors.kt و AppStrings.kt
 يبني خريطة عكسية: color value → token key

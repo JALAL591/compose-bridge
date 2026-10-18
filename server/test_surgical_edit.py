@@ -1,3 +1,4 @@
+import os
 """
 GATE 4 — First Surgical Edit Test
 

@@ -1,3 +1,4 @@
+import os
 """
 Test — Property Finder.
 يجد خصائص داخل composables.

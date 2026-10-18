@@ -1,3 +1,4 @@
+import os
 """
 Test script — يحلل HomeScreenForTest.kt ويطبع ما يجده.
 """

@@ -1,3 +1,4 @@
+import os
 """
 Test script — اختبار تحويل utf16Offset إلى byte_offset.
 """
