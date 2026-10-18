@@ -832,13 +832,13 @@ def replace_pattern(pattern_id: str, dry_run: bool = False) -> str:
 
                 source_bytes = fp.read_bytes()
                 source_text = source_bytes.decode("utf-8", errors="replace")
-                lines = source_text.splitlines()
+                lines_with_ends = source_text.splitlines(keepends=True)
 
                 target_line_idx = -1
-                if occ.line <= len(lines) and occ.value_if_dark in lines[occ.line - 1]:
+                if occ.line <= len(lines_with_ends) and occ.value_if_dark in lines_with_ends[occ.line - 1]:
                     target_line_idx = occ.line - 1
                 else:
-                    for idx, line_str in enumerate(lines):
+                    for idx, line_str in enumerate(lines_with_ends):
                         if occ.value_if_dark in line_str and f"AppColors.{pattern.suggested_token_name}" not in line_str:
                             target_line_idx = idx
                             break
@@ -852,7 +852,7 @@ def replace_pattern(pattern_id: str, dry_run: bool = False) -> str:
                         "pattern_id": pattern.pattern_id,
                     })
 
-                old_line = lines[target_line_idx]
+                old_line = lines_with_ends[target_line_idx]
                 col_in_line = old_line.find(occ.value_if_dark)
                 if col_in_line == -1:
                     journal.rollback_pattern(pattern.pattern_id)
@@ -862,8 +862,8 @@ def replace_pattern(pattern_id: str, dry_run: bool = False) -> str:
                         "pattern_id": pattern.pattern_id,
                     })
 
-                # Calculate precise byte offsets
-                line_byte_start = len("\n".join(lines[:target_line_idx]).encode("utf-8")) + (1 if target_line_idx > 0 else 0)
+                # Calculate precise byte offsets preserving exact CRLF (\r\n) or LF (\n) line endings
+                line_byte_start = len("".join(lines_with_ends[:target_line_idx]).encode("utf-8"))
                 byte_start = line_byte_start + len(old_line[:col_in_line].encode("utf-8"))
                 byte_end = byte_start + len(occ.value_if_dark.encode("utf-8"))
 

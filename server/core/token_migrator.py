@@ -24,12 +24,25 @@ def _atomic_write_text(file_path: Path, text: str):
     """Write text to file atomically using a temporary file in the same directory."""
     import tempfile
     import os
+    import time
     file_path = Path(file_path)
     file_path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", delete=False, dir=file_path.parent) as tf:
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", newline="", delete=False, dir=file_path.parent) as tf:
         tf.write(text)
         temp_name = tf.name
-    os.replace(temp_name, file_path)
+
+    replaced = False
+    last_err = None
+    for attempt in range(10):
+        try:
+            os.replace(temp_name, file_path)
+            replaced = True
+            break
+        except PermissionError as pe:
+            last_err = pe
+            time.sleep(0.05 * (attempt + 1))
+    if not replaced and last_err:
+        raise last_err
 
 class TokenMigrator:
     """Migrate hardcoded value to a design token."""
@@ -1153,11 +1166,12 @@ class TokenMigrator:
                             return (False, f"Replacement failed: '{value}' not found as standalone", None)
                         
                         lines[line - 1] = new_line
-                        updated_target_content = "\n".join(lines) + "\n"
+                        target_line_ending = "\r\n" if "\r\n" in content else "\n"
+                        updated_target_content = target_line_ending.join(lines) + target_line_ending
                         if new_import and self._needs_import(updated_target_content, new_import):
                             updated_target_content = self._add_import(updated_target_content, new_import)
 
-                        target_file.write_text(updated_target_content, encoding="utf-8")
+                        _atomic_write_text(target_file, updated_target_content)
                         return (
                             True,
                             f"Reused existing token '{token_name}' in {file_name}:{line}",
@@ -1196,7 +1210,8 @@ class TokenMigrator:
             
             # ═══ 4. Read target file ═══
             try:
-                content = target_file.read_text(encoding="utf-8")
+                with open(target_file, "r", encoding="utf-8", newline="") as tf_in:
+                    content = tf_in.read()
             except Exception as e:
                 return (False, f"Cannot read file: {e}", None)
             
@@ -1385,12 +1400,13 @@ class TokenMigrator:
                 
                 # Add import if needed
                 import_added = False
-                updated_target_content = "\n".join(lines) + "\n"
+                target_line_ending = "\r\n" if "\r\n" in content else "\n"
+                updated_target_content = target_line_ending.join(lines) + target_line_ending
                 if new_import and self._needs_import(updated_target_content, new_import):
                     updated_target_content = self._add_import(updated_target_content, new_import)
                     import_added = True
 
-                target_file.write_text(updated_target_content, encoding="utf-8")
+                _atomic_write_text(target_file, updated_target_content)
             except Exception as e:
                 # Rollback both files
                 shutil.copy2(target_backup, target_file)

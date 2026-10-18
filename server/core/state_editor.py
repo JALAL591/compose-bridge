@@ -375,7 +375,7 @@ def update_theme_color(key: str, new_hex: str) -> tuple:
     normalized_hex = f"0x{cleaned.upper()}"
 
     # 2. اقرأ الملف
-    with open(file_path, "r", encoding="utf-8") as f:
+    with open(file_path, "r", encoding="utf-8", newline="") as f:
         content = f.read()
 
     # 3. ابحث عن النمط
@@ -406,6 +406,7 @@ def update_theme_color(key: str, new_hex: str) -> tuple:
         with tempfile.NamedTemporaryFile(
             mode="w",
             encoding="utf-8",
+            newline="",
             dir=file_path.parent,
             delete=False,
             prefix=file_path.name + ".tmp_",
@@ -484,7 +485,7 @@ def update_typography_property(
     if not file_path.exists():
         return (False, f"AppTypography.kt not found: {file_path}", None)
 
-    with open(file_path, "r", encoding="utf-8") as f:
+    with open(file_path, "r", encoding="utf-8", newline="") as f:
         content = f.read()
 
     # 1. ابحث عن block الخاص بالـ style
@@ -546,6 +547,7 @@ def update_typography_property(
         with tempfile.NamedTemporaryFile(
             mode="w",
             encoding="utf-8",
+            newline="",
             dir=file_path.parent,
             delete=False,
             prefix=file_path.name + ".tmp_",
@@ -617,7 +619,7 @@ def edit_dimension_in_source(
             return (False, f"File not found: {source_file}", None)
         full_path = candidates[0]
 
-    with open(full_path, "r", encoding="utf-8") as f:
+    with open(full_path, "r", encoding="utf-8", newline="") as f:
         content = f.read()
 
     # استبدل old_value بـ new_value (مع الحفاظ على .dp)
@@ -664,6 +666,7 @@ def edit_dimension_in_source(
         with tempfile.NamedTemporaryFile(
             mode="w",
             encoding="utf-8",
+            newline="",
             dir=full_path.parent,
             delete=False,
             prefix=full_path.name + ".tmp_",
@@ -727,7 +730,7 @@ def update_token_default(token_name: str, value: str) -> tuple:
     if not file_path.exists():
         return (False, f"AppDimens.kt not found: {file_path}", None)
 
-    with open(file_path, "r", encoding="utf-8") as f:
+    with open(file_path, "r", encoding="utf-8", newline="") as f:
         content = f.read()
 
     clean = value.replace(".dp", "").strip()
@@ -771,6 +774,7 @@ def update_token_default(token_name: str, value: str) -> tuple:
         with tempfile.NamedTemporaryFile(
             mode="w",
             encoding="utf-8",
+            newline="",
             dir=file_path.parent,
             delete=False,
             prefix=file_path.name + ".tmp_",

@@ -415,9 +415,10 @@ def surgical_edit(
             None
         )
 
-    # 3. أنشئ النسخة الاحتياطية
+    # 3. أنشئ النسخة الاحتياطية (فقط إذا لم تكن موجودة للحفاظ على النسخة الأصلية النقية)
     backup_path = str(path) + ".bridge.bak"
-    shutil.copy2(path, backup_path)
+    if not os.path.exists(backup_path):
+        shutil.copy2(path, backup_path)
 
     # 4. ابنِ المحتوى الجديد
     new_source = (
@@ -426,7 +427,8 @@ def surgical_edit(
         + source[byte_end:]
     )
 
-    # 5. كتابة ذرية: temp file ثم rename
+    # 5. كتابة ذرية: temp file ثم rename مع محاولات إعادة لـ Windows
+    import time
     try:
         with tempfile.NamedTemporaryFile(
             mode="wb",
@@ -437,14 +439,25 @@ def surgical_edit(
             tmp.write(new_source)
             tmp_path = tmp.name
 
-        # rename يضمن atomicity
-        os.replace(tmp_path, path)
+        replaced = False
+        last_err = None
+        for attempt in range(10):
+            try:
+                os.replace(tmp_path, path)
+                replaced = True
+                break
+            except PermissionError as pe:
+                last_err = pe
+                time.sleep(0.05 * (attempt + 1))
+
+        if not replaced and last_err:
+            raise last_err
+
     except Exception as e:
-        # حاول إزالة الـ temp
         try:
             if os.path.exists(tmp_path):
                 os.remove(tmp_path)
-        except:
+        except Exception:
             pass
         return (False, f"Write failed: {e}", backup_path)
 

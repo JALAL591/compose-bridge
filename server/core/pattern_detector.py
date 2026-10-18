@@ -64,7 +64,8 @@ class PatternDetector:
         kt_files = self._find_kt_files()
         for f in kt_files:
             try:
-                content = f.read_text(encoding="utf-8")
+                with open(f, "r", encoding="utf-8", newline="") as fh:
+                    content = fh.read()
             except Exception:
                 continue
             self._scan_content(content, f)

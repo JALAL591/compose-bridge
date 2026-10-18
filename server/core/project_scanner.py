@@ -117,7 +117,7 @@ class ProjectScanner:
         """Extract tokens and hardcoded values from a single Kotlin file."""
         if content is None:
             try:
-                content = f.read_text(encoding="utf-8")
+                with open(f, "r", encoding="utf-8", newline="") as _fh: content = _fh.read()
             except Exception:
                 return {"dimensions": [], "colors": [], "hardcoded": []}
         
@@ -164,7 +164,7 @@ class ProjectScanner:
 
         def worker(file_path: Path):
             try:
-                content = file_path.read_text(encoding="utf-8")
+                with open(file_path, "r", encoding="utf-8", newline="") as _fh: content = _fh.read()
             except Exception:
                 return None
             res = self._extract_from_file(file_path, content, include_hardcoded=include_hardcoded)
@@ -426,7 +426,7 @@ class ProjectScanner:
         file_contents = {}
         for f in kt_files:
             try:
-                file_contents[f] = f.read_text(encoding="utf-8")
+                with open(f, "r", encoding="utf-8", newline="") as _fh: file_contents[f] = _fh.read()
             except Exception:
                 continue
         impacts = self._build_token_impacts_fast(report.registered_tokens, file_contents)
