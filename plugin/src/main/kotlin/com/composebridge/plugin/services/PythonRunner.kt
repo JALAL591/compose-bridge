@@ -33,6 +33,19 @@ class PythonRunner(private val project: Project) {
                 return f.absolutePath
             }
         }
+                val parent = File(projectRoot).parentFile
+        if (parent != null) {
+            val siblingCandidates = listOf(
+                File(parent, "compose-bridge/server"),
+                File(parent, "compose-bridge/bridge"),
+                File(parent, "StudentApp/bridge")
+            )
+            for (sib in siblingCandidates) {
+                if (sib.exists() && File(sib, "server.py").exists()) {
+                    return sib.absolutePath
+                }
+            }
+        }
         return if (saved.isNotBlank()) saved else ""
     }
 

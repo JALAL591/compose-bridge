@@ -1,3 +1,4 @@
+import os
 """
 AST Finder — Tree-sitter integration for Kotlin parsing.
 """

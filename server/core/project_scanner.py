@@ -1,3 +1,4 @@
+import os
 # -*- coding: utf-8 -*-
 """
 Project Scanner — Full scan of Compose project tokens with caching and parallel execution.

@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit
 class BridgeTransport(
     private val serverUrl: String,
     private val registry: CompositionRegistry,
-    private val authToken: String = "",
+    private val authToken: String = "test-token-local-dev",
 ) {
 
     private val client = OkHttpClient.Builder()

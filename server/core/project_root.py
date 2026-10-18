@@ -56,6 +56,16 @@ def _from_config() -> Optional[Path]:
 
 
 def get_project_root(explicit: Optional[Path] = None, no_config: bool = False) -> Path:
+    import sys
+    for i, arg in enumerate(sys.argv):
+        if arg == "--root" and i + 1 < len(sys.argv):
+            p = Path(sys.argv[i + 1]).resolve()
+            if p.exists():
+                return p
+        elif arg.startswith("--root="):
+            p = Path(arg.split("=", 1)[1]).resolve()
+            if p.exists():
+                return p
     """
     Get the project root using the precedence rules.
 

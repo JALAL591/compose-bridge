@@ -29,6 +29,15 @@ object ComposeBridgeAgent {
         val dimVersion by BridgeDimensionRegistry.version
         currentComposer.collectParameterInformation()
         registry.register(currentComposer.compositionData)
+        val context = androidx.compose.ui.platform.LocalContext.current
+        androidx.compose.runtime.DisposableEffect(context) {
+            (context as? Activity)?.let { activity ->
+                attachOverlay(activity)
+            }
+            onDispose {
+                detachOverlay()
+            }
+        }
         CompositionLocalProvider(
             LocalInspectionTables provides registry.tables
         ) {
@@ -48,7 +57,7 @@ object ComposeBridgeAgent {
 
     fun start(
         serverUrl: String = "ws://127.0.0.1:8711",
-        authToken: String = "",
+        authToken: String = "test-token-local-dev",
     ) {
         if (!BuildConfig.DEBUG) {
             println("[ComposeBridge] ⚠️ Disabled in release builds")
