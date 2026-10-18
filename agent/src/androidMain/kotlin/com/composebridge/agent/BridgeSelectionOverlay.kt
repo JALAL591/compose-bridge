@@ -93,16 +93,22 @@ class BridgeSelectionOverlay(
         style = Paint.Style.FILL
     }
 
-    // Close button
-    private val stopButtonRect = Rect(20, 20, 240, 130)
-    private val stopButtonPaint = Paint().apply {
-        color = Color.rgb(229, 57, 53)
-        style = Paint.Style.FILL
-    }
-    private val stopButtonTextPaint = Paint().apply {
-        color = Color.WHITE
-        textSize = 42f
-        isAntiAlias = true
+    // Close button target aligned with DesignModeButton (statusBarsPadding + 80dp top, 16dp end)
+    private fun getStopButtonRect(): Rect {
+        val density = resources.displayMetrics.density
+        val statusBarHeight = run {
+            val resId = resources.getIdentifier("status_bar_height", "dimen", "android")
+            if (resId > 0) resources.getDimensionPixelSize(resId) else (24 * density).toInt()
+        }
+        val topOffset = statusBarHeight + (80 * density).toInt()
+        val size = (56 * density).toInt()
+        val margin = (16 * density).toInt()
+        val isRtl = resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL
+        val left = if (isRtl) margin else width - margin - size
+        val right = left + size
+        val bottom = topOffset + size
+        val slop = (8 * density).toInt()
+        return Rect(left - slop, topOffset - slop, right + slop, bottom + slop)
     }
 
     private var overlayLocation = IntArray(2)
@@ -122,7 +128,7 @@ class BridgeSelectionOverlay(
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 // Close button
-                if (stopButtonRect.contains(localX.toInt(), localY.toInt())) {
+                if (getStopButtonRect().contains(localX.toInt(), localY.toInt())) {
                     return true
                 }
 
@@ -151,7 +157,7 @@ class BridgeSelectionOverlay(
 
             MotionEvent.ACTION_UP -> {
                 // Close button
-                if (stopButtonRect.contains(localX.toInt(), localY.toInt())) {
+                if (getStopButtonRect().contains(localX.toInt(), localY.toInt())) {
                     onStopRequested?.invoke()
                     draggingHandle = null
                     previewRect = null
@@ -432,13 +438,6 @@ class BridgeSelectionOverlay(
             }
         }
 
-        // Draw close button
-        canvas.drawRect(stopButtonRect, stopButtonPaint)
-        canvas.drawText(
-            "✕ Close",
-            stopButtonRect.left + 25f,
-            stopButtonRect.top + 75f,
-            stopButtonTextPaint
-        )
+                // Close button is rendered by Compose DesignModeButton cleanly at getStopButtonRect()
     }
 }
