@@ -11,9 +11,8 @@
 [![Version](https://img.shields.io/badge/Version-1.0.0-blue.svg)]()
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/JALAL591/compose-bridge/blob/main/LICENSE)
 [![M8ven Score](https://m8ven.ai/badge/mcp/jalal591-compose-bridge-rapm1x)](https://m8ven.ai/mcp/jalal591-compose-bridge-rapm1x?s=readme)
-
 [![compose-bridge MCP server – quality and maintenance score on Glama](https://glama.ai/mcp/servers/JALAL591/compose-bridge/badges/card.svg)](https://glama.ai/mcp/servers/JALAL591/compose-bridge)
-
+[![Reviewed by HOL Guard](https://img.shields.io/badge/HOL_Guard%20|%20compose_bridge-2E5AAC?logo=shield&logoColor=white)](https://hol.org/guard/extensions/mcp.compose-bridge)
 
 ## 📰 Featured In
 
