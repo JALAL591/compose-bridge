@@ -943,6 +943,296 @@ def update_color(token_name: str, value: str) -> tuple:
     return res[0], res[1]
 
 
+
+
+# ============================================================
+# تعديل النصوص (Text Editing) — Hardcoded & Reference
+# ============================================================
+
+def escape_kotlin_string(text: str) -> str:
+    r"""
+    يقوم بتحويل المحارف الخاصة إلى صيغة آمنة لسلاسل كوتلن النصية (Double-quoted strings).
+    - تحويل \ إلى \\
+    - تحويل " إلى \"
+    - تحويل \n إلى \n
+    - تحويل \r إلى \r
+    - تحويل \t إلى \t
+    - تحويل $ إلى \$ لتجنب الـ String Template غير المقصود
+    """
+    if not text:
+        return ""
+    # تأكد من استبدال الـ backslash أولاً لتفادي مضاعفة الـ escapes اللاحقة
+    escaped = text.replace("\\", "\\\\")
+    escaped = escaped.replace('"', '\\"')
+    escaped = escaped.replace("\n", "\\n")
+    escaped = escaped.replace("\r", "\\r")
+    escaped = escaped.replace("\t", "\\t")
+    escaped = escaped.replace("$", "\\$")
+    return escaped
+
+
+def update_text_in_source(
+    file_path: str,
+    line: int,
+    old_text: str,
+    new_text: str,
+    ref_key: Optional[str] = None,
+    project_root: Optional[Path] = None,
+) -> tuple:
+    r"""
+    يقوم بالتعديل الجراحي للنصوص في الكود المصدري عبر حالتين:
+    أ. نص مباشر (Hardcoded): استبدال النص بين علامتي التنصيص Text("old") إلى Text("new") في الملف المحدد.
+    ب. نص مرجعي (Reference): إذا كان النص يشير لـ AppStrings.xyz، يتم تعديل قيمة المتغير في ملف AppStrings.kt نفسه بدلاً من تخريب استدعاء الـ Composable.
+    
+    معالجة الـ String Escaping:
+    يتم تحويل " إلى \" و \ إلى \\ و \n إلى \n لضمان سلامة كود كوتلن من أخطاء الترجمة.
+    
+    الضمانات:
+    - يستخدم FileLock (قفل الملفات).
+    - ينشئ نسخة احتياطية .bridge.bak.
+    - يسجل العملية في PatternJournal ليظهر التعديل في تبويب Changes في الـ IDE.
+    
+    Returns:
+        (success: bool, message: str, info: dict)
+    """
+    from .project_root import get_project_root
+    from .write_lock import acquire_write_lock
+    from .ast_finder import surgical_edit
+    from .pattern_journal import PatternJournal
+    import re
+    import os
+
+    if not project_root:
+        project_root = get_project_root()
+    else:
+        project_root = Path(project_root)
+
+    with acquire_write_lock():
+        target_ref = ref_key
+        if not target_ref and old_text and old_text.strip().startswith("AppStrings."):
+            target_ref = old_text.strip()
+
+        is_ref = bool(target_ref and target_ref.startswith("AppStrings."))
+        escaped_new = escape_kotlin_string(new_text)
+
+        # ----------------------------------------------------
+        # الحالة ب: نص مرجعي (Reference في AppStrings.kt)
+        # ----------------------------------------------------
+        if is_ref:
+            candidates = list(project_root.rglob("AppStrings.kt"))
+            candidates = [c for c in candidates if "build" not in str(c) and ".composebridge" not in str(c)]
+            if not candidates:
+                return (False, f"AppStrings.kt not found in project {project_root}", None)
+
+            strings_file = candidates[0]
+            with open(strings_file, "r", encoding="utf-8", newline="") as f:
+                content = f.read()
+
+            parts = target_ref.split(".")
+            var_name = parts[-1]
+            object_name = parts[-2] if len(parts) >= 2 and parts[-2] != "AppStrings" else None
+
+            lines_with_ends = content.splitlines(keepends=True)
+            target_idx = -1
+            old_literal = None
+            chosen_m = None
+
+            in_target_object = object_name is None
+
+            for idx, line_str in enumerate(lines_with_ends):
+                if object_name and f"object {object_name}" in line_str:
+                    in_target_object = True
+                elif in_target_object and object_name and "object " in line_str and f"object {object_name}" not in line_str:
+                    in_target_object = False
+
+                if in_target_object and var_name in line_str and "val " in line_str:
+                    matches = list(re.finditer(r'"([^"\\]*(?:\\.[^"\\]*)*)"', line_str))
+                    if matches:
+                        if old_text:
+                            for m in matches:
+                                if m.group(1) == old_text or old_text in m.group(1):
+                                    chosen_m = m
+                                    break
+                        if not chosen_m:
+                            chosen_m = matches[-1] if len(matches) > 1 else matches[0]
+
+                        target_idx = idx
+                        old_literal = chosen_m.group(1)
+                        break
+
+            if target_idx == -1 or old_literal is None:
+                if old_text:
+                    for idx, line_str in enumerate(lines_with_ends):
+                        if old_text in line_str:
+                            target_idx = idx
+                            old_literal = old_text
+                            break
+
+            if target_idx == -1 or old_literal is None:
+                return (False, f"Could not find declaration for '{target_ref}' in {strings_file.name}", None)
+
+            target_line_str = lines_with_ends[target_idx]
+            if chosen_m is not None:
+                val_start_col = chosen_m.start(1)
+            else:
+                col_in_line = target_line_str.find(f'"{old_literal}"')
+                val_start_col = col_in_line + 1 if col_in_line != -1 else target_line_str.find(old_literal)
+
+            line_byte_start = len("".join(lines_with_ends[:target_idx]).encode("utf-8"))
+            byte_start = line_byte_start + len(target_line_str[:val_start_col].encode("utf-8"))
+            byte_end = byte_start + len(old_literal.encode("utf-8"))
+
+            ok, msg, bak = surgical_edit(
+                file_path=str(strings_file),
+                byte_start=byte_start,
+                byte_end=byte_end,
+                expected_old_value=old_literal,
+                new_value=escaped_new,
+            )
+            if not ok:
+                return (False, f"Surgical edit failed on {strings_file.name}: {msg}", None)
+
+            # تسجيل التعديل في Journal
+            try:
+                journal = PatternJournal(project_root)
+                journal.record(
+                    pattern_id=f"text_ref_{var_name}",
+                    file=str(strings_file.relative_to(project_root)),
+                    line=target_idx + 1,
+                    old_content=target_line_str.strip(),
+                    new_content=target_line_str.replace(old_literal, escaped_new).strip(),
+                )
+            except Exception as e:
+                print(f"[update_text_in_source] Warning recording journal: {e}")
+
+            return (
+                True,
+                f"Successfully updated reference '{target_ref}' in {strings_file.name}:{target_idx + 1}",
+                {
+                    "type": "reference",
+                    "ref_key": target_ref,
+                    "file": str(strings_file.relative_to(project_root)),
+                    "line": target_idx + 1,
+                    "old_text": old_literal,
+                    "new_text": new_text,
+                }
+            )
+
+        # ----------------------------------------------------
+        # الحالة أ: نص مباشر (Hardcoded في ملف المصدر)
+        # ----------------------------------------------------
+        full_path = None
+        if os.path.isabs(file_path) and os.path.exists(file_path):
+            full_path = Path(file_path)
+        else:
+            fname = Path(file_path).name
+            candidates = list(project_root.rglob(fname))
+            candidates = [c for c in candidates if "build" not in str(c) and ".composebridge" not in str(c)]
+            if candidates:
+                full_path = candidates[0]
+
+        if not full_path or not full_path.exists():
+            return (False, f"Source file not found: {file_path}", None)
+
+        with open(full_path, "r", encoding="utf-8", newline="") as f:
+            content = f.read()
+
+        lines_with_ends = content.splitlines(keepends=True)
+        if not lines_with_ends:
+            return (False, f"File {full_path.name} is empty", None)
+
+        target_idx = -1
+        target_literal = None
+
+        # البحث حول السطر المطلوب (نطاق ±20 سطر)
+        check_idx = max(0, min(len(lines_with_ends) - 1, line - 1))
+        search_indices = [check_idx]
+        for offset in range(1, 21):
+            if check_idx - offset >= 0:
+                search_indices.append(check_idx - offset)
+            if check_idx + offset < len(lines_with_ends):
+                search_indices.append(check_idx + offset)
+
+        # 1. البحث عن تطابق مباشر مع old_text
+        if old_text:
+            for s_idx in search_indices:
+                line_str = lines_with_ends[s_idx]
+                if old_text in line_str:
+                    target_idx = s_idx
+                    target_literal = old_text
+                    break
+
+        # 2. البحث عن Text("...") في الأسطر المحيطة
+        if target_idx == -1:
+            for s_idx in search_indices:
+                line_str = lines_with_ends[s_idx]
+                m_txt = re.search(r'Text\s*\(\s*(?:text\s*=\s*)?"([^"\\]*(?:\\.[^"\\]*)*)"', line_str)
+                if m_txt:
+                    target_idx = s_idx
+                    target_literal = m_txt.group(1)
+                    break
+
+        # 3. بحث أوسع في كامل الملف إذا لم يتم العثور عليه قرب السطر
+        if target_idx == -1 and old_text:
+            for s_idx, line_str in enumerate(lines_with_ends):
+                if old_text in line_str:
+                    target_idx = s_idx
+                    target_literal = old_text
+                    break
+
+        if target_idx == -1 or not target_literal:
+            return (False, f"Text '{old_text}' not found near line {line} in {full_path.name}", None)
+
+        target_line_str = lines_with_ends[target_idx]
+        col_in_line = target_line_str.find(f'"{target_literal}"')
+        if col_in_line != -1:
+            val_start_col = col_in_line + 1
+        else:
+            val_start_col = target_line_str.find(target_literal)
+
+        if val_start_col == -1:
+            return (False, f"Literal '{target_literal}' offset not found in {full_path.name}:{target_idx + 1}", None)
+
+        line_byte_start = len("".join(lines_with_ends[:target_idx]).encode("utf-8"))
+        byte_start = line_byte_start + len(target_line_str[:val_start_col].encode("utf-8"))
+        byte_end = byte_start + len(target_literal.encode("utf-8"))
+
+        ok, msg, bak = surgical_edit(
+            file_path=str(full_path),
+            byte_start=byte_start,
+            byte_end=byte_end,
+            expected_old_value=target_literal,
+            new_value=escaped_new,
+        )
+        if not ok:
+            return (False, f"Surgical edit failed on {full_path.name}: {msg}", None)
+
+        # تسجيل التعديل في Journal
+        try:
+            journal = PatternJournal(project_root)
+            journal.record(
+                pattern_id=f"text_hardcoded_{full_path.stem}_{target_idx + 1}",
+                file=str(full_path.relative_to(project_root)),
+                line=target_idx + 1,
+                old_content=target_line_str.strip(),
+                new_content=target_line_str.replace(target_literal, escaped_new).strip(),
+            )
+        except Exception as e:
+            print(f"[update_text_in_source] Warning recording journal: {e}")
+
+        return (
+            True,
+            f"Successfully updated text in {full_path.name}:{target_idx + 1}",
+            {
+                "type": "hardcoded",
+                "file": str(full_path.relative_to(project_root)),
+                "line": target_idx + 1,
+                "old_text": target_literal,
+                "new_text": new_text,
+            }
+        )
+
+
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="ComposeBridge State Editor CLI")

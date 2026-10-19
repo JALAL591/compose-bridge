@@ -490,12 +490,51 @@ class BridgeTransport(
                                         }
                                     }
 
+                                    val textsArray = resObj["texts"]?.jsonArray
+                                    val parsedTexts = mutableListOf<ElementTextInfo>()
+                                    val existingRuntimeText = BridgeState.elementTexts.firstOrNull()?.text
+                                    textsArray?.forEach { tElem ->
+                                        try {
+                                            val tObj = tElem.jsonObject
+                                            val textVal = tObj["text"]?.jsonPrimitive?.contentOrNull ?: ""
+                                            if (textVal.isNotEmpty()) {
+                                                val tFile = tObj["file"]?.jsonPrimitive?.contentOrNull ?: targetFile ?: ""
+                                                val tLine = tObj["line"]?.jsonPrimitive?.intOrNull ?: 1
+                                                val isRef = tObj["is_resource_or_ref"]?.jsonPrimitive?.booleanOrNull ?: false
+                                                val rKey = tObj["ref_key"]?.jsonPrimitive?.contentOrNull
+                                                
+                                                // ⭐ Prioritize runtime evaluated text if textVal is a reference path
+                                                val finalDisplayText = if (textVal.startsWith("AppStrings.") && !existingRuntimeText.isNullOrBlank() && !existingRuntimeText.startsWith("AppStrings.")) {
+                                                    existingRuntimeText
+                                                } else {
+                                                    textVal
+                                                }
+
+                                                parsedTexts.add(
+                                                    ElementTextInfo(
+                                                        text = finalDisplayText,
+                                                        file = tFile,
+                                                        line = tLine,
+                                                        isResourceOrRef = isRef || (rKey != null),
+                                                        refKey = rKey
+                                                    )
+                                                )
+                                            }
+                                        } catch (e: Exception) {
+                                            println("[BridgeTransport] ⚠️ Error parsing text: $e")
+                                        }
+                                    }
+
                                     mainHandler.post {
                                         BridgeState.elementComposableName = cName
                                         BridgeState.elementColors.clear()
                                         BridgeState.elementColors.addAll(parsedColors)
                                         BridgeState.elementDimensions.clear()
                                         BridgeState.elementDimensions.addAll(parsedDimensions)
+                                        if (parsedTexts.isNotEmpty()) {
+                                            BridgeState.elementTexts.clear()
+                                            BridgeState.elementTexts.addAll(parsedTexts)
+                                        }
                                         BridgeState.isLoadingElementColors = false
                                         BridgeState.elementAnalysisError = null
                                     }

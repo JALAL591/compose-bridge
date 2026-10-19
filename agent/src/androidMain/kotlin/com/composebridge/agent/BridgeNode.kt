@@ -14,17 +14,19 @@ data class BridgeNode(
     val top: Int,
     val right: Int,
     val bottom: Int,
-    val children: List<BridgeNode>
+    val children: List<BridgeNode>,
+    val textContent: String? = null
 ) {
     fun isUserNode(): Boolean {
         if (sourceFile == null) return false
         if (sourceFile.isBlank()) return false
 
+        // ⭐ Text and BasicText removed from blocked list to allow text inspection & editing
         val blocked = listOf(
             "Box.kt", "Layout.kt", "Composables.kt", "Surface.kt",
-            "Card.kt", "Text.kt", "Row.kt", "Column.kt", "Button.kt",
+            "Card.kt", "Row.kt", "Column.kt", "Button.kt",
             "LazyLayout", "SubcomposeLayout", "MaterialTheme.kt",
-            "ColorScheme.kt", "BasicText.kt", "LazyDsl.kt",
+            "ColorScheme.kt", "LazyDsl.kt",
             "LazyListItemProvider.kt", "LazyLayoutItemContentFactory.kt",
             "LazyLayoutPinnableItem.kt", "SaveableStateHolder.kt",
             "LazySaveableStateHolder.kt", "Effects.kt", "CompositionLocal.kt",
@@ -76,7 +78,10 @@ data class BridgeNode(
      */
     fun toFilteredTree(): BridgeNode? {
         if (isUserNode()) {
-            return this.copy(children = children.mapNotNull { it.toFilteredTree() })
+            return this.copy(
+                children = children.mapNotNull { it.toFilteredTree() },
+                textContent = textContent
+            )
         } else {
             val userChildren = children.mapNotNull { it.toFilteredTree() }
             return when (userChildren.size) {
@@ -95,7 +100,8 @@ data class BridgeNode(
                         top = userChildren.minOf { it.top },
                         right = userChildren.maxOf { it.right },
                         bottom = userChildren.maxOf { it.bottom },
-                        children = userChildren
+                        children = userChildren,
+                        textContent = userChildren.firstNotNullOfOrNull { it.textContent }
                     )
                 }
             }
@@ -111,6 +117,7 @@ data class BridgeNode(
             append("\"line\":${line ?: "null"},")
             append("\"utf16Offset\":${utf16Offset ?: "null"},")
             append("\"utf16Length\":${utf16Length ?: "null"},")
+            append("\"textContent\":${textContent.toJsonString()},")
             append("\"bounds\":{")
             append("\"left\":$left,\"top\":$top,\"right\":$right,\"bottom\":$bottom")
             append("},")

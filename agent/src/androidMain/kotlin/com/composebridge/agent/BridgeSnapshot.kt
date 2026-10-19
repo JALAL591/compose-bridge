@@ -10,8 +10,15 @@ import androidx.compose.ui.tooling.data.mapTree
 @OptIn(UiToolingDataApi::class)
 fun CompositionData.toBridgeTree(): BridgeNode? {
     return try {
-        mapTree(factory = { _, context, children ->
+        mapTree(factory = { group, context, children ->
             val location = context.location
+            val extractedText = try {
+                group.data.filterIsInstance<String>().firstOrNull { it.isNotBlank() }
+                    ?: group.data.filterIsInstance<CharSequence>().firstOrNull { it.isNotBlank() }?.toString()
+            } catch (e: Throwable) {
+                null
+            }
+
             BridgeNode(
                 name = context.name,
                 sourceFile = location?.sourceFile,
@@ -23,7 +30,8 @@ fun CompositionData.toBridgeTree(): BridgeNode? {
                 top = context.bounds.top,
                 right = context.bounds.right,
                 bottom = context.bounds.bottom,
-                children = children.filterNotNull()
+                children = children.filterNotNull(),
+                textContent = extractedText
             )
         })
     } catch (e: Throwable) {

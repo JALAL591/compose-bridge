@@ -93,23 +93,26 @@ class BridgeSelectionOverlay(
         style = Paint.Style.FILL
     }
 
-    // Close button target aligned with DesignModeButton (statusBarsPadding + 80dp top, 16dp end)
-    private fun getStopButtonRect(): Rect {
+    // Floating toolbar target aligned with DesignModeButton (statusBarsPadding + 80dp top, 16dp end)
+    private fun getToolbarRect(): Rect {
         val density = resources.displayMetrics.density
         val statusBarHeight = run {
             val resId = resources.getIdentifier("status_bar_height", "dimen", "android")
             if (resId > 0) resources.getDimensionPixelSize(resId) else (24 * density).toInt()
         }
-        val topOffset = statusBarHeight + (80 * density).toInt()
-        val size = (56 * density).toInt()
-        val margin = (16 * density).toInt()
+        val topOffset = statusBarHeight + (70 * density).toInt()
+        val widthPx = (64 * density).toInt()
+        val heightPx = (250 * density).toInt()
+        val margin = (12 * density).toInt()
         val isRtl = resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL
-        val left = if (isRtl) margin else width - margin - size
-        val right = left + size
-        val bottom = topOffset + size
+        val left = if (isRtl) margin else width - margin - widthPx
+        val right = left + widthPx
+        val bottom = topOffset + heightPx
         val slop = (8 * density).toInt()
         return Rect(left - slop, topOffset - slop, right + slop, bottom + slop)
     }
+
+    private fun getStopButtonRect(): Rect = getToolbarRect()
 
     private var overlayLocation = IntArray(2)
 
@@ -125,9 +128,14 @@ class BridgeSelectionOverlay(
         val localX = event.x
         val localY = event.y
 
+        // Allow touches on floating toolbar to pass directly to Compose buttons
+        if (getToolbarRect().contains(localX.toInt(), localY.toInt())) {
+            return false
+        }
+
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                // Close button
+                // Close button fallback
                 if (getStopButtonRect().contains(localX.toInt(), localY.toInt())) {
                     return true
                 }
@@ -178,7 +186,7 @@ class BridgeSelectionOverlay(
                 }
 
                 // Select new element
-                val result = BridgeHitTester.hitTest(getTrees(), localX.toInt(), localY.toInt())
+                val result = BridgeHitTester.hitTest(getTrees(), localX.toInt(), localY.toInt(), BridgeState.currentEditMode)
                 highlightRect = result?.node?.let {
                     Rect(it.left, it.top, it.right, it.bottom)
                 }
@@ -195,7 +203,25 @@ class BridgeSelectionOverlay(
                     // ⭐ 1. Clear old data immediately
                     BridgeState.elementColors.clear()
                     BridgeState.elementDimensions.clear()
-                    BridgeState.elementComposableName = ""
+                    BridgeState.elementTexts.clear()
+
+                    val act = BridgeOverlayManager.attachedActivity ?: (context as? android.app.Activity)
+                    val runtimeText = BridgeSemanticsExtractor.findTextAt(act, localX, localY)
+                        ?: node.textContent
+
+                    if (!runtimeText.isNullOrBlank()) {
+                        BridgeState.elementTexts.add(
+                            ElementTextInfo(
+                                text = runtimeText,
+                                file = node.sourceFile ?: "",
+                                line = node.line ?: 1,
+                                property = "text",
+                                isResourceOrRef = false,
+                                refKey = null
+                            )
+                        )
+                    }
+                    BridgeState.elementComposableName = node.name ?: ""
                     BridgeState.isLoadingElementColors = true
                     BridgeState.elementAnalysisError = null
 
@@ -214,6 +240,13 @@ class BridgeSelectionOverlay(
                     if (file != null && line != null && line > 0) {
                         // ⭐ Build tree JSON
                         val treeJson = buildChildrenJson(node)
+
+                        // ⭐ Parent Properties Aggregation: if node is Text, ascend to parent container
+                        val parent = result.findParentContainer()
+                        val isText = node.name == "Text" || node.name?.contains("Text") == true
+                        val parentFile = if (isText) parent?.sourceFile else null
+                        val parentLine = if (isText) parent?.line else null
+
                         val sent = ComposeBridgeAgent.analyzeElementWithTree(
                             file = file,
                             line = line,
@@ -221,8 +254,12 @@ class BridgeSelectionOverlay(
                             utf16Length = length,
                             treeJson = treeJson,
                             requestId = requestId,
+                            parentFile = parentFile,
+                            parentLine = parentLine,
+                            textValue = runtimeText,
+                            textReference = null,
                         )
-                        println("[Overlay] 📤 analyzeElementWithTree sent=$sent (reqId=$requestId)")
+                        println("[Overlay] 📤 analyzeElementWithTree sent=$sent parent=${parent?.name} text='$runtimeText' (reqId=$requestId)")
                     }
                 }
                 return true

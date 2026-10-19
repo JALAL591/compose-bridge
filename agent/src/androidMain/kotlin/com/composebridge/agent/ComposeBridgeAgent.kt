@@ -198,18 +198,28 @@ object ComposeBridgeAgent {
     /**
      * Requests element analysis with children tree.
      */
-    fun analyzeElementWithTree(
+            fun analyzeElementWithTree(
         file: String,
         line: Int,
         utf16Offset: Int = 0,
         utf16Length: Int = 0,
         treeJson: String = "[]",
         requestId: Long = 0L,
+        parentFile: String? = null,
+        parentLine: Int? = null,
+        textValue: String? = null,
+        textReference: String? = null,
+        mode: String = BridgeState.currentEditMode.name,
     ): Boolean {
-        val escapedTree = treeJson.replace("\"", "\\\"")
-        val json = """
-            {"type":"analyze_element_with_tree","file":"$file","line":$line,"offset":$utf16Offset,"length":$utf16Length,"tree":"$escapedTree","request_id":$requestId}
-        """.trimIndent()
+        val quote = '"'
+        val slash = '\\'
+        val escapedTree = treeJson.replace(quote.toString(), "$slash$quote")
+        val pFilePart = if (parentFile != null) ",${quote}parent_file${quote}:${quote}$parentFile${quote}" else ""
+        val pLinePart = if (parentLine != null) ",${quote}parent_line${quote}:$parentLine" else ""
+        val escapedTxtVal = textValue?.replace(slash.toString(), "$slash$slash")?.replace(quote.toString(), "$slash$quote")?.replace("\n", "${slash}n")
+        val tValPart = if (escapedTxtVal != null) ",${quote}text_value${quote}:${quote}$escapedTxtVal${quote}" else ""
+        val tRefPart = if (textReference != null) ",${quote}text_reference${quote}:${quote}$textReference${quote}" else ""
+        val json = """{"type":"analyze_element_with_tree","file":"$file","line":$line,"offset":$utf16Offset,"length":$utf16Length,"tree":"$escapedTree","request_id":$requestId,"mode":"$mode"$pFilePart$pLinePart$tValPart$tRefPart}"""
         return transport?.send(json) ?: false
     }
 
@@ -327,6 +337,7 @@ object ComposeBridgeAgent {
                     put("token_name", edit.tokenName)
                     edit.originalToken?.let { put("original_token", it) }
                     edit.originalValue?.let { put("original_value", it) }
+                    edit.refKey?.let { put("ref_key", it) }
                     if (edit.occurrences.isNotEmpty()) {
                         put("occurrences", kotlinx.serialization.json.buildJsonArray {
                             edit.occurrences.forEach { occ ->

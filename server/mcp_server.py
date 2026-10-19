@@ -517,6 +517,93 @@ def set_token(token_name: str, value: str) -> str:
             return json.dumps({"error": str(e)})
 
 
+
+@app.tool()
+def set_text(token_name: str, new_value: str, file_path: str = None, line: int = None) -> str:
+    """
+    Surgically edit text content in either:
+    1. An AppStrings reference token (e.g. "AppStrings.Dashboard.quickAccess" or "Dashboard.quickAccess").
+    2. A hardcoded Text("...") composable in a given source file or found across the project.
+    
+    Args:
+        token_name: The reference token key OR the exact old text to replace.
+        new_value: The new text string to set.
+        file_path: Optional source file (e.g. "DashboardScreen.kt" or "AppStrings.kt").
+        line: Optional line number.
+        
+    Returns:
+        JSON string with success status, old_text, new_text, and file location.
+    """
+    from core.write_lock import acquire_write_lock
+    with acquire_write_lock():
+        try:
+            from core.state_editor import update_text_in_source
+            from core.project_root import get_project_root
+            
+            p_root = get_project_root()
+            
+            ref_key = None
+            old_text = token_name
+            if token_name.startswith("AppStrings.") or (file_path and "AppStrings" in file_path):
+                ref_key = token_name if token_name.startswith("AppStrings.") else f"AppStrings.{token_name}"
+                old_text = ""
+                file_path = file_path or "AppStrings.kt"
+            elif not file_path:
+                # Search for old_text across .kt files in project
+                found_file = None
+                found_line = 1
+                for f in p_root.rglob("*.kt"):
+                    if "build" in str(f) or ".composebridge" in str(f):
+                        continue
+                    try:
+                        f_text = f.read_text(encoding="utf-8", errors="ignore")
+                        if token_name in f_text:
+                            for idx, l_str in enumerate(f_text.splitlines(), 1):
+                                if token_name in l_str:
+                                    found_file = str(f)
+                                    found_line = idx
+                                    break
+                            if found_file:
+                                break
+                    except Exception:
+                        pass
+                if found_file:
+                    file_path = found_file
+                    line = found_line
+                else:
+                    return json.dumps({
+                        "success": False,
+                        "error": f"Could not locate text or token '{token_name}' in project",
+                    })
+
+            ok, msg, info = update_text_in_source(
+                file_path=file_path or "AppStrings.kt",
+                line=line or 1,
+                old_text=old_text,
+                new_text=new_value,
+                ref_key=ref_key,
+                project_root=p_root,
+            )
+            
+            if not ok:
+                return json.dumps({"success": False, "error": msg})
+                
+            # Notify Bridge server for live update
+            try:
+                run_async(notify_bridge_server(ref_key or f"text_{file_path}_{line}", new_value))
+            except Exception:
+                pass
+                
+            return json.dumps({
+                "success": True,
+                "message": msg,
+                "info": info
+            }, ensure_ascii=False)
+            
+        except Exception as e:
+            return json.dumps({"success": False, "error": str(e)})
+
+
 @app.tool()
 def list_orphans(project_path: str = None) -> str:
     """

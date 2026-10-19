@@ -11,24 +11,24 @@ import android.view.ViewGroup
  *  - attach: Adds BridgeSelectionOverlay above ComposeView
  *  - detach: Removes it
  *  - setActive: Toggles touch interception
+ *  - setMode: Updates current editing mode (COLOR, DIMENSION, TEXT)
  */
 @SuppressLint("StaticFieldLeak")
 object BridgeOverlayManager {
 
     private var overlay: BridgeSelectionOverlay? = null
-    private var attachedActivity: Activity? = null
+    var attachedActivity: Activity? = null
+        internal set
 
     /**
      * Attaches Overlay to the Activity.
      * If already attached to the same Activity, does nothing.
      */
     fun attach(activity: Activity) {
-        // ⚠️ === rather than == — identity comparison
         if (overlay != null && attachedActivity === activity) return
 
         detach()
 
-        // ⚠️ Use android.R.id.content directly — avoid importing android.R
         val root = activity.window.decorView.findViewById<ViewGroup>(
             android.R.id.content
         ) ?: return
@@ -45,7 +45,6 @@ object BridgeOverlayManager {
             },
         )
 
-        // ⭐ Close button inside Overlay
         newOverlay.onStopRequested = {
             println("[ComposeBridge] 🛑 Stop requested from overlay button")
             DesignModeRegistry.toggle()
@@ -59,7 +58,6 @@ object BridgeOverlayManager {
             ),
         )
 
-        // ⭐ Ensure it is above ComposeView
         newOverlay.bringToFront()
         newOverlay.elevation = 100f
 
@@ -67,6 +65,13 @@ object BridgeOverlayManager {
         attachedActivity = activity
 
         println("[BridgeOverlayManager] ✅ Overlay attached")
+    }
+
+    /**
+     * Updates current mode in BridgeState.
+     */
+    fun setMode(mode: EditMode) {
+        BridgeState.currentMode = mode
     }
 
     /**

@@ -21,7 +21,17 @@ import androidx.compose.ui.unit.sp
  *  1. WebSocket listener — to update values from Python bridge
  *  2. UI screens — to read and display values
  */
+enum class EditMode {
+    COLOR,
+    DIMENSION,
+    TEXT
+}
+
 object BridgeState {
+    var currentMode: EditMode by mutableStateOf(EditMode.COLOR)
+    var currentEditMode: EditMode
+        get() = currentMode
+        set(value) { currentMode = value }
 
     // ═══ Pending Edits Queue ═══
     val pendingEdits = mutableStateListOf<PendingEdit>()
@@ -155,6 +165,7 @@ object BridgeState {
     // ═══ Focus Mode — Selected element colors ═══
     val elementColors = mutableStateListOf<ElementColorInfo>()
     val elementDimensions = mutableStateListOf<ElementDimensionInfo>()
+    val elementTexts = mutableStateListOf<ElementTextInfo>()
     var showDimensionDialog: Boolean by mutableStateOf(false)
     var dimensionPending: ElementDimensionInfo? by mutableStateOf(null)
     var dimensionNewValue: Float? by mutableStateOf(null)
@@ -186,6 +197,7 @@ object BridgeState {
     fun clearElementColors() {
         elementColors.clear()
         elementDimensions.clear()
+        elementTexts.clear()
         isLoadingElementColors = false
         elementComposableName = "Element"
         elementAnalysisError = null
@@ -540,6 +552,16 @@ data class ElementColorInfo(
     val isThemeDependent: Boolean = false,
 )
 
+data class ElementTextInfo(
+    val text: String,
+    val file: String,
+    val line: Int,
+    val property: String = "text",
+    val isResourceOrRef: Boolean = false,
+    val refKey: String? = null,
+    val rawExpression: String? = null,
+)
+
 data class ElementDimensionInfo(
     val property: String,
     val value: String,
@@ -584,4 +606,5 @@ data class PendingEdit(
     val editMode: String = "split",  // "split" | "global"
     val dimensionKind: String = "dp",
     val registryKey: String = "",
+    val refKey: String? = null,
 )

@@ -774,6 +774,7 @@ async def handle_message(websocket: WebSocketServerProtocol, raw: str) -> None:
         utf16_length = message.get("length", 0)
         tree_raw = message.get("tree", "[]")
         request_id = message.get("request_id", 0)
+        mode = str(message.get("mode", "")).upper()
 
         # حاول تحليل tree (قد يكون string أو list)
         try:
@@ -799,8 +800,52 @@ async def handle_message(websocket: WebSocketServerProtocol, raw: str) -> None:
 
         # استخرج التحليل
         result = analyze_element_range(
-            actual_file, actual_line, utf16_offset, utf16_length, tree=tree
+            actual_file, actual_line, utf16_offset, utf16_length, tree=tree,
+            project_root=Path(PROJECT_ROOT) if PROJECT_ROOT else None
         )
+
+        parent_file = message.get("parent_file")
+        parent_line = message.get("parent_line")
+        if parent_file and parent_line:
+            try:
+                parent_result = analyze_element_range(
+                    parent_file, parent_line, 0, 0,
+                    project_root=Path(PROJECT_ROOT) if PROJECT_ROOT else None,
+                )
+                # 1. Merge parent colors (container, background, surface)
+                existing_colors = {c.get("color") for c in result.get("colors", []) if isinstance(c, dict)}
+                for pc in parent_result.get("colors", []):
+                    if isinstance(pc, dict) and pc.get("color") not in existing_colors:
+                        existing_colors.add(pc.get("color"))
+                        result.setdefault("colors", []).append(pc)
+
+                # 2. Merge parent dimensions (padding, size, corner, etc.)
+                existing_dims = {str(d.get("name", "")) + str(d.get("line", "")) for d in result.get("dimension_details", []) if isinstance(d, dict)}
+                for pd in parent_result.get("dimension_details", []):
+                    key = str(pd.get("name", "")) + str(pd.get("line", ""))
+                    if key not in existing_dims:
+                        existing_dims.add(key)
+                        result.setdefault("dimension_details", []).append(pd)
+                        if pd.get("value") and pd.get("value") not in result.get("dimensions", []):
+                            result.setdefault("dimensions", []).append(pd.get("value"))
+            except Exception as e:
+                log_error(f"Failed to aggregate parent properties: {e}")
+
+        req_text_val = message.get("text_value")
+        req_text_ref = message.get("text_reference")
+        if req_text_val:
+            if result.get("texts"):
+                for entry in result["texts"]:
+                    if entry.get("is_resource_or_ref") or entry.get("text", "").startswith("AppStrings."):
+                        entry["text"] = req_text_val
+            else:
+                result.setdefault("texts", []).append({
+                    "text": req_text_val,
+                    "file": actual_file,
+                    "line": actual_line,
+                    "is_resource_or_ref": bool(req_text_ref),
+                    "ref_key": req_text_ref,
+                })
 
         target_file = result.get("source_file", actual_file)
 
@@ -812,6 +857,21 @@ async def handle_message(websocket: WebSocketServerProtocol, raw: str) -> None:
                 {"name": "cardBorder", "default": 2.0},
                 {"name": "cardIcon", "default": 60.0},
             ]
+
+        # Mode-based filtering for payload reduction and speed
+        if mode == "COLOR":
+            result["dimensions"] = []
+            result["dimension_details"] = []
+            result["texts"] = []
+        elif mode == "DIMENSION":
+            result["colors"] = []
+            result["texts"] = []
+            result["suggested_tokens"] = []
+        elif mode == "TEXT":
+            result["colors"] = []
+            result["dimensions"] = []
+            result["dimension_details"] = []
+            result["suggested_tokens"] = []
 
         # أرسل الـ response
         await safe_send(websocket, {
@@ -1125,6 +1185,37 @@ async def handle_message(websocket: WebSocketServerProtocol, raw: str) -> None:
                         modified = journal.list_modified_files()
                         log_info(f"[DIMENSION] Journal now has {len(modified)} modified files")
                         log_info(f"[DIMENSION] {local_property}: {local_old_value} → {new_val_str} (mode={edit_mode})")
+                elif edit_type == "text_edit":
+                    from core.state_editor import update_text_in_source
+                    file_p = edit.get("file", "")
+                    line_num = edit.get("line", 1)
+                    old_t = str(edit.get("old_value") or edit.get("old_text", ""))
+                    new_t = str(edit.get("new_value") or edit.get("new_text", ""))
+                    ref_k = edit.get("ref_key") or edit.get("property")
+                    if ref_k == "text":
+                        ref_k = None
+                    ok, msg, info = update_text_in_source(
+                        file_path=file_p,
+                        line=line_num,
+                        old_text=old_t,
+                        new_text=new_t,
+                        ref_key=ref_k,
+                        project_root=get_project_root(),
+                    )
+                    result = {
+                        "success": ok,
+                        "error": msg if not ok else None,
+                        "message": msg,
+                        "info": info
+                    }
+                    if ok:
+                        await broadcast(json.dumps({
+                            "type": "state_update",
+                            "kind": "text",
+                            "token": ref_k or f"text_{line_num}",
+                            "value": new_t,
+                        }, ensure_ascii=False))
+                        log_info(f"[BATCH-BROADCAST] (text) {ref_k or file_p} = '{new_t}'")
                 else:
                     result = {"success": False, "error": f"Unknown type: {edit_type}"}
 
@@ -1273,6 +1364,46 @@ async def handle_message(websocket: WebSocketServerProtocol, raw: str) -> None:
     # ---------------------------------------------------------
     # ⭐ dimension_override — يمرّر للأجهزة (الهاتف)
     # ---------------------------------------------------------
+    # ---------------------------------------------------------
+    # ⭐ text_edit — تعديل نص مباشرة
+    # ---------------------------------------------------------
+    if msg_type == "text_edit":
+        file_path = message.get("file", "")
+        line_num = message.get("line", 1)
+        old_text = message.get("old_text") or message.get("old_value", "")
+        new_text = message.get("new_text") or message.get("new_value", "")
+        ref_key = message.get("ref_key") or message.get("text_reference") or message.get("property")
+        if ref_key == "text":
+            ref_key = None
+
+        from core.state_editor import update_text_in_source
+        from core.project_root import get_project_root
+
+        ok, msg, info = update_text_in_source(
+            file_path=file_path,
+            line=line_num,
+            old_text=str(old_text),
+            new_text=str(new_text),
+            ref_key=ref_key,
+            project_root=get_project_root(),
+        )
+
+        await safe_send(websocket, {
+            "type": "text_edit_ack",
+            "success": ok,
+            "message": msg,
+            "info": info,
+        })
+
+        if ok:
+            await broadcast(json.dumps({
+                "type": "state_update",
+                "kind": "text",
+                "token": ref_key or f"text_{line_num}",
+                "value": new_text,
+            }, ensure_ascii=False))
+        return
+
     if msg_type == "dimension_override":
         log_forward("Forwarding dimension_override")
         forwarded = await broadcast(raw, exclude=websocket)

@@ -88,6 +88,7 @@ fun GlobalPanels() {
                 // ⭐ Clear data
                 BridgeState.elementColors.clear()
                 BridgeState.elementDimensions.clear()
+                BridgeState.elementTexts.clear()
                 BridgeState.elementComposableName = ""
                 BridgeState.isLoadingElementColors = false
                 DesignModeRegistry.selectedSourceFile = null
@@ -130,130 +131,275 @@ fun GlobalPanels() {
                         }
                     }
 
-                    Spacer(Modifier.height(16.dp))
+                    // ═══ Mode Header & Switcher Tabs ═══
+                    val currentMode = BridgeState.currentEditMode
+                    val modeTitle = when (currentMode) {
+                        EditMode.COLOR -> "🎨 تعديل الألوان (Color Mode)"
+                        EditMode.DIMENSION -> "📏 تعديل الأبعاد والمسافات (Dimension Mode)"
+                        EditMode.TEXT -> "📝 تعديل النصوص والمحتوى (Text Mode)"
+                    }
 
-                    // ═══ Focus Mode — Selected element colors only ═══
-                    SectionTitle("🎨 Element Colors")
-
-                    if (BridgeState.elementAnalysisError != null) {
                     Surface(
-                        color = Color(0xFFFFEBEE),
-                        shape = RoundedCornerShape(8.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp)
+                        color = when (currentMode) {
+                            EditMode.COLOR -> Color(0xFF6366F1).copy(alpha = 0.15f)
+                            EditMode.DIMENSION -> Color(0xFF0EA5E9).copy(alpha = 0.15f)
+                            EditMode.TEXT -> Color(0xFFF59E0B).copy(alpha = 0.15f)
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Text(
-                            text = "⚠️ ${BridgeState.elementAnalysisError}",
-                            fontSize = 12.sp,
-                            color = Color(0xFFC62828),
-                            modifier = Modifier.padding(10.dp)
+                            text = modeTitle,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = when (currentMode) {
+                                EditMode.COLOR -> Color(0xFF818CF8)
+                                EditMode.DIMENSION -> Color(0xFF38BDF8)
+                                EditMode.TEXT -> Color(0xFFFBBF24)
+                            },
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)
                         )
                     }
-                } else if (BridgeState.elementColors.isEmpty()) {
-                    Text(
-                        text = "No custom colors found in this element scope",
-                        fontSize = 12.sp,
-                        color = Color.Gray,
-                        modifier = Modifier.padding(vertical = 8.dp)
-                    )
-                } else {
-                    BridgeState.elementColors.forEach { colorInfo ->
-                        if (colorInfo.isThemeDependent) {
-                            ThemeDependentColorCard(color = colorInfo)
-                        } else {
-                            FocusColorRow(
-                                colorInfo = colorInfo,
-                                onTapHeader = {
-                                    if (!colorInfo.isToken) {
-                                        BridgeState.hardcodedColorPending = colorInfo
-                                        BridgeState.hardcodedUsageGlobal = colorInfo.usageGlobal
-                                        BridgeState.hardcodedLocations = colorInfo.locations
-                                        BridgeState.hardcodedNewHex = null
-                                        BridgeState.showHardcodedDialog = true
+
+                    Spacer(Modifier.height(8.dp))
+
+                    // ═══ Mode Switcher Tabs ═══
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                            .padding(4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        listOf(
+                            Triple(EditMode.COLOR, "🎨 الألوان", Color(0xFF6366F1)),
+                            Triple(EditMode.DIMENSION, "📏 الأبعاد", Color(0xFF0EA5E9)),
+                            Triple(EditMode.TEXT, "📝 النصوص", Color(0xFFF59E0B)),
+                        ).forEach { (m, label, accent) ->
+                            val isSelected = currentMode == m
+                            Surface(
+                                onClick = { BridgeState.currentEditMode = m },
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isSelected) accent else Color.Transparent,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier.padding(vertical = 8.dp)
+                                ) {
+                                    Text(
+                                        text = label,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(16.dp))
+
+                    // ═══ Mode-specific Content Sections ═══
+                    when (currentMode) {
+                        EditMode.COLOR -> {
+                            SectionTitle("🎨 Element Colors")
+                            if (BridgeState.elementAnalysisError != null) {
+                                Surface(
+                                    color = Color(0xFFFFEBEE),
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 8.dp)
+                                ) {
+                                    Text(
+                                        text = "⚠️ ${BridgeState.elementAnalysisError}",
+                                        fontSize = 12.sp,
+                                        color = Color(0xFFC62828),
+                                        modifier = Modifier.padding(10.dp)
+                                    )
+                                }
+                            } else if (BridgeState.elementColors.isEmpty()) {
+                                Text(
+                                    text = "No custom colors found in this element scope",
+                                    fontSize = 12.sp,
+                                    color = Color.Gray,
+                                    modifier = Modifier.padding(vertical = 8.dp)
+                                )
+                            } else {
+                                BridgeState.elementColors.forEach { colorInfo ->
+                                    if (colorInfo.isThemeDependent) {
+                                        ThemeDependentColorCard(color = colorInfo)
+                                    } else {
+                                        FocusColorRow(
+                                            colorInfo = colorInfo,
+                                            onTapHeader = {
+                                                if (!colorInfo.isToken) {
+                                                    BridgeState.hardcodedColorPending = colorInfo
+                                                    BridgeState.hardcodedUsageGlobal = colorInfo.usageGlobal
+                                                    BridgeState.hardcodedLocations = colorInfo.locations
+                                                    BridgeState.hardcodedNewHex = null
+                                                    BridgeState.showHardcodedDialog = true
+                                                }
+                                            },
+                                            onPickColor = { newHex ->
+                                                if (colorInfo.isToken) {
+                                                    if (colorInfo.isShared) {
+                                                        colorPendingChange = colorInfo
+                                                        pendingNewHex = newHex
+                                                    } else {
+                                                        val edit = PendingEdit(
+                                                            type = "global_color",
+                                                            file = DesignModeRegistry.selectedSourceFile ?: "",
+                                                            line = colorInfo.lineInElement,
+                                                            property = colorInfo.property,
+                                                            oldValue = colorInfo.value,
+                                                            newValue = newHex,
+                                                            tokenName = colorInfo.name,
+                                                            originalToken = colorInfo.name,
+                                                            originalValue = colorInfo.value,
+                                                        )
+                                                        BridgeState.addPendingEdit(edit)
+                                                        BridgeState.showSnackbar("📝 Added (${BridgeState.pendingCount})")
+                                                    }
+                                                } else {
+                                                    BridgeState.hardcodedColorPending = colorInfo
+                                                    BridgeState.hardcodedUsageGlobal = colorInfo.usageGlobal
+                                                    BridgeState.hardcodedLocations = colorInfo.locations
+                                                    BridgeState.hardcodedNewHex = newHex
+                                                    BridgeState.showHardcodedDialog = true
+                                                }
+                                            }
+                                        )
                                     }
-                                },
-                                onPickColor = { newHex ->
-                                    if (colorInfo.isToken) {
-                                        if (colorInfo.isShared) {
-                                            // Dialog for shared tokens
-                                            colorPendingChange = colorInfo
-                                            pendingNewHex = newHex
-                                        } else {
+                                }
+                            }
+                        }
+
+                        EditMode.DIMENSION -> {
+                            SectionTitle("📏 Element Dimensions")
+                            if (BridgeState.elementDimensions.isEmpty()) {
+                                Text(
+                                    text = "ℹ️ No editable dimensions detected in current element scope",
+                                    fontSize = 12.sp,
+                                    color = Color.Gray,
+                                    modifier = Modifier.padding(12.dp),
+                                )
+                            } else {
+                                BridgeState.elementDimensions.forEach { dim ->
+                                    DimensionRow(
+                                        dimension = dim,
+                                        onValueSelected = { newVal ->
                                             val edit = PendingEdit(
-                                                type = "global_color",
+                                                type = "dimension",
                                                 file = DesignModeRegistry.selectedSourceFile ?: "",
-                                                line = colorInfo.lineInElement,
-                                                property = colorInfo.property,
-                                                oldValue = colorInfo.value,
-                                                newValue = newHex,
-                                                tokenName = colorInfo.name,
-                                                originalToken = colorInfo.name,
-                                                originalValue = colorInfo.value,
+                                                line = dim.line,
+                                                property = dim.property,
+                                                oldValue = dim.value,
+                                                newValue = newVal.toString(),
+                                                tokenName = dim.property,
+                                                isTernary = dim.isTernary,
+                                                dimensionKind = dim.kind,
+                                                registryKey = dim.registryKey
                                             )
                                             BridgeState.addPendingEdit(edit)
                                             BridgeState.showSnackbar("📝 Added (${BridgeState.pendingCount})")
                                         }
-                                    } else {
-                                        // ⭐ hardcoded -> convert dialog
-                                        BridgeState.hardcodedColorPending = colorInfo
-                                        BridgeState.hardcodedUsageGlobal = colorInfo.usageGlobal
-                                        BridgeState.hardcodedLocations = colorInfo.locations
-                                        BridgeState.hardcodedNewHex = newHex
-                                        BridgeState.showHardcodedDialog = true
+                                    )
+                                }
+                            }
+                        }
+
+                        EditMode.TEXT -> {
+                            SectionTitle("📝 Element Text")
+                            if (BridgeState.elementTexts.isEmpty()) {
+                                Text(
+                                    text = "ℹ️ No editable text string detected in current element scope",
+                                    fontSize = 12.sp,
+                                    color = Color.Gray,
+                                    modifier = Modifier.padding(12.dp),
+                                )
+                            } else {
+                                BridgeState.elementTexts.forEachIndexed { idx, textInfo ->
+                                    var localText by remember(textInfo.text) { mutableStateOf(textInfo.text) }
+                                    var applied by remember(textInfo.text) { mutableStateOf(false) }
+
+                                    LaunchedEffect(textInfo.text) {
+                                        localText = textInfo.text
+                                        applied = false
+                                    }
+
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp),
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                                        )
+                                    ) {
+                                        Column(modifier = Modifier.padding(12.dp)) {
+                                            if (textInfo.isResourceOrRef && !textInfo.refKey.isNullOrEmpty()) {
+                                                Text(
+                                                    text = "🔗 Reference: ${textInfo.refKey}",
+                                                    fontSize = 11.sp,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+                                                Spacer(Modifier.height(4.dp))
+                                            }
+
+                                            OutlinedTextField(
+                                                value = localText,
+                                                onValueChange = {
+                                                    localText = it
+                                                    applied = false
+                                                },
+                                                modifier = Modifier.fillMaxWidth(),
+                                                label = { Text("Text Content") },
+                                                singleLine = false,
+                                                maxLines = 4
+                                            )
+
+                                            Spacer(Modifier.height(8.dp))
+
+                                            Row(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                horizontalArrangement = Arrangement.End
+                                            ) {
+                                                Button(
+                                                    onClick = {
+                                                        applied = true
+                                                        val editId = java.util.UUID.randomUUID().toString()
+                                                        val edit = PendingEdit(
+                                                            id = editId,
+                                                            type = "text_edit",
+                                                            file = textInfo.file,
+                                                            line = textInfo.line,
+                                                            property = textInfo.refKey ?: "text",
+                                                            oldValue = textInfo.text,
+                                                            newValue = localText,
+                                                            tokenName = textInfo.refKey ?: "text",
+                                                            refKey = textInfo.refKey
+                                                        )
+                                                        BridgeState.pendingEdits.add(edit)
+                                                        ComposeBridgeAgent.sendBatchEdits(listOf(edit))
+                                                        BridgeState.snackbarMessage = "Text update queued"
+                                                    },
+                                                    enabled = localText != textInfo.text && !applied
+                                                ) {
+                                                    Text(if (applied) "Applied ✓" else "Apply Text")
+                                                }
+                                            }
+                                        }
                                     }
                                 }
-                            )
+                            }
                         }
                     }
-                }
 
-                Spacer(Modifier.height(20.dp))
-
-                // ═══ Dimensions ═══
-                if (BridgeState.elementDimensions.isNotEmpty()) {
-                    SectionTitle("📏 Element Dimensions")
-
-                    BridgeState.elementDimensions.forEach { dim ->
-                        DimensionRow(
-                            dimension = dim,
-                            onValueSelected = { newValue ->
-                                // ⭐ Local preview
-                                val composableName = if (!dim.functionName.isNullOrEmpty()) dim.functionName
-                                    else (BridgeState.elementComposableName.takeIf { it.isNotEmpty() && it != "Element" } ?: "Element")
-                                val registryKey = dim.registryKey.ifEmpty {
-                                    "${composableName}_${dim.property}_${dim.line}"
-                                }
-                                BridgeDimensionRegistry.setOverride(registryKey, newValue.dp)
-
-                                // ⭐ Add to Queue
-                                if (dim.inSharedFunction && dim.functionCallCount > 1) {
-                                    // ⭐ Shared function → Dialog
-                                    BridgeState.dimensionPending = dim
-                                    BridgeState.dimensionNewValue = newValue
-                                    BridgeState.showDimensionDialog = true
-                                } else if (dim.isShared && dim.usageGlobal > 1) {
-                                    BridgeState.dimensionPending = dim
-                                    BridgeState.dimensionNewValue = newValue
-                                    BridgeState.showDimensionDialog = true
-                                } else {
-                                    // ⭐ Direct — Split
-                                    addDimensionToQueue(dim, newValue, mode = "split")
-                                }
-                            },
-                        )
-                    }
-                } else {
-                    SectionTitle("📏 Element Dimensions")
-                    Text(
-                        text = "ℹ️ No editable dimensions in this element",
-                        fontSize = 12.sp,
-                        color = Color.Gray,
-                        modifier = Modifier.padding(16.dp),
-                    )
-                }
-
-                Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(16.dp))
 
                 OutlinedButton(
                     onClick = {
