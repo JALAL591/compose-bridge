@@ -1,19 +1,15 @@
-# استخدم صورة Python أساسية
 FROM python:3.11-slim
 
-# تعيين مجلد العمل
 WORKDIR /app
 
-# نسخ ملفات المشروع
+# 1. نسخ ملف المتطلبات أولاً لتثبيت المكتبات
+COPY server/requirements.txt ./server/
+
+# 2. تثبيت المكتبات (هذا السطر مهم جداً)
+RUN pip install --no-cache-dir -r server/requirements.txt
+
+# 3. نسخ باقي كود السيرفر
 COPY server/ ./server/
 
-# تثبيت الاعتماديات (إذا كان لديك ملف requirements.txt، استخدم الأمر التالي)
-# RUN pip install --no-cache-dir -r server/requirements.txt
-# وإلا، يمكنك تثبيت المكتبات الأساسية يدوياً
-RUN pip install --no-cache-dir mcp-server
-
-# تعيين متغيرات البيئة المطلوبة (إذا لزم الأمر)
-# ENV COMPOSEBRIDGE_ROOT=/path/to/project
-
-# أمر التشغيل لـ Glama (يجب أن يكون عبر stdio)
+# 4. الأمر النهائي لتشغيل السيرفر
 CMD ["python", "server/mcp_server.py"]
