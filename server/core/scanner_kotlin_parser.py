@@ -10,7 +10,7 @@ Uses regex patterns for:
 
 import re
 from pathlib import Path
-from typing import List, Tuple, Set, Dict
+from typing import List, Tuple, Set, Dict, Optional
 
 
 # ═══════════════════════════════════════════════════════════
