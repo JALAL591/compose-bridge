@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.composebridge.plugin"
-version = "1.0.0"
+version = "1.1.0"
 
 repositories {
     mavenCentral()
@@ -16,8 +16,13 @@ dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
 }
 
+// Resolved dynamically from ANDROID_STUDIO_HOME env var or androidStudioLocalPath in gradle.properties
+val studioHome: String = System.getenv("ANDROID_STUDIO_HOME")
+    ?: (project.findProperty("androidStudioLocalPath") as? String)
+    ?: "C:/Users/thinkpad/AndroidStudioLocal"
+
 intellij {
-    localPath.set("C:/Users/thinkpad/AndroidStudioLocal")
+    localPath.set(studioHome)
     plugins.set(listOf("android", "Kotlin", "com.intellij.java"))
 }
 
@@ -32,8 +37,8 @@ tasks {
     }
 
     runIde {
-        projectExecutable.set("C:/Users/thinkpad/AndroidStudioLocal/jbr/bin/java.exe")
-        jvmArgs("-Xbootclasspath/a:C:/Users/thinkpad/AndroidStudioLocal/lib/nio-fs.jar")
+        projectExecutable.set("$studioHome/jbr/bin/java.exe")
+        jvmArgs("-Xbootclasspath/a:$studioHome/lib/nio-fs.jar")
         coroutinesJavaAgentPath.set(file("dummy-agent.jar").toPath())
     }
     

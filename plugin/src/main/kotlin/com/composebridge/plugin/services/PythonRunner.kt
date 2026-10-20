@@ -60,7 +60,7 @@ class PythonRunner(private val project: Project) {
             val siblingCandidates = listOf(
                 File(parent, "compose-bridge/server"),
                 File(parent, "compose-bridge/bridge"),
-                File(parent, "StudentApp/bridge")
+                File(project.basePath ?: projectRoot, "bridge")
             )
             for (sib in siblingCandidates) {
                 if (sib.exists() && File(sib, "server.py").exists()) {

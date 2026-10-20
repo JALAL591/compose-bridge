@@ -241,24 +241,63 @@ def _detect_property(line: str) -> str:
     return "color"
 
 
-def _detect_composable_name(search_scope: str, fallback_line_content: str = "") -> str:
-    """Detects Composable name of the current scope."""
+def _find_enclosing_function_or_class(content: str, line_number: int) -> str:
+    """Finds enclosing @Composable function, standard function, or class around line_number."""
+    if not content or line_number <= 0:
+        return "Element"
+    lines = content.splitlines()
+    target_idx = min(len(lines) - 1, max(0, line_number - 1))
+
+    # 1. Search backwards for @Composable fun or standard fun
+    for idx in range(target_idx, -1, -1):
+        line = lines[idx]
+        m_fun = re.search(r'\b(?:(?:private|public|internal)\s+)*fun\s+([A-Za-z0-9_]+)\s*\(', line)
+        if m_fun:
+            name = m_fun.group(1)
+            is_comp = False
+            for prev_idx in range(idx, max(-1, idx - 4), -1):
+                if '@Composable' in lines[prev_idx]:
+                    is_comp = True
+                    break
+            if is_comp or name[0].isupper():
+                return name
+
+    # 2. Search backwards for class or object
+    for idx in range(target_idx, -1, -1):
+        line = lines[idx]
+        m_cls = re.search(r'\b(?:class|object)\s+([A-Za-z0-9_]+)', line)
+        if m_cls:
+            return m_cls.group(1)
+
+    return "Element"
+
+
+def _detect_composable_name(search_scope: str, fallback_line_content: str = "", full_content: str = "", line_number: int = 0) -> str:
+    """Detects Composable name of the current scope or enclosing function/class."""
     # 1. Composable function signature: fun QuickAccessCard(...)
     fun_m = re.search(r'\bfun\s+([A-Z]\w+)\s*\(', search_scope)
     if fun_m:
         return fun_m.group(1)
-        
+
     # 2. Main Composable calls: Card(, Button(, Surface(, Box(, etc.
     call_m = re.search(r'\b([A-Z]\w+Card|[A-Z]\w+Widget|[A-Z]\w+Item|[A-Z]\w+Button|[A-Z]\w+Bar|[A-Z]\w+Header|Card|Surface|Button)\s*\(', search_scope)
     if call_m:
         return call_m.group(1)
-        
+
     # 3. Fallback from any Composable call
     any_m = re.search(r'\b([A-Z]\w+)\s*\(', fallback_line_content or search_scope)
     if any_m and any_m.group(1) not in {'Color', 'Modifier', 'Dp', 'TextStyle', 'Alignment', 'Arrangement'}:
-        return any_m.group(1)
-        
-    return "Element"
+        candidate = any_m.group(1)
+        if candidate not in {'Text', 'BasicText', 'Column', 'Row', 'Spacer', 'Box'} or not full_content:
+            return candidate
+
+    # 4. Enclosing @Composable function or class in full_content
+    if full_content and line_number > 0:
+        enclosing = _find_enclosing_function_or_class(full_content, line_number)
+        if enclosing != "Element":
+            return enclosing
+
+    return any_m.group(1) if (any_m and any_m.group(1) not in {'Color', 'Modifier', 'Dp', 'TextStyle', 'Alignment', 'Arrangement'}) else "Element"
 
 
 def _find_color_locations(
@@ -659,23 +698,122 @@ def _count_function_calls(
 
 
 
-def _resolve_app_strings_value(project_root: Path, ref_key: str) -> Optional[str]:
-    """يبحث في AppStrings.kt عن قيمة المتغير المرجعي ويستخرج النص المبدئي."""
+def _resolve_app_strings_value(project_root: Path, ref_key: str, runtime_hint: Optional[str] = None) -> Optional[str]:
+    """
+    Resolves AppStrings reference (e.g. AppStrings.Activities.unit or AppStrings.Actions.scheduleTitle)
+    to its actual string value.
+    Supports:
+    - Single pattern: val unit @Composable get() = "أنشطة"
+    - If/else pattern: val selectClass @Composable get() = if (Terminology.isUni) "..." else "..."
+    - BridgeTextRegistry wrappers: BridgeTextRegistry.getText("...", "...")
+    """
     try:
         candidates = list(project_root.rglob("AppStrings.kt"))
         candidates = [c for c in candidates if "build" not in str(c) and ".composebridge" not in str(c)]
         if not candidates:
             return None
         text = candidates[0].read_text(encoding="utf-8", errors="ignore")
-        var_name = ref_key.split(".")[-1]
-        for line in text.splitlines():
-            if var_name in line and "val " in line:
-                m = re.search(r'"([^"\\]*(?:\\.[^"\\]*)*)"', line)
-                if m:
-                    return m.group(1)
+        parts = ref_key.split(".")
+        var_name = parts[-1]
+        object_name = parts[-2] if len(parts) >= 2 and parts[-2] != "AppStrings" else None
+
+        lines = text.splitlines()
+        in_target_obj = object_name is None
+        matched_line = None
+
+        for line in lines:
+            if object_name and re.search(rf'\bobject\s+{re.escape(object_name)}\b', line):
+                in_target_obj = True
+                continue
+            elif in_target_obj and object_name and re.search(r'\bobject\s+\w+', line) and not re.search(rf'\bobject\s+{re.escape(object_name)}\b', line):
+                in_target_obj = False
+
+            if in_target_obj and re.search(rf'\bval\s+{re.escape(var_name)}\b', line):
+                matched_line = line
+                break
+
+        # Fallback: search anywhere in file if object match didn't find it
+        if not matched_line:
+            for line in lines:
+                if re.search(rf'\bval\s+{re.escape(var_name)}\b', line):
+                    matched_line = line
+                    break
+
+        if matched_line:
+            m_bridge = re.search(r'BridgeTextRegistry\.getText\s*\(\s*"[^"]+"\s*,\s*"([^"\\]*(?:\\.[^"\\]*)*)"\s*\)', matched_line)
+            if m_bridge:
+                return m_bridge.group(1).replace('\\"', '"').replace('\\\\', '\\')
+            if runtime_hint:
+                return runtime_hint
+
+            quotes = re.findall(r'"([^"\\]*(?:\\.[^"\\]*)*)"', matched_line)
+            if quotes:
+                filtered_quotes = [q for q in quotes if not q.startswith("AppStrings.")]
+                if not filtered_quotes:
+                    filtered_quotes = quotes
+
+                # 1. If/else pattern: prefer the else branch if present
+                m_else = re.search(r'else\s+"([^"\\]*(?:\\.[^"\\]*)*)"', matched_line)
+                if m_else:
+                    return m_else.group(1).replace('\\"', '"').replace('\\\\', '\\')
+
+                # 2. Single pattern or default: extract the value between the last quotes in the line
+                # e.g.: val unit @Composable get() = "أنشطة" -> returns "أنشطة"
+                return filtered_quotes[-1].replace('\\"', '"').replace('\\\\', '\\')
     except Exception:
         pass
     return None
+
+
+def _find_ref_in_app_strings(project_root: Path, text_value: str) -> Optional[str]:
+    """Finds matching AppStrings reference for a given text value by searching AppStrings.kt."""
+    if not text_value or len(text_value.strip()) < 2:
+        return None
+    val_clean = text_value.strip()
+    try:
+        candidates = list(project_root.rglob("AppStrings.kt"))
+        candidates = [c for c in candidates if "build" not in str(c) and ".composebridge" not in str(c)]
+        if not candidates:
+            return None
+        content = candidates[0].read_text(encoding="utf-8", errors="ignore")
+        lines = content.splitlines()
+
+        stack = []
+        best_sub = None
+        best_sub_len = 0
+
+        for line in lines:
+            obj_m = re.search(r'\bobject\s+([a-zA-Z0-9_]+)\b', line)
+            if obj_m:
+                stack.append((obj_m.group(1), line.count('{') - line.count('}')))
+            else:
+                brace_delta = line.count('{') - line.count('}')
+                if brace_delta != 0 and stack:
+                    name, b_count = stack[-1]
+                    b_count += brace_delta
+                    if b_count <= 0:
+                        stack.pop()
+                    else:
+                        stack[-1] = (name, b_count)
+
+            val_m = re.search(r'\bval\s+([a-zA-Z0-9_]+)\b', line)
+            if val_m and '"' in line:
+                prop_name = val_m.group(1)
+                quotes = re.findall(r'"([^"\\]*(?:\\.[^"\\]*)*)"', line)
+                filtered = [q for q in quotes if not q.startswith("AppStrings.")] or quotes
+                obj_path = [s[0] for s in stack if s[0] != "AppStrings"]
+                full_key = f"AppStrings.{'.'.join(obj_path + [prop_name])}"
+
+                for q in filtered:
+                    if q == val_clean:
+                        return full_key
+                    if q and (q in val_clean or val_clean in q) and len(q) >= 3:
+                        if len(q) > best_sub_len:
+                            best_sub_len = len(q)
+                            best_sub = full_key
+        return best_sub
+    except Exception:
+        return None
 
 
 def analyze_element_range(
@@ -685,6 +823,8 @@ def analyze_element_range(
     utf16_length: int = 0,
     project_root: Optional[Path] = None,
     tree: Optional[list] = None,
+    runtime_text_hint: Optional[str] = None,
+    parent_line: Optional[int] = None,
 ) -> dict:
     """
     Analyzes literal source code range of an element.
@@ -879,8 +1019,14 @@ def analyze_element_range(
     # Composable Name
     composable_name = _detect_composable_name(
         search_scope,
-        fallback_line_content=content.splitlines()[line_number - 1] if 0 < line_number <= len(content.splitlines()) else ""
+        fallback_line_content=content.splitlines()[line_number - 1] if 0 < line_number <= len(content.splitlines()) else "",
+        full_content=content,
+        line_number=actual_line_number
     )
+    if composable_name in ["Element", "Text", "BasicText", "Column", "Row", "Box", "Spacer"] and content:
+        enclosing_name = _find_enclosing_function_or_class(content, actual_line_number)
+        if enclosing_name != "Element":
+            composable_name = enclosing_name
 
     # ⭐ 1. ابحث عن Composable scope أولاً
     dim_scope_text = search_scope
@@ -955,95 +1101,196 @@ def analyze_element_range(
     )
     properties = list(set(prop_pattern.findall(dim_scope_text)))
 
-    # ═══ Text Extraction ═══
-    structured_texts = []
-    seen_texts = set()
+    # ─── Text Extraction ───
+    def _extract_from_text(scope_str: str, base_line: int, file_p: str, filter_call_line: Optional[int] = None) -> List[Dict]:
+        results = []
+        seen = set()
 
-    # 1. Hardcoded text: Text("...") or Text(text = "...")
-    hardcoded_text_pattern = re.compile(r'Text\s*\(\s*(?:text\s*=\s*)?"([^"\\]*(?:\\.[^"\\]*)*)"')
-    for m in hardcoded_text_pattern.finditer(dim_scope_text):
-        val = m.group(1).replace('\\"', '"').replace('\\\\', '\\').replace('\\n', '\n')
-        key = ("hardcoded", val)
-        if key not in seen_texts and val.strip():
-            seen_texts.add(key)
-            offset_in_scope = m.start()
-            line_in_scope = dim_scope_text[:offset_in_scope].count("\n")
-            detected_line = (scope_start_line or line_number) + line_in_scope
-            structured_texts.append({
-                "text": val,
-                "file": effective_file,
-                "line": detected_line,
-                "is_resource_or_ref": False,
-                "ref_key": None,
-            })
+        # 1. Composable parameter references: e.g. title = AppStrings.Actions.scheduleTitle
+        param_ref_pattern = re.compile(r'([a-zA-Z0-9_]+)\s*=\s*(AppStrings(?:\.[a-zA-Z0-9_]+)+)')
+        for m in param_ref_pattern.finditer(scope_str):
+            prop_name = m.group(1)
+            ref_k = m.group(2)
+            key = ("ref", ref_k)
+            if key not in seen:
+                seen.add(key)
+                line_off = scope_str[:m.start()].count("\n")
+                detected_line = base_line + line_off
+                resolved_val = _resolve_app_strings_value(root, ref_k, runtime_text_hint)
+                results.append({
+                    "property": prop_name,
+                    "text": resolved_val or ref_k,
+                    "file": file_p,
+                    "line": detected_line,
+                    "is_resource_or_ref": True,
+                    "ref_key": ref_k,
+                })
 
-    # 2. Reference text: Text(AppStrings.xyz) or Text(text = AppStrings.xyz)
-    ref_text_pattern = re.compile(r'Text\s*\(\s*(?:text\s*=\s*)?(AppStrings(?:\.[a-zA-Z0-9_]+)+)')
-    for m in ref_text_pattern.finditer(dim_scope_text):
-        ref_k = m.group(1)
-        key = ("ref", ref_k)
-        if key not in seen_texts:
-            seen_texts.add(key)
-            offset_in_scope = m.start()
-            line_in_scope = dim_scope_text[:offset_in_scope].count("\n")
-            detected_line = (scope_start_line or line_number) + line_in_scope
-            resolved_val = _resolve_app_strings_value(project_root, ref_k)
-            structured_texts.append({
-                "text": resolved_val or ref_k,
-                "file": effective_file,
-                "line": detected_line,
-                "is_resource_or_ref": True,
-                "ref_key": ref_k,
-            })
+        # 2. Direct Text(AppStrings.xyz) or Text(text = AppStrings.xyz)
+        ref_text_pattern = re.compile(r'Text\s*\(\s*(?:text\s*=\s*)?(AppStrings(?:\.[a-zA-Z0-9_]+)+)')
+        for m in ref_text_pattern.finditer(scope_str):
+            ref_k = m.group(1)
+            key = ("ref", ref_k)
+            if key not in seen:
+                seen.add(key)
+                line_off = scope_str[:m.start()].count("\n")
+                detected_line = base_line + line_off
+                resolved_val = _resolve_app_strings_value(root, ref_k, runtime_text_hint)
+                results.append({
+                    "property": "text",
+                    "text": resolved_val or ref_k,
+                    "file": file_p,
+                    "line": detected_line,
+                    "is_resource_or_ref": True,
+                    "ref_key": ref_k,
+                })
 
-    # 3. Parameter/Variable text: Text(title) or Text(subtitle)
-    var_text_pattern = re.compile(r'Text\s*\(\s*(?:text\s*=\s*)?([a-zA-Z0-9_]+)')
-    for m in var_text_pattern.finditer(dim_scope_text):
-        var_name = m.group(1)
-        if var_name in ("modifier", "color", "style", "null", "true", "false", "it", "fontSize", "fontWeight"):
-            continue
-        # Find enclosing function
-        abs_pos = content.find(dim_scope_text) + m.start() if dim_scope_text in content else m.start()
-        before_code = content[:abs_pos]
-        func_matches = list(re.finditer(r'fun\s+([a-zA-Z0-9_]+)\s*\(([^)]*)\)', before_code))
-        if func_matches:
-            last_func = func_matches[-1]
-            func_name = last_func.group(1)
-            params = last_func.group(2)
-            if re.search(rf'\b{var_name}\b', params):
-                # Search for calls to func_name in this file
-                call_pattern = re.compile(rf'{func_name}\s*\((.*?)\)', re.DOTALL)
-                for call_m in call_pattern.finditer(content):
-                    call_body = call_m.group(1)
-                    param_m = re.search(rf'{var_name}\s*=\s*([^\n,]+)', call_body)
-                    if param_m:
-                        arg_val = param_m.group(1).strip()
-                        call_line = content[:call_m.start()].count("\n") + 1
-                        if arg_val.startswith("AppStrings."):
-                            ref_k = arg_val
-                            resolved_val = _resolve_app_strings_value(project_root, ref_k)
-                            key = ("ref", ref_k)
-                            if key not in seen_texts:
-                                seen_texts.add(key)
-                                structured_texts.append({
-                                    "text": resolved_val or ref_k,
-                                    "file": effective_file,
-                                    "line": call_line,
-                                    "is_resource_or_ref": True,
-                                    "ref_key": ref_k,
-                                })
-                        elif arg_val.startswith('"') and arg_val.endswith('"'):
-                            raw_val = arg_val[1:-1].replace('\\"', '"').replace('\\\\', '\\')
-                            key = ("hardcoded", raw_val)
-                            if key not in seen_texts:
-                                seen_texts.add(key)
-                                structured_texts.append({
-                                    "text": raw_val,
-                                    "file": effective_file,
-                                    "line": call_line,
-                                    "is_resource_or_ref": False,
-                                    "ref_key": None,
-                                })
+        # 3. Composable parameter string literals: e.g. title = "..."
+        param_str_pattern = re.compile(r'([a-zA-Z0-9_]+)\s*=\s*"([^"\\]*(?:\\.[^"\\]*)*)"')
+        for m in param_str_pattern.finditer(scope_str):
+            prop_name = m.group(1)
+            if prop_name in ("modifier", "tag", "key", "route", "id"):
+                continue
+            raw_lit = m.group(2)
+            has_template = "$" in raw_lit
+            # Check for embedded AppStrings reference in template
+            embedded_ref = None
+            if has_template:
+                m_emb = re.search(r'\$\{?(AppStrings(?:\.[a-zA-Z0-9_]+)+)\}?', raw_lit)
+                if m_emb:
+                    embedded_ref = m_emb.group(1)
+
+            val = runtime_text_hint if (has_template and runtime_text_hint) else raw_lit.replace('\\"', '"').replace('\\\\', '\\').replace('\\n', '\n')
+            if has_template and not runtime_text_hint and embedded_ref:
+                val = _resolve_app_strings_value(root, embedded_ref) or val
+
+            key = ("hardcoded", val)
+            if key not in seen and val.strip():
+                seen.add(key)
+                line_off = scope_str[:m.start()].count("\n")
+                detected_line = base_line + line_off
+                results.append({
+                    "property": prop_name,
+                    "text": val,
+                    "file": file_p,
+                    "line": detected_line,
+                    "is_resource_or_ref": bool(embedded_ref),
+                    "ref_key": embedded_ref,
+                })
+
+        # 4. Direct Text("...") or Text(text = "...")
+        hardcoded_text_pattern = re.compile(r'Text\s*\(\s*(?:text\s*=\s*)?"([^"\\]*(?:\\.[^"\\]*)*)"')
+        for m in hardcoded_text_pattern.finditer(scope_str):
+            raw_lit = m.group(1)
+            has_template = "$" in raw_lit
+            embedded_ref = None
+            if has_template:
+                m_emb = re.search(r'\$\{?(AppStrings(?:\.[a-zA-Z0-9_]+)+)\}?', raw_lit)
+                if m_emb:
+                    embedded_ref = m_emb.group(1)
+
+            val = runtime_text_hint if (has_template and runtime_text_hint) else raw_lit.replace('\\"', '"').replace('\\\\', '\\').replace('\\n', '\n')
+            if has_template and not runtime_text_hint and embedded_ref:
+                val = _resolve_app_strings_value(root, embedded_ref) or val
+
+            key = ("hardcoded", val)
+            if key not in seen and val.strip():
+                seen.add(key)
+                line_off = scope_str[:m.start()].count("\n")
+                detected_line = base_line + line_off
+                results.append({
+                    "property": "text",
+                    "text": val,
+                    "file": file_p,
+                    "line": detected_line,
+                    "is_resource_or_ref": bool(embedded_ref),
+                    "ref_key": embedded_ref,
+                })
+
+        # 5. Parameter/Variable text: Text(title) or Text(subtitle)
+        var_text_pattern = re.compile(r'Text\s*\(\s*(?:text\s*=\s*)?([a-zA-Z0-9_]+)')
+        for m in var_text_pattern.finditer(scope_str):
+            var_name = m.group(1)
+            if var_name in ("modifier", "color", "style", "null", "true", "false", "it", "fontSize", "fontWeight"):
+                continue
+            abs_pos = content.find(scope_str) + m.start() if scope_str in content else m.start()
+            before_code = content[:abs_pos]
+            func_matches = list(re.finditer(r'fun\s+([a-zA-Z0-9_]+)\s*\(([^)]*)\)', before_code))
+            if func_matches:
+                last_func = func_matches[-1]
+                func_name = last_func.group(1)
+                params = last_func.group(2)
+                if re.search(rf'\b{var_name}\b', params):
+                    call_pattern = re.compile(rf'{func_name}\s*\((.*?)\)', re.DOTALL)
+                    all_calls = list(call_pattern.finditer(content))
+                    chosen_call = None
+
+                    # If filter_call_line specified, match call near that line
+                    target_line = filter_call_line or parent_line
+                    if target_line:
+                        for call_m in all_calls:
+                            c_line = content[:call_m.start()].count("\n") + 1
+                            if abs(c_line - target_line) <= 5:
+                                chosen_call = call_m
+                                break
+
+                    # Match by runtime_text_hint
+                    if not chosen_call and runtime_text_hint:
+                        for call_m in all_calls:
+                            call_body = call_m.group(1)
+                            if runtime_text_hint in call_body:
+                                chosen_call = call_m
+                                break
+                            for ref_m in re.finditer(r'AppStrings(?:\.[a-zA-Z0-9_]+)+', call_body):
+                                res_val = _resolve_app_strings_value(root, ref_m.group(0), runtime_text_hint)
+                                if res_val == runtime_text_hint:
+                                    chosen_call = call_m
+                                    break
+                            if chosen_call:
+                                break
+
+                    calls_to_process = [chosen_call] if chosen_call else all_calls
+                    for call_m in calls_to_process:
+                        call_body = call_m.group(1)
+                        param_m = re.search(rf'{var_name}\s*=\s*([^\n,]+)', call_body)
+                        if param_m:
+                            arg_val = param_m.group(1).strip()
+                            call_line = content[:call_m.start()].count("\n") + 1
+                            if arg_val.startswith("AppStrings."):
+                                ref_k = arg_val
+                                resolved_val = _resolve_app_strings_value(root, ref_k, runtime_text_hint)
+                                key = ("ref", ref_k)
+                                if key not in seen:
+                                    seen.add(key)
+                                    results.append({
+                                        "property": var_name,
+                                        "text": resolved_val or ref_k,
+                                        "file": actual_source_file,
+                                        "line": call_line,
+                                        "is_resource_or_ref": True,
+                                        "ref_key": ref_k,
+                                    })
+                            elif arg_val.startswith('"') and arg_val.endswith('"'):
+                                raw_val = arg_val[1:-1].replace('\\"', '"').replace('\\\\', '\\')
+                                key = ("hardcoded", raw_val)
+                                if key not in seen:
+                                    seen.add(key)
+                                    results.append({
+                                        "property": var_name,
+                                        "text": raw_val,
+                                        "file": actual_source_file,
+                                        "line": call_line,
+                                        "is_resource_or_ref": False,
+                                        "ref_key": None,
+                                    })
+        return results
+
+    # First, extract from the immediate call scope (search_scope)
+    structured_texts = _extract_from_text(search_scope, start_line_in_file, actual_source_file)
+
+    # If no texts found in call scope and we expanded to composable scope, extract there
+    if not structured_texts and dim_scope_text != search_scope:
+        structured_texts = _extract_from_text(dim_scope_text, dim_scope_start_line, effective_file, filter_call_line=start_line_in_file)
 
     return {
         "composable_name": composable_name,
@@ -1068,6 +1315,40 @@ RISKY_FILE_PATTERNS = [
 ]
 
 
+def _detect_app_colors_pkg(file_path: Path) -> str:
+    """Detect package of AppColors by searching for AppColors.kt or inspecting build.gradle.kts."""
+    try:
+        cur = file_path.parent
+        project_root = None
+        for _ in range(8):
+            if any((cur / f).exists() for f in ["settings.gradle.kts", "settings.gradle", ".git"]):
+                project_root = cur
+                break
+            if cur.parent == cur:
+                break
+            cur = cur.parent
+
+        if project_root:
+            # 1. Search for AppColors.kt in project
+            for candidate in project_root.rglob("AppColors.kt"):
+                if candidate.is_file() and "build" not in candidate.parts:
+                    c = candidate.read_text(encoding="utf-8", errors="ignore")
+                    m = re.search(r'^\s*package\s+([\w.]+)', c, re.MULTILINE)
+                    if m:
+                        return m.group(1)
+
+            # 2. Check build.gradle.kts for namespace
+            for candidate in project_root.rglob("build.gradle.kts"):
+                if candidate.is_file() and "build" not in candidate.parts:
+                    c = candidate.read_text(encoding="utf-8", errors="ignore")
+                    m = re.search(r'namespace\s*=\s*["\']([\w.]+)["\']', c)
+                    if m:
+                        return f"{m.group(1)}.ui.theme"
+    except Exception:
+        pass
+    return ""
+
+
 def _ensure_app_colors_import(file_path: Path, content: str, app_colors_pkg: str = "") -> Tuple[str, bool, int, str]:
     """
     Ensure the file has an AppColors import.
@@ -1076,22 +1357,29 @@ def _ensure_app_colors_import(file_path: Path, content: str, app_colors_pkg: str
     pkg_match = re.search(r'^\s*package\s+([\w.]+)', content, re.MULTILINE)
     file_pkg = pkg_match.group(1) if pkg_match else ""
 
+    if not app_colors_pkg:
+        app_colors_pkg = _detect_app_colors_pkg(file_path)
+
+    if not app_colors_pkg and file_pkg:
+        parts = file_pkg.split('.')
+        base = ".".join(parts[:3]) if len(parts) >= 3 else file_pkg
+        app_colors_pkg = f"{base}.ui.theme"
+
     if app_colors_pkg and file_pkg == app_colors_pkg:
         return content, False, 0, ""
 
-    target_import = f"import {app_colors_pkg}.AppColors" if app_colors_pkg else "import com.edu.teacher.ui.theme.AppColors"
-    wildcard_import = f"import {app_colors_pkg}.*" if app_colors_pkg else "import com.edu.teacher.ui.theme.*"
+    target_import = f"import {app_colors_pkg}.AppColors" if app_colors_pkg else ""
+    wildcard_import = f"import {app_colors_pkg}.*" if app_colors_pkg else ""
+
+    if not target_import:
+        return content, False, 0, ""
 
     import_patterns = [
         target_import,
         wildcard_import,
-        "import com.edu.teacher.ui.theme.AppColors",
-        "import com.edu.teacher.ui.theme.*",
-        "import com.student.app.ui.theme.AppColors",
-        "import com.student.app.ui.theme.*",
     ]
     for pattern in import_patterns:
-        if pattern in content:
+        if pattern and pattern in content:
             return content, False, 0, ""
 
     lines = content.splitlines()
@@ -1856,15 +2144,21 @@ def _line_context_with_start(content: str, line_number: int, before: int = 3, af
 
     call_start = None
     for cand in check_indices:
-        if re.search(r'\b[A-Z]\w*\s*\(', lines[cand]):
+        l = lines[cand]
+        if re.search(r'^\s*[a-zA-Z0-9_]+\s*=', l):
+            continue
+        if re.search(r'\b[A-Z]\w*\s*\(', l):
             call_start = cand
             break
 
-    # If not found looking ahead/at target, check backwards up to 10 lines, ensuring call doesn't close before target_idx
+    # If not found looking ahead/at target, check backwards up to 15 lines, ensuring call doesn't close before target_idx
     if call_start is None:
-        for b in range(1, min(10, idx + 1)):
+        for b in range(1, min(15, idx + 1)):
             cand = idx - b
-            if re.search(r'\b[A-Z]\w*\s*\(', lines[cand]):
+            l = lines[cand]
+            if re.search(r'^\s*[a-zA-Z0-9_]+\s*=', l):
+                continue
+            if re.search(r'\b[A-Z]\w*\s*\(', l):
                 test_depth = 0
                 test_open = False
                 closed_before_idx = False

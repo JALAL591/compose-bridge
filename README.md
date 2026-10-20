@@ -1,14 +1,16 @@
 # ComposeBridge 🌉
 
+> 📖 **Where is ComposeBridge heading?** Read our [Vision & Architecture RFC](docs/architecture/RFC-001-vision.md).
+
 **Real-time on-device visual editor for Jetpack Compose + MCP Server for AI agents. Live UI tuning, AST-guided surgical source splicing, and standalone AI-driven code edits.**
 
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1.20+-purple.svg)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-1.7.3+-4285F4.svg)](https://developer.android.com/jetpack/compose)
 [![Zero Rebuild](https://img.shields.io/badge/DevEx-Zero--Rebuild%20Preview-brightgreen.svg)]()
 [![Latency](https://img.shields.io/badge/Latency-%3C50ms-success.svg)]()
-[![Status](https://img.shields.io/badge/Status-Production%20Ready%20(v1.0.0)-success.svg)]()
+[![Status](https://img.shields.io/badge/Status-Production%20Ready%20(v1.1.0)-success.svg)]()
 [![Scanner Speed](https://img.shields.io/badge/Scanner%20Speed-137ms%20%2F%20146%20files-brightgreen.svg)]()
-[![Version](https://img.shields.io/badge/Version-1.0.0-blue.svg)]()
+[![Version](https://img.shields.io/badge/Version-1.1.0-blue.svg)]()
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/JALAL591/compose-bridge/blob/main/LICENSE)
 [![M8ven Score](https://m8ven.ai/badge/mcp/jalal591-compose-bridge-rapm1x)](https://m8ven.ai/mcp/jalal591-compose-bridge-rapm1x?s=readme)
 [![Reviewed by HOL Guard](https://img.shields.io/badge/HOL_Guard%20|%20compose_bridge-2E5AAC?logo=shield&logoColor=white)](https://hol.org/guard/extensions/mcp.compose-bridge)
@@ -26,26 +28,25 @@
 
 ---
 
-### 📥 Direct Downloads & Quick Install (v1.0.0)
+### 📥 Direct Downloads & Quick Install (v1.1.0)
 
 | Package | Asset (.zip / .aar) | Installation |
 |---|---|---|
-| **IDE Plugin (Android Studio / IntelliJ)** | [📥 **ComposeBridgeIntelliJ-1.0.0.zip**](https://github.com/JALAL591/compose-bridge/raw/main/dist/ComposeBridgeIntelliJ-1.0.0.zip) | In Android Studio: `Settings` ➔ `Plugins` ➔ `⚙️` ➔ `Install Plugin from Disk...` |
+| **IDE Plugin (Android Studio / IntelliJ)** | [📥 **ComposeBridgeIntelliJ-1.1.0.zip**](https://github.com/JALAL591/compose-bridge/raw/main/dist/ComposeBridgeIntelliJ-1.1.0.zip) | In Android Studio: `Settings` ➔ `Plugins` ➔ `⚙️` ➔ `Install Plugin from Disk...` |
 | **Compose Agent Library** | [📦 **composebridge-agent-release.aar**](https://github.com/JALAL591/compose-bridge/raw/main/dist/composebridge-agent-release.aar) | Copy to `app/libs/` or add to project dependencies |
 
 **ComposeBridge** is a developer tooling suite that bridges a running Compose app (KMP/Android) with your IDE or AI Agent.
 
 > [!NOTE]
-> **KMP / Desktop Support Status**: KMP/Desktop support is currently in **Beta**. Focus is on **Android stability** for v1.0.0.
+> **KMP / Desktop Support Status**: KMP/Desktop support is currently in **Beta**. Focus is on **Android stability** for v1.1.0.
 
 
-### 🎯 What's New in v1.0.0?
-- **Focus Mode:** The BottomSheet now shows **only** the colors and dimensions of the tapped element. No more digging through long lists.
-- **Global vs. Split:** Change a value across the whole project, or create an isolated token just for this element.
-- **Pending Edits Queue:** Batch multiple UI tweaks locally and hit **Sync** once.
-- **Dimensions Support:** Live-edit heights, widths, paddings, and font sizes — not just colors.
-- **Review & Reject:** A full `git status`-like review in the IDE. Approve to keep, or Reject All for a byte-for-byte rollback.
-- **17+ MCP Tools:** AI agents can now run Gradle builds, detect patterns, and rollback changes autonomously. See the full [**MCP Tools Reference**](docs/mcp-tools-reference.md).
+### 🎯 What's New in v1.1.0?
+- **📝 Text Editing with Live Preview:** Tap any text element on device, edit its content directly in the inspector BottomSheet, and preview changes instantly with zero latency via `BridgeTextRegistry`.
+- **⚡ On-the-Fly Auto-Migration:** Intelligent AST engine automatically wraps edited strings into `BridgeTextRegistry` upon first touch—no manual code wrapping required.
+- **🤖 Autonomous AI Agent Integration (MCP):** Connect Claude, Cursor, Antigravity or any Model Context Protocol agent with 17+ deep-inspection and code refactoring tools.
+- **🗺️ Architectural Vision (RFC-001):** Published comprehensive technical architecture and roadmap (`docs/architecture/RFC-001-vision.md`).
+- **🛡️ Cross-Platform Reliability:** Fixed navigation backstack resets, normalized Windows CRLF line-endings, and added precision regex extraction for single-pattern getters.
 
 ### 🎬 See it in action & Screenshots
 
@@ -130,7 +131,7 @@ Ideal for AI coding assistants (Claude Desktop, Cursor, Antigravity IDE) or term
 #### 1. Add the Agent to your project
 ```kotlin
 // build.gradle.kts (Android or commonMain)
-debugImplementation("com.composebridge:agent:1.0.0")
+debugImplementation("com.composebridge:agent:1.1.0")
 ```
 
 #### 2. Initialize in MainActivity
@@ -199,7 +200,7 @@ Antigravity IDE — edit `~/.gemini/config/mcp_config.json`:
 
 ---
 
-## ⚠️ Platform Support (v1.0.0)
+## ⚠️ Platform Support (v1.1.0)
 
 | Feature | Android | Desktop | iOS |
 |---------|:-------:|:-------:|:---:|

@@ -1,5 +1,6 @@
 import sys
-sys.path.insert(0, r"C:\Users\thinkpad\StudioProjects\compose-bridge\server")
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import unittest
 from core.scanner_kotlin_parser import scan_file_dimensions, scan_file_usages, scan_file_colors

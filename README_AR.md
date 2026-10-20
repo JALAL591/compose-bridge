@@ -1,14 +1,16 @@
 # ComposeBridge 🌉
 
+> 📖 **إلى أين تتجه أداة ComposeBridge؟** اقرأ [وثيقة الرؤية والمعمارية RFC](docs/architecture/RFC-001-vision.md).
+
 **محرر بصري حي على الجهاز الحقيقي لتطبيقات Jetpack Compose + خادم MCP لوكلاء الذكاء الاصطناعي. تعديل الواجهة لحظياً + تعديل جراحي في الكود المصدري.**
 
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1.20+-purple.svg)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-1.7.3+-4285F4.svg)](https://developer.android.com/jetpack/compose)
 [![Zero Rebuild](https://img.shields.io/badge/DevEx-Zero--Rebuild%20Preview-brightgreen.svg)]()
 [![Latency](https://img.shields.io/badge/Latency-%3C50ms-success.svg)]()
-[![Status](https://img.shields.io/badge/Status-Production%20Ready%20(v1.0.0)-success.svg)]()
+[![Status](https://img.shields.io/badge/Status-Production%20Ready%20(v1.1.0)-success.svg)]()
 [![Scanner Speed](https://img.shields.io/badge/Scanner%20Speed-137ms%20%2F%20146%20files-brightgreen.svg)]()
-[![Version](https://img.shields.io/badge/Version-1.0.0-blue.svg)]()
+[![Version](https://img.shields.io/badge/Version-1.1.0-blue.svg)]()
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/JALAL591/compose-bridge/blob/main/LICENSE)
 [![M8ven Score](https://m8ven.ai/badge/mcp/jalal591-compose-bridge-rapm1x)](https://m8ven.ai/mcp/jalal591-compose-bridge-rapm1x?s=readme)
 
@@ -24,17 +26,17 @@
 
 ---
 
-### 📥 التحميل المباشر والتثبيت السريع (v1.0.0)
+### 📥 التحميل المباشر والتثبيت السريع (v1.1.0)
 
 | الحزمة | ملف التثبيت (.zip / .aar) | طريقة التثبيت السريع |
 |---|---|---|
-| **إضافة بيئة التطوير (Android Studio / IntelliJ)** | [📥 **تحميل ComposeBridgeIntelliJ-1.0.0.zip**](https://github.com/JALAL591/compose-bridge/raw/main/dist/ComposeBridgeIntelliJ-1.0.0.zip) | في Android Studio: انتقل إلى `Settings` ➔ `Plugins` ➔ `⚙️` ➔ `Install Plugin from Disk...` |
+| **إضافة بيئة التطوير (Android Studio / IntelliJ)** | [📥 **تحميل ComposeBridgeIntelliJ-1.1.0.zip**](https://github.com/JALAL591/compose-bridge/raw/main/dist/ComposeBridgeIntelliJ-1.1.0.zip) | في Android Studio: انتقل إلى `Settings` ➔ `Plugins` ➔ `⚙️` ➔ `Install Plugin from Disk...` |
 | **مكتبة أندرويد لـ Jetpack Compose** | [📦 **تحميل composebridge-agent-release.aar**](https://github.com/JALAL591/compose-bridge/raw/main/dist/composebridge-agent-release.aar) | انسخ الملف إلى مجلد `app/libs/` في مشروعك |
 
 **ComposeBridge** هي حزمة أدوات للمطورين تربط تطبيق Compose (KMP/Android) بمحرر الأكواد أو وكيل الذكاء الاصطناعي الخاص بك.
 
 > [!NOTE]
-> **حالة دعم KMP / Desktop**: دعم KMP/Desktop حالياً في مرحلة **Beta تجريبية**. التركيز الأساسي لإصدار v1.0.0 ينصب على **استقرار منصة أندرويد (Android stability)**.
+> **حالة دعم KMP / Desktop**: دعم KMP/Desktop حالياً في مرحلة **Beta تجريبية**. التركيز الأساسي لإصدار v1.1.0 ينصب على **استقرار منصة أندرويد (Android stability)**.
 
 
 ### 🎯 ما الجديد في الإصدار v1.0.0؟
@@ -128,7 +130,7 @@ composebridge/
 #### 1. أضف الـ Agent إلى مشروعك
 ```kotlin
 // build.gradle.kts
-debugImplementation("com.composebridge:agent:1.0.0")
+debugImplementation("com.composebridge:agent:1.1.0")
 ```
 
 #### 2. قم بتهيئته في MainActivity
@@ -197,7 +199,7 @@ Antigravity IDE — قم بتعديل `~/.gemini/config/mcp_config.json`:
 
 ---
 
-## ⚠️ دعم المنصات (الإصدار v1.0.0)
+## ⚠️ دعم المنصات (الإصدار v1.1.0)
 
 | الميزة | Android | Desktop | iOS |
 |--------|:-------:|:-------:|:---:|

@@ -94,25 +94,33 @@ class BridgeSelectionOverlay(
     }
 
     // Floating toolbar target aligned with DesignModeButton (statusBarsPadding + 80dp top, 16dp end)
-    private fun getToolbarRect(): Rect {
+        // Floating toolbar target aligned with DesignModeButton (statusBarsPadding + 80dp top, 16dp end)
+    private fun isTouchOnToolbar(x: Float, y: Float): Boolean {
         val density = resources.displayMetrics.density
         val statusBarHeight = run {
             val resId = resources.getIdentifier("status_bar_height", "dimen", "android")
             if (resId > 0) resources.getDimensionPixelSize(resId) else (24 * density).toInt()
         }
-        val topOffset = statusBarHeight + (70 * density).toInt()
-        val widthPx = (64 * density).toInt()
-        val heightPx = (250 * density).toInt()
-        val margin = (12 * density).toInt()
-        val isRtl = resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL
-        val left = if (isRtl) margin else width - margin - widthPx
-        val right = left + widthPx
-        val bottom = topOffset + heightPx
-        val slop = (8 * density).toInt()
-        return Rect(left - slop, topOffset - slop, right + slop, bottom + slop)
-    }
+        val topOffset = statusBarHeight + (65 * density).toInt()
+        val heightPx = (80 * density).toInt()
+        val bottomOffset = topOffset + heightPx
 
-    private fun getStopButtonRect(): Rect = getToolbarRect()
+        // Outside vertical toolbar strip?
+        if (y < topOffset || y > bottomOffset) return false
+
+        // DesignModeButton is a horizontal Row (~210dp width) aligned to TopEnd with 16dp end padding.
+        // In RTL: TopEnd is at screen LEFT (x around 0..250dp).
+        // In LTR: TopEnd is at screen RIGHT (x around width - 250dp..width).
+        val toolbarWidth = (250 * density).toInt()
+        val isRtl = resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL ||
+                BridgeOverlayManager.attachedActivity?.window?.decorView?.layoutDirection == View.LAYOUT_DIRECTION_RTL
+
+        return if (isRtl) {
+            x <= toolbarWidth
+        } else {
+            x >= (width - toolbarWidth)
+        }
+    }
 
     private var overlayLocation = IntArray(2)
 
@@ -128,17 +136,14 @@ class BridgeSelectionOverlay(
         val localX = event.x
         val localY = event.y
 
-        // Allow touches on floating toolbar to pass directly to Compose buttons
-        if (getToolbarRect().contains(localX.toInt(), localY.toInt())) {
+        // Allow touches on floating toolbar (Colors, Dimensions, Text, Close) to pass directly to Compose buttons
+        if (isTouchOnToolbar(localX, localY)) {
             return false
         }
 
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
-                // Close button fallback
-                if (getStopButtonRect().contains(localX.toInt(), localY.toInt())) {
-                    return true
-                }
+
 
                 // Is touch on a handle?
                 val handle = findHandle(localX, localY)
@@ -164,14 +169,7 @@ class BridgeSelectionOverlay(
             }
 
             MotionEvent.ACTION_UP -> {
-                // Close button
-                if (getStopButtonRect().contains(localX.toInt(), localY.toInt())) {
-                    onStopRequested?.invoke()
-                    draggingHandle = null
-                    previewRect = null
-                    invalidate()
-                    return true
-                }
+
 
                 // Finish drag
                 if (draggingHandle != null) {
@@ -206,21 +204,15 @@ class BridgeSelectionOverlay(
                     BridgeState.elementTexts.clear()
 
                     val act = BridgeOverlayManager.attachedActivity ?: (context as? android.app.Activity)
-                    val runtimeText = BridgeSemanticsExtractor.findTextAt(act, localX, localY)
-                        ?: node.textContent
-
-                    if (!runtimeText.isNullOrBlank()) {
-                        BridgeState.elementTexts.add(
-                            ElementTextInfo(
-                                text = runtimeText,
-                                file = node.sourceFile ?: "",
-                                line = node.line ?: 1,
-                                property = "text",
-                                isResourceOrRef = false,
-                                refKey = null
-                            )
-                        )
+                    val semanticText = BridgeSemanticsExtractor.findTextAt(act, localX, localY)
+                    val rawText = node.textContent
+                    // If raw text looks like raw string template code ($ or {), prefer evaluated semanticText!
+                    val runtimeText = when {
+                        !semanticText.isNullOrBlank() -> semanticText
+                        rawText != null && ("$" in rawText || "{" in rawText) -> null
+                        else -> rawText
                     }
+                    BridgeState.lastEvaluatedScreenText = semanticText ?: runtimeText
                     BridgeState.elementComposableName = node.name ?: ""
                     BridgeState.isLoadingElementColors = true
                     BridgeState.elementAnalysisError = null
@@ -241,11 +233,12 @@ class BridgeSelectionOverlay(
                         // ⭐ Build tree JSON
                         val treeJson = buildChildrenJson(node)
 
-                        // ⭐ Parent Properties Aggregation: if node is Text, ascend to parent container
+                        // ⭐ Parent Properties Aggregation: ascend to visual parent container
                         val parent = result.findParentContainer()
-                        val isText = node.name == "Text" || node.name?.contains("Text") == true
-                        val parentFile = if (isText) parent?.sourceFile else null
-                        val parentLine = if (isText) parent?.line else null
+                        val isText = node.name == "Text" || node.name?.contains("Text") == true || BridgeHitTester.isTextNode(node)
+                        val parentFile = parent?.sourceFile ?: (if (isText) file else null)
+                        val parentLine = parent?.line
+                        val resolvedTextRef = result.textReference ?: BridgeHitTester.resolveTextReference(runtimeText, act)
 
                         val sent = ComposeBridgeAgent.analyzeElementWithTree(
                             file = file,
@@ -257,8 +250,11 @@ class BridgeSelectionOverlay(
                             parentFile = parentFile,
                             parentLine = parentLine,
                             textValue = runtimeText,
-                            textReference = null,
+                            textReference = resolvedTextRef,
                         )
+                        if (!sent) {
+                            BridgeState.isLoadingElementColors = false
+                        }
                         println("[Overlay] 📤 analyzeElementWithTree sent=$sent parent=${parent?.name} text='$runtimeText' (reqId=$requestId)")
                     }
                 }

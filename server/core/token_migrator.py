@@ -109,7 +109,7 @@ class TokenMigrator:
         Find the file where tokens are stored.
         
         Priority:
-        1. AppDimens.kt / AppColors.kt (StudentApp style)
+        1. AppDimens.kt / AppColors.kt (Standard Design System style)
         2. Theme.kt / Color.kt / Dimens.kt (standard Compose)
         3. Any file with 'val .*Color' pattern
         4. None (needs creation)
@@ -487,7 +487,7 @@ class TokenMigrator:
         Detect how tokens are stored.
         
         Returns:
-        - "registry": uses BridgeDimensionRegistry (StudentApp style)
+        - "registry": uses BridgeDimensionRegistry (Standard Design System style)
         - "object": object AppDimens { val x = 16.dp }
         - "top-level": val x = 16.dp (top-level)
         """

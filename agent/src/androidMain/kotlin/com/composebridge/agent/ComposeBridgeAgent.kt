@@ -337,7 +337,11 @@ object ComposeBridgeAgent {
                     put("token_name", edit.tokenName)
                     edit.originalToken?.let { put("original_token", it) }
                     edit.originalValue?.let { put("original_value", it) }
-                    edit.refKey?.let { put("ref_key", it) }
+                    edit.refKey?.let {
+                        put("ref_key", it)
+                        put("text_reference", it)
+                        put("target", it)
+                    }
                     if (edit.occurrences.isNotEmpty()) {
                         put("occurrences", kotlinx.serialization.json.buildJsonArray {
                             edit.occurrences.forEach { occ ->

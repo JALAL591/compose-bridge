@@ -134,9 +134,9 @@ fun GlobalPanels() {
                     // ═══ Mode Header & Switcher Tabs ═══
                     val currentMode = BridgeState.currentEditMode
                     val modeTitle = when (currentMode) {
-                        EditMode.COLOR -> "🎨 تعديل الألوان (Color Mode)"
-                        EditMode.DIMENSION -> "📏 تعديل الأبعاد والمسافات (Dimension Mode)"
-                        EditMode.TEXT -> "📝 تعديل النصوص والمحتوى (Text Mode)"
+                        EditMode.COLOR -> "🎨 Element Colors (Color Mode)"
+                        EditMode.DIMENSION -> "📏 Element Dimensions (Dimension Mode)"
+                        EditMode.TEXT -> "📝 Element Text (Text Mode)"
                     }
 
                     Surface(
@@ -163,43 +163,6 @@ fun GlobalPanels() {
 
                     Spacer(Modifier.height(8.dp))
 
-                    // ═══ Mode Switcher Tabs ═══
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                            .padding(4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        listOf(
-                            Triple(EditMode.COLOR, "🎨 الألوان", Color(0xFF6366F1)),
-                            Triple(EditMode.DIMENSION, "📏 الأبعاد", Color(0xFF0EA5E9)),
-                            Triple(EditMode.TEXT, "📝 النصوص", Color(0xFFF59E0B)),
-                        ).forEach { (m, label, accent) ->
-                            val isSelected = currentMode == m
-                            Surface(
-                                onClick = { BridgeState.currentEditMode = m },
-                                shape = RoundedCornerShape(8.dp),
-                                color = if (isSelected) accent else Color.Transparent,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Box(
-                                    contentAlignment = Alignment.Center,
-                                    modifier = Modifier.padding(vertical = 8.dp)
-                                ) {
-                                    Text(
-                                        text = label,
-                                        fontSize = 12.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    Spacer(Modifier.height(16.dp))
 
                     // ═══ Mode-specific Content Sections ═══
                     when (currentMode) {
@@ -277,11 +240,11 @@ fun GlobalPanels() {
                             }
                         }
 
-                        EditMode.DIMENSION -> {
-                            SectionTitle("📏 Element Dimensions")
+                                                EditMode.DIMENSION -> {
+                            SectionTitle("📐 Element Dimensions")
                             if (BridgeState.elementDimensions.isEmpty()) {
                                 Text(
-                                    text = "ℹ️ No editable dimensions detected in current element scope",
+                                    text = "🔍 No editable dimensions detected in current element scope",
                                     fontSize = 12.sp,
                                     color = Color.Gray,
                                     modifier = Modifier.padding(12.dp),
@@ -291,20 +254,17 @@ fun GlobalPanels() {
                                     DimensionRow(
                                         dimension = dim,
                                         onValueSelected = { newVal ->
-                                            val edit = PendingEdit(
-                                                type = "dimension",
-                                                file = DesignModeRegistry.selectedSourceFile ?: "",
-                                                line = dim.line,
-                                                property = dim.property,
-                                                oldValue = dim.value,
-                                                newValue = newVal.toString(),
-                                                tokenName = dim.property,
-                                                isTernary = dim.isTernary,
-                                                dimensionKind = dim.kind,
-                                                registryKey = dim.registryKey
-                                            )
-                                            BridgeState.addPendingEdit(edit)
-                                            BridgeState.showSnackbar("📝 Added (${BridgeState.pendingCount})")
+                                            if (dim.isShared) {
+                                                val composableName = if (!dim.functionName.isNullOrEmpty()) dim.functionName 
+                                                    else (BridgeState.elementComposableName.takeIf { it.isNotEmpty() && it != "Element" } ?: "Element")
+                                                val rKey = dim.registryKey.ifEmpty { "${composableName}_${dim.property}_${dim.line}" }
+                                                BridgeDimensionRegistry.setOverride(rKey, newVal.dp)
+                                                BridgeState.dimensionPending = dim
+                                                BridgeState.dimensionNewValue = newVal
+                                                BridgeState.showDimensionDialog = true
+                                            } else {
+                                                addDimensionToQueue(dim, newVal, mode = "split")
+                                            }
                                         }
                                     )
                                 }
@@ -372,20 +332,30 @@ fun GlobalPanels() {
                                                     onClick = {
                                                         applied = true
                                                         val editId = java.util.UUID.randomUUID().toString()
+                                                        val refKeyToUse = if (!textInfo.refKey.isNullOrEmpty()) textInfo.refKey
+                                                                          else if (textInfo.property.startsWith("AppStrings.")) textInfo.property
+                                                                          else null
+                                                        val targetKey = refKeyToUse ?: textInfo.property.ifEmpty { "text" }
+                                                        BridgeTextRegistry.setOverride(targetKey, localText)
+                                                        if (!textInfo.refKey.isNullOrEmpty() && textInfo.refKey != targetKey) {
+                                                            BridgeTextRegistry.setOverride(textInfo.refKey, localText)
+                                                        }
+                                                        if (!textInfo.property.isNullOrEmpty() && textInfo.property != targetKey) {
+                                                            BridgeTextRegistry.setOverride(textInfo.property, localText)
+                                                        }
                                                         val edit = PendingEdit(
                                                             id = editId,
                                                             type = "text_edit",
                                                             file = textInfo.file,
                                                             line = textInfo.line,
-                                                            property = textInfo.refKey ?: "text",
+                                                            property = refKeyToUse ?: textInfo.property.ifEmpty { "text" },
                                                             oldValue = textInfo.text,
                                                             newValue = localText,
-                                                            tokenName = textInfo.refKey ?: "text",
-                                                            refKey = textInfo.refKey
+                                                            tokenName = refKeyToUse ?: textInfo.property.ifEmpty { "text" },
+                                                            refKey = refKeyToUse
                                                         )
-                                                        BridgeState.pendingEdits.add(edit)
-                                                        ComposeBridgeAgent.sendBatchEdits(listOf(edit))
-                                                        BridgeState.snackbarMessage = "Text update queued"
+                                                        BridgeState.addPendingEdit(edit)
+                                                        BridgeState.showSnackbar("📝 Added (${BridgeState.pendingCount})")
                                                     },
                                                     enabled = localText != textInfo.text && !applied
                                                 ) {
@@ -1731,7 +1701,7 @@ private fun addDimensionToQueue(
     val edit = PendingEdit(
         id = java.util.UUID.randomUUID().toString(),
         type = "dimension",
-        file = if (dim.file.isNotEmpty()) dim.file else (DesignModeRegistry.selectedSourceFile ?: ""),
+        file = if (dim.file.isNotEmpty() && !dim.file.endsWith("Text.kt")) dim.file else (DesignModeRegistry.selectedSourceFile ?: ""),
         line = dim.line,
         property = dim.property,
         oldValue = if (dim.currentValue == roundedOldVal) roundedOldVal.toInt().toString() else dim.currentValue.toString(),

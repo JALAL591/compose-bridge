@@ -21,9 +21,18 @@ captures/
 *.aar
 *.zip
 *.jar
-!dist/*.aar
-!dist/*.zip
 !**/gradle-wrapper.jar
+
+# Scratch & Local Experiments
+scratch/
+
+# Dist Release Artifacts (Keep only official release assets)
+dist/*.aar
+dist/*.zip
+!dist/composebridge-agent-release.aar
+!dist/ComposeBridgeIntelliJ-1.1.0.zip
+!dist/composebridge-server-1.1.0.zip
+!dist/ComposeBridge-v1.1.0-AllInOne.zip
 
 # Python
 __pycache__/

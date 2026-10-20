@@ -187,12 +187,22 @@ class BridgeTransport(
         try {
             if (text.contains("state_update")) {
                 val obj = json.parseToJsonElement(text).jsonObject
-                val prop = obj["property"]?.jsonPrimitive?.contentOrNull
-                val value = obj["value"]?.jsonPrimitive?.contentOrNull
-                if (prop != null && value != null) {
-                    val simpleKey = prop.removePrefix("AppColors.").trim()
-                    BridgeThemeRegistry.setColorHex(simpleKey, value)
-                    println("[BridgeTransport] 🎨 Local apply: $simpleKey = $value")
+                val kind = obj["kind"]?.jsonPrimitive?.contentOrNull
+                if (kind == "text") {
+                    val token = obj["token"]?.jsonPrimitive?.contentOrNull ?: obj["property"]?.jsonPrimitive?.contentOrNull
+                    val value = obj["value"]?.jsonPrimitive?.contentOrNull
+                    if (token != null && value != null) {
+                        BridgeTextRegistry.setOverride(token, value)
+                        println("[BridgeTransport] 📝 Local apply: $token = $value")
+                    }
+                } else if (kind == null || kind == "color" || kind == "split") {
+                    val prop = obj["property"]?.jsonPrimitive?.contentOrNull ?: obj["token"]?.jsonPrimitive?.contentOrNull
+                    val value = obj["value"]?.jsonPrimitive?.contentOrNull
+                    if (prop != null && value != null) {
+                        val simpleKey = prop.removePrefix("AppColors.").trim()
+                        BridgeThemeRegistry.setColorHex(simpleKey, value)
+                        println("[BridgeTransport] 🎨 Local apply: $simpleKey = $value")
+                    }
                 }
             } else if (text.contains("update_token_default")) {
                 val obj = json.parseToJsonElement(text).jsonObject
@@ -304,19 +314,24 @@ class BridgeTransport(
 
                     "state_update" -> {
                         val kind = obj["kind"]?.jsonPrimitive?.contentOrNull
+                        val token = obj["token"]?.jsonPrimitive?.contentOrNull
+                        val property = obj["property"]?.jsonPrimitive?.contentOrNull
+                        val rawValue = obj["value"]?.jsonPrimitive?.contentOrNull
+
                         if (kind == "dimension") {
-                            val token = obj["token"]?.jsonPrimitive?.contentOrNull
-                            val valueStr = obj["value"]?.jsonPrimitive?.contentOrNull
-                            val numVal = valueStr?.removeSuffix(".dp")?.removeSuffix(".sp")?.toFloatOrNull()
+                            val numVal = rawValue?.removeSuffix(".dp")?.removeSuffix(".sp")?.toFloatOrNull()
                             if (!token.isNullOrEmpty() && numVal != null) {
                                 BridgeDimensionRegistry.setOverride(token, numVal.dp)
                                 println("[BridgeTransport] 📏 dimension state_update: $token = $numVal.dp")
                             }
+                        } else if (kind == "text") {
+                            val tokenName = token ?: property ?: ""
+                            if (tokenName.isNotEmpty() && rawValue != null) {
+                                BridgeTextRegistry.setOverride(tokenName, rawValue)
+                                android.util.Log.i("BridgeTransport", "📝 text state_update: $tokenName = '$rawValue'")
+                                println("[BridgeTransport] 📝 text state_update: $tokenName = '$rawValue'")
+                            }
                         } else {
-                            val token = obj["token"]?.jsonPrimitive?.contentOrNull
-                            val property = obj["property"]?.jsonPrimitive?.contentOrNull
-                            val rawValue = obj["value"]?.jsonPrimitive?.contentOrNull
-                            
                             val tokenName = token ?: property?.removePrefix("AppColors.")?.trim()
                             val value = if (rawValue != null && rawValue.contains("0x", ignoreCase = true)) {
                                 val match = Regex("""0x[0-9A-Fa-f]+""").find(rawValue)
@@ -492,7 +507,6 @@ class BridgeTransport(
 
                                     val textsArray = resObj["texts"]?.jsonArray
                                     val parsedTexts = mutableListOf<ElementTextInfo>()
-                                    val existingRuntimeText = BridgeState.elementTexts.firstOrNull()?.text
                                     textsArray?.forEach { tElem ->
                                         try {
                                             val tObj = tElem.jsonObject
@@ -502,26 +516,29 @@ class BridgeTransport(
                                                 val tLine = tObj["line"]?.jsonPrimitive?.intOrNull ?: 1
                                                 val isRef = tObj["is_resource_or_ref"]?.jsonPrimitive?.booleanOrNull ?: false
                                                 val rKey = tObj["ref_key"]?.jsonPrimitive?.contentOrNull
-                                                
-                                                // ⭐ Prioritize runtime evaluated text if textVal is a reference path
-                                                val finalDisplayText = if (textVal.startsWith("AppStrings.") && !existingRuntimeText.isNullOrBlank() && !existingRuntimeText.startsWith("AppStrings.")) {
-                                                    existingRuntimeText
+                                                val prop = tObj["property"]?.jsonPrimitive?.contentOrNull ?: "text"
+
+                                                // If server returned template code ($ or {), prefer evaluated text from device screen
+                                                val cleanVal = if (textVal.contains("$") || textVal.contains("{")) {
+                                                    BridgeState.lastEvaluatedScreenText?.takeIf { it.isNotBlank() } ?: textVal
                                                 } else {
                                                     textVal
                                                 }
-
+                                                val finalProp = if (!rKey.isNullOrEmpty() && rKey.startsWith("AppStrings.")) rKey else prop
+                                                val finalIsRef = isRef || (!rKey.isNullOrEmpty() && rKey.startsWith("AppStrings."))
                                                 parsedTexts.add(
                                                     ElementTextInfo(
-                                                        text = finalDisplayText,
+                                                        text = cleanVal,
                                                         file = tFile,
                                                         line = tLine,
-                                                        isResourceOrRef = isRef || (rKey != null),
+                                                        property = finalProp,
+                                                        isResourceOrRef = finalIsRef,
                                                         refKey = rKey
                                                     )
                                                 )
                                             }
                                         } catch (e: Exception) {
-                                            println("[BridgeTransport] ⚠️ Error parsing text: $e")
+                                            println("[BridgeTransport] Error parsing text: $e")
                                         }
                                     }
 
@@ -531,10 +548,8 @@ class BridgeTransport(
                                         BridgeState.elementColors.addAll(parsedColors)
                                         BridgeState.elementDimensions.clear()
                                         BridgeState.elementDimensions.addAll(parsedDimensions)
-                                        if (parsedTexts.isNotEmpty()) {
-                                            BridgeState.elementTexts.clear()
-                                            BridgeState.elementTexts.addAll(parsedTexts)
-                                        }
+                                        BridgeState.elementTexts.clear()
+                                        BridgeState.elementTexts.addAll(parsedTexts)
                                         BridgeState.isLoadingElementColors = false
                                         BridgeState.elementAnalysisError = null
                                     }

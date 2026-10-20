@@ -59,15 +59,31 @@ object BridgeState {
             (existing.tokenName.isNotEmpty() && existing.tokenName == edit.tokenName && existing.property == edit.property)
         }
         pendingEdits.add(edit)
-        previewColors[edit.tokenName] = edit.newValue
-        BridgeThemeRegistry.setColorHex(edit.tokenName, edit.newValue)
+        if (edit.type == "text_edit") {
+            val key = edit.refKey ?: edit.property.ifEmpty { edit.tokenName }
+            BridgeTextRegistry.setOverride(key, edit.newValue)
+            if (edit.property.isNotEmpty() && edit.property != key) {
+                BridgeTextRegistry.setOverride(edit.property, edit.newValue)
+            }
+        } else {
+            previewColors[edit.tokenName] = edit.newValue
+            BridgeThemeRegistry.setColorHex(edit.tokenName, edit.newValue)
+        }
     }
 
     fun removePendingEdit(id: String) {
         val edit = pendingEdits.find { it.id == id } ?: return
         pendingEdits.remove(edit)
-        previewColors.remove(edit.tokenName)
-        BridgeThemeRegistry.setColorHex(edit.tokenName, edit.oldValue)
+        if (edit.type == "text_edit") {
+            val key = edit.refKey ?: edit.property.ifEmpty { edit.tokenName }
+            BridgeTextRegistry.setOverride(key, edit.oldValue)
+            if (edit.property.isNotEmpty() && edit.property != key) {
+                BridgeTextRegistry.setOverride(edit.property, edit.oldValue)
+            }
+        } else {
+            previewColors.remove(edit.tokenName)
+            BridgeThemeRegistry.setColorHex(edit.tokenName, edit.oldValue)
+        }
     }
 
     fun onBatchAck(allReceivedIds: Set<String>) {
@@ -81,7 +97,15 @@ object BridgeState {
     fun clearPendingEdits(revert: Boolean = true) {
         if (revert) {
             pendingEdits.forEach { edit ->
-                BridgeThemeRegistry.setColorHex(edit.tokenName, edit.oldValue)
+                if (edit.type == "text_edit") {
+                    val key = edit.refKey ?: edit.property.ifEmpty { edit.tokenName }
+                    BridgeTextRegistry.setOverride(key, edit.oldValue)
+                    if (edit.property.isNotEmpty() && edit.property != key) {
+                        BridgeTextRegistry.setOverride(edit.property, edit.oldValue)
+                    }
+                } else {
+                    BridgeThemeRegistry.setColorHex(edit.tokenName, edit.oldValue)
+                }
             }
         }
         pendingEdits.clear()
@@ -166,6 +190,7 @@ object BridgeState {
     val elementColors = mutableStateListOf<ElementColorInfo>()
     val elementDimensions = mutableStateListOf<ElementDimensionInfo>()
     val elementTexts = mutableStateListOf<ElementTextInfo>()
+    var lastEvaluatedScreenText: String? by mutableStateOf(null)
     var showDimensionDialog: Boolean by mutableStateOf(false)
     var dimensionPending: ElementDimensionInfo? by mutableStateOf(null)
     var dimensionNewValue: Float? by mutableStateOf(null)

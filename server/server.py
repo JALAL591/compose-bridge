@@ -789,28 +789,55 @@ async def handle_message(websocket: WebSocketServerProtocol, raw: str) -> None:
         # ⭐ فحص ما إذا كان العنصر الحقيقي موجوداً في ملف مختلف (مثل Widget في Screen)
         actual_file = source_file
         actual_line = line_number
-        if tree and isinstance(tree, list):
-            for node in tree:
-                if isinstance(node, dict):
-                    sf = node.get("sourceFile")
-                    if sf and sf != source_file and not sf.endswith(source_file):
-                        actual_file = sf
-                        actual_line = node.get("line", line_number)
-                        break
-
-        # استخرج التحليل
-        result = analyze_element_range(
-            actual_file, actual_line, utf16_offset, utf16_length, tree=tree,
-            project_root=Path(PROJECT_ROOT) if PROJECT_ROOT else None
-        )
-
         parent_file = message.get("parent_file")
         parent_line = message.get("parent_line")
+
+        def _is_internal_lib(f: str) -> bool:
+            if not f:
+                return True
+            fl = f.lower()
+            return (
+                "androidx" in fl or
+                f.endswith("Text.kt") or
+                f.endswith("BasicText.kt") or
+                "lazylist" in fl or
+                "foundation" in fl or
+                "compose.ui" in fl or
+                "compose.material" in fl
+            )
+
+        if _is_internal_lib(actual_file):
+            if parent_file and not _is_internal_lib(parent_file):
+                actual_file = parent_file
+                actual_line = parent_line or line_number
+            elif tree and isinstance(tree, list):
+                for node in tree:
+                    if isinstance(node, dict):
+                        sf = node.get("sourceFile")
+                        if sf and not _is_internal_lib(sf):
+                            actual_file = sf
+                            actual_line = node.get("line", line_number)
+                            break
+
+        # استخرج التحليل
+        parent_file = message.get("parent_file")
+        parent_line = message.get("parent_line")
+        req_text_val = message.get("text_value")
+        req_text_ref = message.get("text_reference")
+
+        result = analyze_element_range(
+            actual_file, actual_line, utf16_offset, utf16_length, tree=tree,
+            project_root=Path(PROJECT_ROOT) if PROJECT_ROOT else None,
+            runtime_text_hint=req_text_val,
+            parent_line=parent_line,
+        )
+
         if parent_file and parent_line:
             try:
                 parent_result = analyze_element_range(
                     parent_file, parent_line, 0, 0,
                     project_root=Path(PROJECT_ROOT) if PROJECT_ROOT else None,
+                    runtime_text_hint=req_text_val,
                 )
                 # 1. Merge parent colors (container, background, surface)
                 existing_colors = {c.get("color") for c in result.get("colors", []) if isinstance(c, dict)}
@@ -828,24 +855,56 @@ async def handle_message(websocket: WebSocketServerProtocol, raw: str) -> None:
                         result.setdefault("dimension_details", []).append(pd)
                         if pd.get("value") and pd.get("value") not in result.get("dimensions", []):
                             result.setdefault("dimensions", []).append(pd.get("value"))
+
+                # 3. Merge parent texts (e.g. AdaptiveActionCard parameters)
+                existing_texts = {t.get("ref_key") or t.get("text") for t in result.get("texts", []) if isinstance(t, dict)}
+                for pt in parent_result.get("texts", []):
+                    t_key = pt.get("ref_key") or pt.get("text")
+                    if t_key and t_key not in existing_texts:
+                        existing_texts.add(t_key)
+                        result.setdefault("texts", []).append(pt)
+
+                # 4. Adopt parent composable_name if result is Element or Text
+                p_cname = parent_result.get("composable_name")
+                if p_cname and p_cname not in ["Element", "Text", "BasicText", "Column", "Row"]:
+                    if result.get("composable_name") in ["Element", "Text", "BasicText", "Column", "Row", None]:
+                        result["composable_name"] = p_cname
             except Exception as e:
                 log_error(f"Failed to aggregate parent properties: {e}")
 
-        req_text_val = message.get("text_value")
-        req_text_ref = message.get("text_reference")
+        # If evaluated runtime text was captured from device screen, prefer it over raw template code
         if req_text_val:
-            if result.get("texts"):
-                for entry in result["texts"]:
-                    if entry.get("is_resource_or_ref") or entry.get("text", "").startswith("AppStrings."):
-                        entry["text"] = req_text_val
-            else:
-                result.setdefault("texts", []).append({
+            if not result.get("texts"):
+                result["texts"] = [{
                     "text": req_text_val,
                     "file": actual_file,
                     "line": actual_line,
-                    "is_resource_or_ref": bool(req_text_ref),
+                    "is_resource_or_ref": bool(req_text_ref and str(req_text_ref).startswith("AppStrings.")),
                     "ref_key": req_text_ref,
-                })
+                }]
+            else:
+                for t in result.get("texts", []):
+                    # If extracted text has $ or { (template code), replace with real evaluated screen text
+                    if "$" in t.get("text", "") or "{" in t.get("text", ""):
+                        t["text"] = req_text_val
+                    if req_text_ref and not t.get("ref_key"):
+                        t["ref_key"] = req_text_ref
+                        t["is_resource_or_ref"] = True
+
+        # ⭐ Auto-resolve ref_key from AppStrings.kt if missing
+        p_root = Path(PROJECT_ROOT) if PROJECT_ROOT else None
+        if p_root:
+            from core.source_analyzer import _find_ref_in_app_strings
+            for t in result.get("texts", []):
+                if not t.get("ref_key"):
+                    search_str = t.get("text") or req_text_val
+                    found_ref = _find_ref_in_app_strings(p_root, search_str)
+                    if found_ref:
+                        t["ref_key"] = found_ref
+                        t["is_resource_or_ref"] = True
+                        if not t.get("property") or t.get("property") == "text":
+                            t["property"] = found_ref
+                        log_info(f"[ANALYZE] Auto-resolved ref_key: '{search_str}' -> {found_ref}")
 
         target_file = result.get("source_file", actual_file)
 
@@ -858,20 +917,7 @@ async def handle_message(websocket: WebSocketServerProtocol, raw: str) -> None:
                 {"name": "cardIcon", "default": 60.0},
             ]
 
-        # Mode-based filtering for payload reduction and speed
-        if mode == "COLOR":
-            result["dimensions"] = []
-            result["dimension_details"] = []
-            result["texts"] = []
-        elif mode == "DIMENSION":
-            result["colors"] = []
-            result["texts"] = []
-            result["suggested_tokens"] = []
-        elif mode == "TEXT":
-            result["colors"] = []
-            result["dimensions"] = []
-            result["dimension_details"] = []
-            result["suggested_tokens"] = []
+        # Preserve all colors, dimensions, and texts across all modes for seamless multi-mode inspection
 
         # أرسل الـ response
         await safe_send(websocket, {
@@ -1191,8 +1237,8 @@ async def handle_message(websocket: WebSocketServerProtocol, raw: str) -> None:
                     line_num = edit.get("line", 1)
                     old_t = str(edit.get("old_value") or edit.get("old_text", ""))
                     new_t = str(edit.get("new_value") or edit.get("new_text", ""))
-                    ref_k = edit.get("ref_key") or edit.get("property")
-                    if ref_k == "text":
+                    ref_k = edit.get("ref_key") or edit.get("text_reference") or edit.get("target") or edit.get("token_name") or edit.get("property")
+                    if ref_k in ("text", "title", "subtitle", "label", "null", "all"):
                         ref_k = None
                     ok, msg, info = update_text_in_source(
                         file_path=file_p,
@@ -1372,8 +1418,8 @@ async def handle_message(websocket: WebSocketServerProtocol, raw: str) -> None:
         line_num = message.get("line", 1)
         old_text = message.get("old_text") or message.get("old_value", "")
         new_text = message.get("new_text") or message.get("new_value", "")
-        ref_key = message.get("ref_key") or message.get("text_reference") or message.get("property")
-        if ref_key == "text":
+        ref_key = message.get("ref_key") or message.get("text_reference") or message.get("target") or message.get("token_name") or message.get("property")
+        if ref_key in ("text", "title", "subtitle", "label", "null", "all"):
             ref_key = None
 
         from core.state_editor import update_text_in_source

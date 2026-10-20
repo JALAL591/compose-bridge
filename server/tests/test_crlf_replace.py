@@ -11,7 +11,7 @@ import tempfile
 from pathlib import Path
 import sys
 
-BRIDGE_DIR = Path(r"C:\Users\thinkpad\StudioProjects\compose-bridge\server")
+BRIDGE_DIR = Path(__file__).resolve().parent.parent
 if str(BRIDGE_DIR) not in sys.path:
     sys.path.insert(0, str(BRIDGE_DIR))
 
