@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "com.composebridge"
-version = "1.1.0"
+version = "1.1.1"
 
 kotlin {
     androidTarget {
@@ -28,6 +28,7 @@ kotlin {
     sourceSets {
         val commonMain by getting {
             dependencies {
+                api(project(":composebridge-runtime"))
                 implementation(compose.runtime)
                 implementation(compose.foundation)
                 implementation(compose.ui)

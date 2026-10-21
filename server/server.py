@@ -37,6 +37,7 @@ from core.state_manager import StateManager
 HOST = "0.0.0.0"
 PORT = 8711
 
+from core.auth_manager import get_or_create_auth_token
 from core.project_root import get_project_root
 
 PROJECT_ROOT = get_project_root()
@@ -44,10 +45,9 @@ print(f"[ROOT] Project root: {PROJECT_ROOT}")
 STATE_MANAGER = StateManager(PROJECT_ROOT)
 STATE_MANAGER.init()
 
-# ⚠️ TEMPORARY — fixed token for local testing
-# TODO: replace with QR code or env var before release
-AUTH_TOKEN = "test-token-local-dev"
-print(f"[AUTH] Token: {AUTH_TOKEN} (FIXED for testing)")
+# Dynamically loaded / generated from .composebridge-state/auth.json
+AUTH_TOKEN = get_or_create_auth_token(PROJECT_ROOT)
+print(f"[AUTH] Token: {AUTH_TOKEN[:6]}... (loaded from auth.json)")
 
 
 # ============================================================

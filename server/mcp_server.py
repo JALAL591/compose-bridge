@@ -5,6 +5,7 @@ ComposeBridge MCP Server — Diagnostic Version
 Logs all events to ~/composebridge-mcp.log for debugging.
 """
 
+from core.auth_manager import get_or_create_auth_token
 import asyncio
 import json
 import logging
@@ -112,7 +113,7 @@ async def notify_bridge_server(token: str, value: str) -> bool:
             # Auth
             await ws.send(json.dumps({
                 "type": "auth",
-                "token": "test-token-local-dev",
+                "token": get_or_create_auth_token(PROJECT_ROOT),
             }))
             await asyncio.wait_for(ws.recv(), timeout=2)
 
@@ -145,7 +146,7 @@ async def notify_agent_lifecycle(event: str) -> bool:
             # Auth
             await ws.send(json.dumps({
                 "type": "auth",
-                "token": "test-token-local-dev",
+                "token": get_or_create_auth_token(PROJECT_ROOT),
             }))
             await asyncio.wait_for(ws.recv(), timeout=2)
             
@@ -171,9 +172,21 @@ def run_async(coro):
 
 @app.tool(
     name="find_token_by_color",
-    description="Reverse lookup: which token has this hex color?",
+    description="Reverse lookup: Find token(s) matching an exact hex color.",
 )
 def find_token_by_color(hex_color: str) -> str:
+    """
+    Reverse lookup: Find token(s) matching a hex color. Match is EXACT (case-insensitive).
+    
+    What it does: Searches the design system color tokens to find which token names have this exact color.
+    When to use: When you have a hardcoded hex color (e.g. from design mockup or code) and want to check if a token already exists for it.
+    When NOT to use: Do not use for fuzzy or perceptual color matching. Use list_tokens to explore all available colors.
+    Side effects: Read-only. No files modified.
+    Parameters:
+      - hex_color: '#RRGGBB' or 'RRGGBB' (hash optional, case-insensitive).
+    Returns:
+      JSON string with {"token": "Primary"} or {"token": None} if no match found. Does not do color distance matching.
+    """
     log(f"🔧 find_token_by_color: {hex_color}")
     try:
         idx = get_index()
@@ -187,9 +200,20 @@ def find_token_by_color(hex_color: str) -> str:
 
 @app.tool(
     name="rollback_last",
-    description="Undo last surgical edit.",
+    description="Reverts the LAST surgical edit made in the current session.",
 )
 def rollback_last() -> str:
+    """
+    Reverts the LAST surgical edit made in the current session.
+    
+    What it does: Undoes the most recent single edit recorded in the session journal.
+    When to use: Immediately after an edit made with set_token or add_token that had unintended results.
+    When NOT to use: Do not use for pattern-wide rollbacks (use rollback_pattern) or specific file reverts (use reject_file_changes).
+    Side effects: Destructive rollback. Modifies the target file back to its previous content byte-for-byte.
+    Parameters: None.
+    Returns:
+      JSON string {"rolled_back": true/false}. Returns error if no previous edit exists in session. Only ONE edit is reverted.
+    """
     log("🔧 rollback_last")
     try:
         ok = _rollback_last()
@@ -313,13 +337,16 @@ def add_token(
 @app.tool()
 def get_naming_convention(token_type: str = "dimension") -> str:
     """
-    Detect the naming convention used in the project.
+    Read-only analysis. Detects if project uses camelCase, snake_case, or PascalCase for tokens.
     
-    Args:
-        token_type: "dimension" or "color"
-    
+    What it does: Analyzes existing tokens to detect whether project uses camelCase, snake_case, or PascalCase.
+    When to use: Use BEFORE creating new tokens with add_token or replace_pattern to maintain project consistency.
+    When NOT to use: Do not use to inspect actual token values; use list_tokens instead.
+    Side effects: Read-only. No files modified.
+    Parameters:
+      - token_type: 'dimension' (default) or 'color'.
     Returns:
-        JSON with detected style, examples, and suggestions.
+      JSON string with detected style (e.g. 'camelCase'), confidence score, examples, and recommendations.
     """
     from core.token_migrator import TokenMigrator
     
@@ -419,9 +446,17 @@ def list_tokens(project_path: str = None) -> str:
 @app.tool()
 def set_token(token_name: str, value: str) -> str:
     """
-    Surgically edit a token value.
-    Notifies Bridge + phones live.
-    Uses agent_start/agent_end for session tracking.
+    DESTRUCTIVE: Modifies .kt files. Surgically edit a design token value in source code.
+    
+    What it does: Modifies .kt files containing the token definition. Notifies phone via WebSocket (live preview).
+    When to use: When adjusting a design token (color or dimension) and immediately observing visual feedback.
+    When NOT to use: Do not use for text strings (use set_text). Do not use for converting hardcoded values to tokens (use add_token).
+    Side effects: DESTRUCTIVE: Modifies source code on disk. Requires approve_file_changes to commit changes or reject_file_changes to revert.
+    Parameters:
+      - token_name: exact token name OR 'AppColors.TokenName' (e.g., 'Primary', 'cardCorner').
+      - value: '#RRGGBB' for colors or numeric for dimensions (e.g., '#FF1122', '24.dp').
+    Returns:
+      JSON string with update status, file path, and previous/new values.
     """
     from core.write_lock import acquire_write_lock
     with acquire_write_lock():
@@ -521,18 +556,19 @@ def set_token(token_name: str, value: str) -> str:
 @app.tool()
 def set_text(token_name: str, new_value: str, file_path: str = None, line: int = None) -> str:
     """
-    Surgically edit text content in either:
-    1. An AppStrings reference token (e.g. "AppStrings.Dashboard.quickAccess" or "Dashboard.quickAccess").
-    2. A hardcoded Text("...") composable in a given source file or found across the project.
+    DESTRUCTIVE: Modifies .kt files. Surgically edit text content with automatic BridgeTextRegistry wrapping.
     
-    Args:
-        token_name: The reference token key OR the exact old text to replace.
-        new_value: The new text string to set.
-        file_path: Optional source file (e.g. "DashboardScreen.kt" or "AppStrings.kt").
-        line: Optional line number.
-        
+    What it does: Modifies .kt files. Auto-migrates hardcoded text to BridgeTextRegistry for live preview.
+    When to use: When editing UI text strings, whether defined in AppStrings or hardcoded in Composable Text("...") elements.
+    When NOT to use: Do not use for colors or dimensions (use set_token or add_token).
+    Side effects: DESTRUCTIVE: Modifies source code on disk. Requires approve_file_changes before changes take effect in git. Can be reverted via reject_file_changes.
+    Parameters:
+      - token_name: reference key (e.g., 'AppStrings.Dashboard.title') OR exact old text content to replace.
+      - new_value: The new text string to set.
+      - file_path: relative path to source file (e.g., 'QuickActionsWidget.kt' or 'ui/theme/AppStrings.kt').
+      - line: optional line number for disambiguation if text appears multiple times.
     Returns:
-        JSON string with success status, old_text, new_text, and file location.
+      JSON string with success status, old_text, new_text, and modified file location.
     """
     from core.write_lock import acquire_write_lock
     with acquire_write_lock():
@@ -708,14 +744,17 @@ def get_token_impact(token_name: str, project_path: str = None) -> str:
 @app.tool()
 def suggest_token_split(token_name: str = None, project_path: str = None) -> str:
     """
-    Suggest splitting tokens that are used in multiple contexts.
-
-    Args:
-        token_name: optional — analyze a specific token only.
-        project_path: optional — explicit path to project root.
-
+    Read-only analysis. Suggests splitting tokens used in multiple contexts.
+    
+    What it does: Detects if a token is used in different contexts (e.g. cards and buttons) and proposes contextual splits.
+    When to use: Use BEFORE replace_pattern.
+    When NOT to use: For token impact analysis use get_token_impact. For sibling tokens use get_token_siblings.
+    Side effects: Read-only. No files modified.
+    Parameters:
+      - token_name: optional filter to analyze a specific token only.
+      - project_path: optional override for project root path.
     Returns:
-        JSON with split suggestions.
+      JSON string with split suggestions, proposed token names, and affected call sites.
     """
     from core.project_scanner import ProjectScanner
     from core.project_root import get_project_root
@@ -800,14 +839,17 @@ def detect_conditional_variants(token_name: str = None) -> str:
 @app.tool()
 def replace_pattern(pattern_id: str, dry_run: bool = False) -> str:
     """
-    Replace all occurrences of a detected pattern.
-    Creates the suggested token + replaces all usages.
+    DESTRUCTIVE BATCH OPERATION: Replaces ALL occurrences of a pattern across the project.
     
-    Args:
-        pattern_id: from detect_conditional_variants.
-        
+    What it does: Creates new token + replaces usages. Can be rolled back via rollback_pattern(pattern_id).
+    When to use: When replacing a recurring conditional or hardcoded pattern across all files.
+    When NOT to use: USE dry_run=True FIRST to preview affected files. pattern_id must come from detect_conditional_variants.
+    Side effects: DESTRUCTIVE: Modifies multiple .kt files simultaneously. Records changes in journal.
+    Parameters:
+      - pattern_id: Unique pattern identifier from detect_conditional_variants.
+      - dry_run: If True (recommended first), previews changes without writing to disk.
     Returns:
-        JSON with replacements made.
+      JSON string with replacements made, modified files, and created token name.
     """
     from core.pattern_detector import PatternDetector
     from core.token_migrator import TokenMigrator
@@ -1038,8 +1080,16 @@ def list_applied_patterns() -> str:
 @app.tool()
 def rollback_pattern(pattern_id: str) -> str:
     """
-    Rollback all changes for a specific pattern.
-    Reverts every file modification made by replace_pattern.
+    Rolls back ALL changes made by a specific replace_pattern call.
+    
+    What it does: Requires pattern_id from the original replace_pattern response. All files are reverted byte-for-byte.
+    When to use: When a replace_pattern operation caused regressions and needs complete reversal.
+    When NOT to use: Cannot undo if files were modified externally. Use rollback_last for single-edit undo.
+    Side effects: Destructive rollback. Modifies all files touched by the pattern back to their prior state.
+    Parameters:
+      - pattern_id: The exact pattern_id from the original replace_pattern response.
+    Returns:
+      JSON string with list of reverted files and status.
     """
     from core.pattern_journal import PatternJournal
     from core.write_lock import acquire_write_lock
@@ -1055,8 +1105,16 @@ def rollback_pattern(pattern_id: str) -> str:
 @app.tool()
 def get_token_siblings(token_name: str) -> str:
     """
-    Get semantic siblings of a token.
-    Example: Primary → [PrimaryDark, PrimaryLight]
+    Read-only. Returns semantically related tokens (e.g., Primary → PrimaryDark, PrimaryLight).
+    
+    What it does: Finds related variants of a token based on naming patterns and semantic links.
+    When to use: When exploring related tokens or checking which color variants already exist.
+    When NOT to use: Does NOT include the original token. Returns empty list if no siblings.
+    Side effects: Read-only. No files modified.
+    Parameters:
+      - token_name: exact token name (e.g., 'Primary') or fully-qualified (e.g., 'AppColors.Primary').
+    Returns:
+      JSON string with list of sibling token names and current values.
     """
     from core.token_linker import TokenLinker
     try:
@@ -1074,7 +1132,17 @@ def get_token_siblings(token_name: str) -> str:
 
 @app.tool()
 def get_all_token_groups() -> str:
-    """Get all semantic groups in the project."""
+    """
+    Read-only. Returns ALL semantic token groups in the project (e.g., 'Actions', 'Dashboard', 'Settings').
+    
+    What it does: Lists all token groups discovered across design system objects.
+    When to use: To inspect the high-level semantic grouping of design tokens.
+    When NOT to use: Use list_tokens for individual tokens. Groups are based on object declarations in AppStrings/DesignSystem.
+    Side effects: Read-only. No files modified.
+    Parameters: None.
+    Returns:
+      JSON string with group names, member token counts, and parent objects.
+    """
     from core.token_linker import TokenLinker
     try:
         linker = TokenLinker(PROJECT_ROOT)
@@ -1090,7 +1158,17 @@ def get_all_token_groups() -> str:
 
 @app.tool()
 def list_modified_files() -> str:
-    """List all files modified by replace_pattern."""
+    """
+    Read-only. Lists files modified by recent replace_pattern operations in the current session.
+    
+    What it does: Queries the session journal to return all files currently in a modified state.
+    When to use: To see what files have unapproved changes before approving or rejecting.
+    When NOT to use: Does NOT persist across sessions. For git-based modifications use get_file_diff. Returns files in journal (not git status).
+    Side effects: Read-only. No files modified.
+    Parameters: None.
+    Returns:
+      JSON string with list of relative file paths.
+    """
     from core.pattern_journal import PatternJournal
     try:
         journal = PatternJournal(PROJECT_ROOT)
@@ -1106,7 +1184,18 @@ def list_modified_files() -> str:
 
 @app.tool()
 def reject_file_changes(file_path: str) -> str:
-    """Revert all changes for a specific file."""
+    """
+    Destructive: Reverts pending changes for a SINGLE file using .bridge.bak backup.
+    
+    What it does: Rolls back byte-for-byte to the state before the recent surgical edit or replace_pattern.
+    When to use: When modifications to a specific file are incorrect and need to be discarded.
+    When NOT to use: File must be currently modified. Use reject_all_files for all files.
+    Side effects: Destructive rollback. Overwrites file with original backup and removes entry from journal.
+    Parameters:
+      - file_path: relative path to project root (e.g., 'QuickActionsWidget.kt' or 'ui/theme/AppStrings.kt').
+    Returns:
+      JSON string confirming rollback of the file.
+    """
     from core.pattern_journal import PatternJournal
     from core.write_lock import acquire_write_lock
     try:
@@ -1120,7 +1209,18 @@ def reject_file_changes(file_path: str) -> str:
 
 @app.tool()
 def approve_file_changes(file_path: str) -> str:
-    """Approve changes for a specific file (remove from journal)."""
+    """
+    Approves pending changes for a SPECIFIC file. Removes its entry from journal.
+    
+    What it does: Marks changes as accepted and discards the backup so the file is no longer in pending state.
+    When to use: When changes to a specific file have been inspected (via get_file_diff) and verified correct.
+    When NOT to use: File must be modified. To approve all files use approve_all_files.
+    Side effects: Clears the journal entry and backup for this file. Modifications remain permanently on disk.
+    Parameters:
+      - file_path: relative to project root (e.g., 'QuickActionsWidget.kt' or 'ui/theme/AppStrings.kt').
+    Returns:
+      JSON string confirming file approval.
+    """
     from core.pattern_journal import PatternJournal
     from core.write_lock import acquire_write_lock
     try:
@@ -1134,7 +1234,17 @@ def approve_file_changes(file_path: str) -> str:
 
 @app.tool()
 def approve_all_files() -> str:
-    """Approve all pending changes."""
+    """
+    Destructive: Approves ALL pending changes permanently. Removes them from journal.
+    
+    What it does: Permanently accepts all pending changes in the journal across all modified files.
+    When to use: When all modifications from recent operations are verified and accepted.
+    When NOT to use: No rollback after this action. Use approve_file_changes for single files. Use reject_all_files to discard instead.
+    Side effects: Destructive: Permanently clears all backups and journal entries. Changes cannot be rolled back.
+    Parameters: None.
+    Returns:
+      JSON string confirming all files approved.
+    """
     from core.pattern_journal import PatternJournal
     from core.write_lock import acquire_write_lock
     try:
@@ -1148,7 +1258,17 @@ def approve_all_files() -> str:
 
 @app.tool()
 def reject_all_files() -> str:
-    """Revert all pending changes."""
+    """
+    Destructive: Reverts ALL pending changes using byte-level backup (.bridge.bak).
+    
+    What it does: Rolls back byte-for-byte all files modified in the current journal session.
+    When to use: To completely discard all recent changes and return every file to its exact prior state.
+    When NOT to use: Use reject_file_changes for a single file. Use reject_all_files_force if some rollbacks may fail.
+    Side effects: Destructive rollback. Overwrites all modified files with their .bridge.bak backups and clears journal.
+    Parameters: None.
+    Returns:
+      JSON string with list of reverted files and status.
+    """
     from core.pattern_journal import PatternJournal
     from core.write_lock import acquire_write_lock
     try:
@@ -1162,7 +1282,17 @@ def reject_all_files() -> str:
 
 @app.tool()
 def reject_all_files_force() -> str:
-    """Force reject — clear journal even if some reverts fail."""
+    """
+    Destructive + Forceful. Clears the entire journal EVEN IF some rollbacks fail.
+    
+    What it does: Forcefully attempts rollback and clears the journal unconditionally.
+    When to use: Use only when reject_all_files fails due to missing backups or file corruption.
+    When NOT to use: May leave files in inconsistent state. For safe rollback use reject_all_files.
+    Side effects: Destructive + Forceful: Clears all journal tracking regardless of whether every file reverted cleanly.
+    Parameters: None.
+    Returns:
+      JSON string with forced rollback results.
+    """
     from core.pattern_journal import PatternJournal
     from core.write_lock import acquire_write_lock
     try:
@@ -1176,7 +1306,18 @@ def reject_all_files_force() -> str:
 
 @app.tool()
 def get_file_diff(file_path: str) -> str:
-    """Get before/after content and diff for a modified file."""
+    """
+    Read-only. Returns before/after content and unified diff for a specific modified file.
+    
+    What it does: Computes unified diff comparing original backup (.bridge.bak) with current on-disk content.
+    When to use: To inspect exact changes before approving (approve_file_changes) or rejecting (reject_file_changes).
+    When NOT to use: Use list_modified_files first to get valid paths. file_path should match the entry from list_modified_files (relative to project root).
+    Side effects: Read-only. No files modified.
+    Parameters:
+      - file_path: relative path to project root (e.g., 'QuickActionsWidget.kt' or 'ui/theme/AppStrings.kt').
+    Returns:
+      JSON string with original content, modified content, and unified diff.
+    """
     from core.pattern_journal import PatternJournal
     try:
         journal = PatternJournal(PROJECT_ROOT)

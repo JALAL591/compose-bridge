@@ -29,10 +29,11 @@ scratch/
 # Dist Release Artifacts (Keep only official release assets)
 dist/*.aar
 dist/*.zip
+!dist/composebridge-runtime-release.aar
 !dist/composebridge-agent-release.aar
-!dist/ComposeBridgeIntelliJ-1.1.0.zip
-!dist/composebridge-server-1.1.0.zip
-!dist/ComposeBridge-v1.1.0-AllInOne.zip
+!dist/ComposeBridgeIntelliJ-1.1.1.zip
+!dist/composebridge-server-1.1.1.zip
+!dist/ComposeBridge-v1.1.1-AllInOne.zip
 
 # Python
 __pycache__/

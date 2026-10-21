@@ -73,6 +73,38 @@ def get_bridge_state_file() -> Path:
     return PROJECT_ROOT / "agent" / "src" / "androidMain" / "kotlin" / "com" / "composebridge" / "agent" / "BridgeState.kt"
 
 
+def _find_registry_file(file_name: str = "AppDimens.kt") -> Optional[Path]:
+    """Find registry or token file dynamically across the project."""
+    for f in PROJECT_ROOT.rglob(file_name):
+        s = str(f)
+        if ".bak" not in s and "build" not in s and ".composebridge" not in s:
+            return f
+    return None
+
+
+def _atomic_write_text(file_path: Path, text: str) -> None:
+    """Write text atomically preserving CRLF and line endings."""
+    import tempfile
+    import time
+    file_path = Path(file_path)
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile("w", encoding="utf-8", newline="", delete=False, dir=file_path.parent) as tf:
+        tf.write(text)
+        temp_name = tf.name
+
+    replaced = False
+    last_err = None
+    for attempt in range(10):
+        try:
+            os.replace(temp_name, file_path)
+            replaced = True
+            break
+        except PermissionError as pe:
+            last_err = pe
+            time.sleep(0.05 * (attempt + 1))
+    if not replaced and last_err:
+        raise last_err
+
 def get_app_colors_file() -> Path:
     """Resolve AppColors.kt dynamically."""
     cfg_paths = get_config_paths()
@@ -84,7 +116,7 @@ def get_app_colors_file() -> Path:
         s = str(f)
         if ".bak" not in s and "build" not in s:
             return f
-    return PROJECT_ROOT / "app" / "src" / "main" / "java" / "com" / "student" / "app" / "ui" / "theme" / "AppColors.kt"
+    return _find_registry_file("AppColors.kt") or (PROJECT_ROOT / "AppColors.kt")
 
 
 def get_app_typography_file() -> Path:
@@ -98,7 +130,7 @@ def get_app_typography_file() -> Path:
         s = str(f)
         if ".bak" not in s and "build" not in s:
             return f
-    return PROJECT_ROOT / "app" / "src" / "main" / "java" / "com" / "student" / "app" / "ui" / "theme" / "AppTypography.kt"
+    return _find_registry_file("AppTypography.kt") or (PROJECT_ROOT / "AppTypography.kt")
 
 
 BRIDGE_STATE_FILE = get_bridge_state_file()
@@ -276,8 +308,6 @@ def apply_state_update(property_name: str, value: str) -> tuple:
         _journal_save(file_path, source.decode("utf-8", errors="replace"), new_source.decode("utf-8", errors="replace"))
     except Exception:
         pass
-
-    return (False, f"Write failed: {e}", None)
 
     return (
         True,
@@ -713,22 +743,9 @@ def update_token_default(token_name: str, value: str) -> tuple:
     import tempfile
     import os
 
-    file_path = (
-        PROJECT_ROOT
-        / "app"
-        / "src"
-        / "main"
-        / "java"
-        / "com"
-        / "student"
-        / "app"
-        / "ui"
-        / "theme"
-        / "AppDimens.kt"
-    )
-
-    if not file_path.exists():
-        return (False, f"AppDimens.kt not found: {file_path}", None)
+    file_path = _find_registry_file("AppDimens.kt")
+    if not file_path or not file_path.exists():
+        return (False, f"AppDimens.kt not found in project: {PROJECT_ROOT}", None)
 
     with open(file_path, "r", encoding="utf-8", newline="") as f:
         content = f.read()
@@ -1226,7 +1243,7 @@ def update_text_in_source(
                                 ins_pos = pkg_match.end()
                                 imp_line = "\n\nimport com.composebridge.agent.BridgeTextRegistry"
                                 updated_file_content = updated_file_content[:ins_pos] + imp_line + updated_file_content[ins_pos:]
-                                strings_file.write_text(updated_file_content, encoding="utf-8")
+                                _atomic_write_text(strings_file, updated_file_content)
                     except Exception as e:
                         print(f"[update_text_in_source] Warning adding import: {e}")
             if not ok:
@@ -1364,7 +1381,7 @@ def update_text_in_source(
                             else:
                                 pkg_idx = max([i for i, l in enumerate(lines) if l.strip().startswith("package ")] or [-1])
                                 lines.insert(pkg_idx + 1 if pkg_idx >= 0 else 0, imp_str)
-                            full_path.write_text("\n".join(lines), encoding="utf-8")
+                            _atomic_write_text(full_path, "\n".join(lines))
                     except Exception as imp_err:
                         print(f"[update_text_in_source] Import insertion warning: {imp_err}")
                 return (

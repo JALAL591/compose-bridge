@@ -8,9 +8,9 @@
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-1.7.3+-4285F4.svg)](https://developer.android.com/jetpack/compose)
 [![Zero Rebuild](https://img.shields.io/badge/DevEx-Zero--Rebuild%20Preview-brightgreen.svg)]()
 [![Latency](https://img.shields.io/badge/Latency-%3C50ms-success.svg)]()
-[![Status](https://img.shields.io/badge/Status-Production%20Ready%20(v1.1.0)-success.svg)]()
+[![Status](https://img.shields.io/badge/Status-Production%20Ready%20(v1.1.1)-success.svg)]()
 [![Scanner Speed](https://img.shields.io/badge/Scanner%20Speed-137ms%20%2F%20146%20files-brightgreen.svg)]()
-[![Version](https://img.shields.io/badge/Version-1.1.0-blue.svg)]()
+[![Version](https://img.shields.io/badge/Version-1.1.1-blue.svg)]()
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/JALAL591/compose-bridge/blob/main/LICENSE)
 [![M8ven Score](https://m8ven.ai/badge/mcp/jalal591-compose-bridge-rapm1x)](https://m8ven.ai/mcp/jalal591-compose-bridge-rapm1x?s=readme)
 [![Reviewed by HOL Guard](https://img.shields.io/badge/HOL_Guard%20|%20compose_bridge-2E5AAC?logo=shield&logoColor=white)](https://hol.org/guard/extensions/mcp.compose-bridge)
@@ -28,20 +28,21 @@
 
 ---
 
-### 📥 Direct Downloads & Quick Install (v1.1.0)
+### 📥 Direct Downloads & Quick Install (v1.1.1)
 
 | Package | Asset (.zip / .aar) | Installation |
 |---|---|---|
-| **IDE Plugin (Android Studio / IntelliJ)** | [📥 **ComposeBridgeIntelliJ-1.1.0.zip**](https://github.com/JALAL591/compose-bridge/raw/main/dist/ComposeBridgeIntelliJ-1.1.0.zip) | In Android Studio: `Settings` ➔ `Plugins` ➔ `⚙️` ➔ `Install Plugin from Disk...` |
-| **Compose Agent Library** | [📦 **composebridge-agent-release.aar**](https://github.com/JALAL591/compose-bridge/raw/main/dist/composebridge-agent-release.aar) | Copy to `app/libs/` or add to project dependencies |
+| **IDE Plugin (Android Studio / IntelliJ)** | [📥 **ComposeBridgeIntelliJ-1.1.1.zip**](https://github.com/JALAL591/compose-bridge/raw/main/dist/ComposeBridgeIntelliJ-1.1.1.zip) | In Android Studio: `Settings` ➔ `Plugins` ➔ `⚙️` ➔ `Install Plugin from Disk...` |
+| **Compose Runtime Library (Release & Debug)** | [📦 **composebridge-runtime-release.aar**](https://github.com/JALAL591/compose-bridge/raw/main/dist/composebridge-runtime-release.aar) | Copy to `app/libs/` as `implementation` (Zero overhead, production-safe registries) |
+| **Compose Agent Library (Debug Inspector)** | [📦 **composebridge-agent-release.aar**](https://github.com/JALAL591/compose-bridge/raw/main/dist/composebridge-agent-release.aar) | Copy to `app/libs/` as `debugImplementation` (Live overlays, WebSocket, UI tools) |
 
 **ComposeBridge** is a developer tooling suite that bridges a running Compose app (KMP/Android) with your IDE or AI Agent.
 
 > [!NOTE]
-> **KMP / Desktop Support Status**: KMP/Desktop support is currently in **Beta**. Focus is on **Android stability** for v1.1.0.
+> **KMP / Desktop Support Status**: KMP/Desktop support is currently in **Beta**. Focus is on **Android stability** for v1.1.1.
 
 
-### 🎯 What's New in v1.1.0?
+### 🎯 What's New in v1.1.1?
 - **📝 Text Editing with Live Preview:** Tap any text element on device, edit its content directly in the inspector BottomSheet, and preview changes instantly with zero latency via `BridgeTextRegistry`.
 - **⚡ On-the-Fly Auto-Migration:** Intelligent AST engine automatically wraps edited strings into `BridgeTextRegistry` upon first touch—no manual code wrapping required.
 - **🤖 Autonomous AI Agent Integration (MCP):** Connect Claude, Cursor, Antigravity or any Model Context Protocol agent with 17+ deep-inspection and code refactoring tools.
@@ -128,10 +129,17 @@ Ideal for AI coding assistants (Claude Desktop, Cursor, Antigravity IDE) or term
 
 ### 📲 App Integration Steps
 
-#### 1. Add the Agent to your project
+#### 1. Add dependencies to your project
 ```kotlin
 // build.gradle.kts (Android or commonMain)
-debugImplementation("com.composebridge:agent:1.1.0")
+dependencies {
+    // Core runtime registries (BridgeTextRegistry, BridgeThemeRegistry, BridgeDimensionRegistry)
+    // Required in both Debug and Release builds so production APK builds cleanly
+    implementation("com.composebridge:runtime:1.1.1") // or files("libs/composebridge-runtime-release.aar")
+
+    // On-device UI inspector and bridge (Debug only)
+    debugImplementation("com.composebridge:agent:1.1.1") // or files("libs/composebridge-agent-release.aar")
+}
 ```
 
 #### 2. Initialize in MainActivity
@@ -200,7 +208,7 @@ Antigravity IDE — edit `~/.gemini/config/mcp_config.json`:
 
 ---
 
-## ⚠️ Platform Support (v1.1.0)
+## ⚠️ Platform Support (v1.1.1)
 
 | Feature | Android | Desktop | iOS |
 |---------|:-------:|:-------:|:---:|
@@ -208,7 +216,7 @@ Antigravity IDE — edit `~/.gemini/config/mcp_config.json`:
 | **IDE Plugin (5 Tabs)** | ✅ | ✅ | ✅ |
 | **Phone Live Editing** | ✅ | ❌ | ❌ |
 
-*Desktop and iOS on-device overlays are planned for v1.1.0.*
+*Desktop and iOS on-device overlays are planned for v1.1.1.*
 
 ---
 

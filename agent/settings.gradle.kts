@@ -14,3 +14,6 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "composebridge-agent"
+
+include(":composebridge-runtime")
+project(":composebridge-runtime").projectDir = file("runtime")

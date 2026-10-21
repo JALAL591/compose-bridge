@@ -1345,7 +1345,7 @@ class TokenMigrator:
                 insert_idx = self._find_registry_insertion_point(reg_content, style=style)
                 reg_lines = reg_content.splitlines()
                 reg_lines.insert(insert_idx, new_entry)
-                registry_file.write_text("\n".join(reg_lines) + "\n", encoding="utf-8")
+                _atomic_write_text(registry_file, "\n".join(reg_lines) + "\n")
             except Exception as e:
                 # Rollback registry
                 shutil.copy2(registry_backup, registry_file)
