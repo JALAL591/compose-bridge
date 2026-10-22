@@ -30,6 +30,17 @@ tasks {
     patchPluginXml {
         sinceBuild.set("241")
         untilBuild.set(provider { null })
+        changeNotes.set("""
+<h3>v1.1.2 - Complete Refactoring & Critical Fixes</h3>
+<ul>
+  <li><b>Architectural Refactoring:</b> Split monolithic files into 25+ specialized modules (source_analyzer: 2116→72 lines).</li>
+  <li><b>Text Editing Fixed:</b> Resolved relative imports and AppStrings resolution issues.</li>
+  <li><b>Multi-Registry Dimensions:</b> Fixed padding edits on complex lines.</li>
+  <li><b>Release Builds:</b> Added <code>composebridge-runtime</code> for flawless <code>assembleRelease</code>.</li>
+  <li><b>Privacy Cleanup:</b> Removed all hardcoded paths from the codebase.</li>
+  <li><b>Verification:</b> 100% E2E tests passing and fully tested on a real device.</li>
+</ul>
+        """.trimIndent())
     }
     
     buildSearchableOptions {

@@ -1,20 +1,16 @@
 # ComposeBridge 🌉
 
-> 📖 **Where is ComposeBridge heading?** Read our [Vision & Architecture RFC](docs/architecture/RFC-001-vision.md).
-
-**Real-time on-device visual editor for Jetpack Compose + MCP Server for AI agents. Live UI tuning, AST-guided surgical source splicing, and standalone AI-driven code edits.**
+**Real-time on-device visual editor for Jetpack Compose + Model Context Protocol (MCP) server for AI coding agents.**  
+*Live UI tuning (<50ms latency), AST-guided surgical source code splicing, and autonomous AI-assisted refactoring.*
 
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.1.20+-purple.svg)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-1.7.3+-4285F4.svg)](https://developer.android.com/jetpack/compose)
-[![Zero Rebuild](https://img.shields.io/badge/DevEx-Zero--Rebuild%20Preview-brightgreen.svg)]()
+[![Status](https://img.shields.io/badge/Status-Early%20Access%20%7C%20Tested%20on%20Device-orange.svg)]()
+[![DevEx](https://img.shields.io/badge/DevEx-Zero--Rebuild%20Tuning-brightgreen.svg)]()
 [![Latency](https://img.shields.io/badge/Latency-%3C50ms-success.svg)]()
-[![Status](https://img.shields.io/badge/Status-Production%20Ready%20(v1.1.2)-success.svg)]()
-[![Scanner Speed](https://img.shields.io/badge/Scanner%20Speed-137ms%20%2F%20146%20files-brightgreen.svg)]()
 [![Version](https://img.shields.io/badge/Version-1.1.2-blue.svg)]()
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/JALAL591/compose-bridge/blob/main/LICENSE)
-[![M8ven Score](https://m8ven.ai/badge/mcp/jalal591-compose-bridge-rapm1x)](https://m8ven.ai/mcp/jalal591-compose-bridge-rapm1x?s=readme)
-[![Reviewed by HOL Guard](https://img.shields.io/badge/HOL_Guard%20|%20compose_bridge-2E5AAC?logo=shield&logoColor=white)](https://hol.org/guard/extensions/mcp.compose-bridge)
-[![compose-bridge MCP server – quality and maintenance score on Glama](https://glama.ai/mcp/servers/JALAL591/compose-bridge/badges/score.svg)](https://glama.ai/mcp/servers/JALAL591/compose-bridge)
+[![Glama MCP](https://glama.ai/mcp/servers/JALAL591/compose-bridge/badges/score.svg)](https://glama.ai/mcp/servers/JALAL591/compose-bridge)
 
 ## 📰 Featured In
 
@@ -24,211 +20,194 @@
   </a>
 </p>
 
-[English](https://github.com/JALAL591/compose-bridge/blob/main/README.md) | [العربية](https://github.com/JALAL591/compose-bridge/blob/main/README_AR.md)
+[English](README.md) | [العربية](README_AR.md)
 
 ---
 
-### 📥 Direct Downloads & Quick Install (v1.1.2)
+### 📥 Direct Downloads (v1.1.2)
 
-| Package | Asset (.zip / .aar) | Installation |
+| Package | Asset | Purpose |
 |---|---|---|
-| **IDE Plugin (Android Studio / IntelliJ)** | [📥 **ComposeBridgeIntelliJ-1.1.1.zip**](https://github.com/JALAL591/compose-bridge/raw/main/dist/ComposeBridgeIntelliJ-1.1.1.zip) | In Android Studio: `Settings` ➔ `Plugins` ➔ `⚙️` ➔ `Install Plugin from Disk...` |
-| **Compose Runtime Library (Release & Debug)** | [📦 **composebridge-runtime-release.aar**](https://github.com/JALAL591/compose-bridge/raw/main/dist/composebridge-runtime-release.aar) | Copy to `app/libs/` as `implementation` (Zero overhead, production-safe registries) |
-| **Compose Agent Library (Debug Inspector)** | [📦 **composebridge-agent-release.aar**](https://github.com/JALAL591/compose-bridge/raw/main/dist/composebridge-agent-release.aar) | Copy to `app/libs/` as `debugImplementation` (Live overlays, WebSocket, UI tools) |
-
-**ComposeBridge** is a developer tooling suite that bridges a running Compose app (KMP/Android) with your IDE or AI Agent.
-
-> [!NOTE]
-> **KMP / Desktop Support Status**: KMP/Desktop support is currently in **Beta**. Focus is on **Android stability** for v1.1.1.
-
-
-### 🎯 What's New in v1.1.1?
-- **📝 Text Editing with Live Preview:** Tap any text element on device, edit its content directly in the inspector BottomSheet, and preview changes instantly with zero latency via `BridgeTextRegistry`.
-- **⚡ On-the-Fly Auto-Migration:** Intelligent AST engine automatically wraps edited strings into `BridgeTextRegistry` upon first touch—no manual code wrapping required.
-- **🤖 Autonomous AI Agent Integration (MCP):** Connect Claude, Cursor, Antigravity or any Model Context Protocol agent with 17+ deep-inspection and code refactoring tools.
-- **🗺️ Architectural Vision (RFC-001):** Published comprehensive technical architecture and roadmap (`docs/architecture/RFC-001-vision.md`).
-- **🛡️ Cross-Platform Reliability:** Fixed navigation backstack resets, normalized Windows CRLF line-endings, and added precision regex extraction for single-pattern getters.
-
-### 🎬 See it in action & Screenshots
-
-Click the preview below to watch ComposeBridge visually edit a running Jetpack Compose UI and persist the change back to Kotlin source.
-
-<p align="center">
-  <a href="https://youtu.be/Hywyq7cBdDM">
-    <img src="https://img.youtube.com/vi/Hywyq7cBdDM/hqdefault.jpg" alt="Watch ComposeBridge live demo" width="70%" style="border-radius: 8px;" />
-  </a>
-</p>
-
-#### 📸 Studio Plugin & Live Device Integration
-
-| 1. Studio ToolWindow & Token Scanner | 2. Surgical Pattern Refactoring & Diff | 3. Live On-Device Preview & Inspector |
-|:---:|:---:|:---:|
-| <a href="https://github.com/JALAL591/compose-bridge/blob/main/docs/screenshots/1_composebridge_main_ui.jpg"><img src="https://raw.githubusercontent.com/JALAL591/compose-bridge/main/docs/screenshots/1_composebridge_main_ui.jpg" width="100%" alt="ComposeBridge Main UI" /></a> | <a href="https://github.com/JALAL591/compose-bridge/blob/main/docs/screenshots/2_composebridge_patterns_diff.jpg"><img src="https://raw.githubusercontent.com/JALAL591/compose-bridge/main/docs/screenshots/2_composebridge_patterns_diff.jpg" width="100%" alt="ComposeBridge Patterns Diff" /></a> | <a href="https://github.com/JALAL591/compose-bridge/blob/main/docs/screenshots/3_composebridge_live_device_sync.jpg"><img src="https://raw.githubusercontent.com/JALAL591/compose-bridge/main/docs/screenshots/3_composebridge_live_device_sync.jpg" width="100%" alt="ComposeBridge Live Sync" /></a> |
+| **IDE Plugin (Android Studio / IntelliJ)** | [📥 **ComposeBridgeIntelliJ-1.1.2.zip**](dist/ComposeBridgeIntelliJ-1.1.2.zip) | Install in IDE: `Settings` ➔ `Plugins` ➔ `⚙️` ➔ `Install Plugin from Disk...` |
+| **Compose Runtime Library (Release & Debug)** | [📦 **composebridge-runtime-release.aar**](dist/composebridge-runtime-release.aar) | Core registries (~9KB). Required in `implementation` for production-safe APK builds |
+| **Compose Agent Library (Debug Only)** | [📦 **composebridge-agent-release.aar**](dist/composebridge-agent-release.aar) | Visual overlays, touch inspector, and WebSocket bridge. Put in `debugImplementation` |
+| **Python Server & MCP Package** | [📦 **composebridge-server-1.1.2.zip**](dist/composebridge-server-1.1.2.zip) | Modular WebSocket hub & MCP server for AI agents |
+| **All-in-One Distribution** | [📦 **ComposeBridge-v1.1.2-AllInOne.zip**](dist/ComposeBridge-v1.1.2-AllInOne.zip) | Bundles Plugin, Runtime, Agent, and Server together |
 
 ---
 
-## 🚀 Key Features
+## ⚡ Quick Start in 60 Seconds
 
-| Feature | Description |
-|---------|-------------|
-| **⚡ Live Preview** | Tweak colors and dimensions at **<50ms latency**. Changes reflect instantly on the phone (after one initial rebuild). |
-| **🎯 Focus Mode** | Smart BottomSheet shows **only** the properties of the selected element (e.g., `c1`, `c2`, `padding`). |
-| **🧠 Semantic Intelligence** | Detects if a value is shared. Offers **Split** (isolate to this card) or **Global** (change everywhere). |
-| **💾 Safe Refactoring** | AST-Guided Splicing. Changes tracked in a `PatternJournal`. **Reject All** reverts byte-for-byte. |
-| **🔌 IDE Plugin** | 5 Tabs: Scan, Impact, Split, Patterns, and **Changes** (Approve/Reject UI). |
-| **🤖 Standalone MCP** | Works without the phone. AI agents can scan, refactor, and build the project. |
+### Step 1: Install IDE Plugin
+1. Download [ComposeBridgeIntelliJ-1.1.2.zip](dist/ComposeBridgeIntelliJ-1.1.2.zip).
+2. In Android Studio, go to **Settings (Preferences)** ➔ **Plugins** ➔ Click the **⚙️ gear icon** ➔ **Install Plugin from Disk...**.
+3. Select the zip file and restart Android Studio.
 
----
-
-## 📦 Repository Structure
-
-```text
-composebridge/
-├── agent/       # Compose runtime library (:composebridge-agent)
-├── server/      # Python WebSocket daemon + MCP server + AST splicer
-├── plugin/      # Android Studio Plugin (5 Tabs)
-└── docs/        # Architecture + setup guides
-```
-
----
-
-## 🛠️ Quick Start (Android / KMP)
-
-You can launch and connect ComposeBridge in two ways depending on your workflow:
-
-### 🔹 Option 1: Using the Android Studio Plugin (Recommended)
-
-No manual terminal commands are needed. The IDE plugin manages the background server and ADB reverse forwarding automatically.
-
-1. **Open the ToolWindow**: In Android Studio, open the **ComposeBridge** tool window on the right sidebar.
-2. **Start the Server**: Click **▶ Start Bridge**.
-   - The plugin launches `server.py` in the background and executes `adb reverse tcp:8711 tcp:8711` automatically.
-   - The status updates to `🟢 Bridge Running`.
-   - *(Optional)* In **Settings → ComposeBridge**, check **Auto-start Bridge Server** to launch automatically when you open your project.
-3. **Add the Agent** to your app's dependencies and initialize (see steps below).
-
----
-
-### 🔹 Option 2: Standalone Server / AI Agents (MCP)
-
-Ideal for AI coding assistants (Claude Desktop, Cursor, Antigravity IDE) or terminal workflows:
-
-1. **Start the local server**:
-   ```bash
-   cd server
-   pip install -r requirements.txt
-   python server.py
-   ```
-2. **Setup ADB reverse port forwarding** (for Android phone connection):
-   ```bash
-   adb reverse tcp:8711 tcp:8711
-   ```
-*(Note: If you are solely using AI Agents via MCP tools, no phone or ADB reverse is needed — see the [MCP Server](#-mcp-server-ai-agents) section below).*
-
----
-
-### 📲 App Integration Steps
-
-#### 1. Add dependencies to your project
+### Step 2: Add Dependencies to your Android App
+Copy `composebridge-runtime-release.aar` and `composebridge-agent-release.aar` into your app module's `libs/` folder:
 ```kotlin
-// build.gradle.kts (Android or commonMain)
+// app/build.gradle.kts
 dependencies {
-    // Core runtime registries (BridgeTextRegistry, BridgeThemeRegistry, BridgeDimensionRegistry)
-    // Required in both Debug and Release builds so production APK builds cleanly
-    implementation("com.composebridge:runtime:1.1.1") // or files("libs/composebridge-runtime-release.aar")
+    // 1. Runtime registries: compiles cleanly in both Debug & Release
+    implementation(files("libs/composebridge-runtime-release.aar"))
 
-    // On-device UI inspector and bridge (Debug only)
-    debugImplementation("com.composebridge:agent:1.1.1") // or files("libs/composebridge-agent-release.aar")
+    // 2. Interactive visual inspector: debug builds only
+    debugImplementation(files("libs/composebridge-agent-release.aar"))
 }
 ```
 
-#### 2. Initialize in MainActivity
+### Step 3: Initialize in MainActivity (Debug)
 ```kotlin
-override fun onCreate(savedInstanceState: Bundle?) {
-    super.onCreate(savedInstanceState)
-    ComposeBridgeAgent.start(serverUrl = "ws://127.0.0.1:8711")
-    setContent {
-        ComposeBridgeAgent.Root {
-            App()
+// MainActivity.kt
+import com.composebridge.agent.ComposeBridgeAgent
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        
+        // Start bridge connection (automatically connects to local hub)
+        ComposeBridgeAgent.start(serverUrl = "ws://127.0.0.1:8711")
+
+        setContent {
+            // Wrap root content in ComposeBridgeAgent.Root
+            ComposeBridgeAgent.Root {
+                MyApplicationTheme {
+                    MainScreen()
+                }
+            }
         }
     }
 }
 ```
 
-#### 3. Connect & Tune
-1. Deploy and run the app on your Android device (or emulator).
-2. Tap the **🔧 FAB** → Design Mode ON.
-3. Tap any Composable → Focus Mode opens.
-4. Tweak colors/dimensions live → Hit **Sync**.
-
-> **Note on Live Preview:** Changing a hardcoded value or creating a new token requires **one rebuild** to update the compiled bytecode. After this, all future tweaks via the Registry are instant.
+### Step 4: Start the Bridge & Tune Live
+1. In Android Studio, open the **ComposeBridge** tool window on the right sidebar and click **▶ Start Bridge** (this starts the local server and runs `adb reverse tcp:8711 tcp:8711` automatically).
+2. Run your app on your device or emulator.
+3. Tap the floating **🔧 FAB** on screen to toggle Design Mode.
+4. Tap any text, color, or dimension to adjust values in real-time!
 
 ---
 
-## 🤖 MCP Server (AI Agents)
+## 📐 Architecture & Communication Flow
 
-ComposeBridge exposes its tools to AI agents via the Model Context Protocol (MCP). **No phone is required for MCP.**
+ComposeBridge coordinates three interconnected components over a fast local loopback interface:
 
-### Supported Clients
-- ✅ Antigravity IDE (Gemini)
-- ✅ Claude Desktop
-- ✅ Cursor
-- ✅ Cline / Continue
-
-### Setup
-
-**1. Install dependencies**
-```bash
-cd server
-pip install -r requirements.txt
+```text
+ +--------------------------+                 +----------------------------+
+ |   Android Phone / AVD    |                 |   Local WebSocket Hub      |
+ |                          |                 |   (Python 3.10+ Daemon)    |
+ |  [App UI in Compose]     |                 |                            |
+ |            |             |   WebSocket     |   server.py (:8711)        |
+ |  [:composebridge-agent]  |<===============>|      ├── Message Router    |
+ |    - Visual Touch Overlay|   (Port 8711)   |      ├── AST Splicer       |
+ |    - Semantic Inspector  |                 |      └── PatternJournal    |
+ |            |             |                 +----------------------------+
+ |  [:composebridge-runtime]|                               ||
+ |    - TextRegistry        |                               || JSON-RPC
+ |    - ThemeRegistry       |                               || (stdio / TCP)
+ |    - DimensionRegistry   |                               \/
+ +--------------------------+                 +----------------------------+
+                                              |   Developer Tools & AI     |
+                                              |                            |
+                                              |  [Android Studio Plugin]   |
+                                              |    - Live Changes Diff     |
+                                              |    - Token Split / Scanner |
+                                              |  [Autonomous MCP Agents]   |
+                                              |    - Antigravity / Claude  |
+                                              |    - 27 Standard MCP Tools |
+                                              +----------------------------+
 ```
 
-**2. Configure your AI client**
-Antigravity IDE — edit `~/.gemini/config/mcp_config.json`:
+1. **On-Device Agent (`:composebridge-agent`):** Injected via `ComposeBridgeAgent.Root`. Renders non-intrusive hit-testing overlays, extracts semantic metadata, and transmits change requests over local WebSocket (`ws://127.0.0.1:8711`).
+2. **Decoupled Runtime (`:composebridge-runtime`):** Standalone ~9KB runtime containing registry singletons (`BridgeTextRegistry`, `BridgeThemeRegistry`, `BridgeDimensionRegistry`). Ensures production Release builds compile with zero overhead without packaging debug overlays.
+3. **Local Bridge Server (`server.py`):** Acts as the central event hub and Kotlin AST manipulation engine. Applies deterministic changes using file write-locks, atomic rewrites, and maintains a byte-level `.bridge.bak` rollback journal.
+4. **Model Context Protocol (MCP Server):** Exposes 27 structured tools allowing AI pair programmers (Antigravity, Claude, Cursor) to autonomously analyze token usage, suggest token splits, and execute multi-file refactorings.
+
+---
+
+## 🚀 Core Capabilities
+
+| Capability | Description |
+|---|---|
+| **⚡ Instant Live Tuning** | Tweak colors, paddings, and string contents with **sub-50ms latency**. Changes update dynamically without waiting for Gradle rebuilds. |
+| **🧠 Semantic Token Intelligence** | Detects whether a modified color or dimension is shared globally. Offers **Split** (create an isolated token for this widget) or **Global** (update theme-wide). |
+| **📝 Text Editing & Auto-Migration** | Tap any text element to edit wording directly on device. The AST engine automatically wraps raw strings into `BridgeTextRegistry` on first edit. |
+| **💾 Safe Rollbacks (PatternJournal)** | Every surgical edit is backed up byte-for-byte. The Studio **Changes** tab allows reviewing unified diffs and reverting individual files or all edits with one click. |
+| **🤖 Full MCP Server for AI Agents** | 27 tools supporting token discovery, impact analysis, orphan detection, surgical pattern replacement, and safe Gradle compilation validation. |
+
+---
+
+## 🤖 MCP Server (AI Coding Assistants)
+
+ComposeBridge exposes 27 deep-inspection and code refactoring tools to any AI assistant supporting the **Model Context Protocol (MCP)**. **No physical phone is required to use MCP tools.**
+
+### Compatible AI Clients:
+- ✅ **Google Antigravity IDE**
+- ✅ **Claude Desktop**
+- ✅ **Cursor**
+- ✅ **Windsurf / Continue**
+
+### Configuration (`mcp_config.json`):
 ```json
 {
   "mcpServers": {
     "composebridge": {
       "command": "python",
-      "args": ["C:\\path\\to\\composebridge\\server\\mcp_server.py"]
+      "args": ["-u", "C:\path\to\compose-bridge\server\mcp_server.py"],
+      "env": {
+        "PYTHONIOENCODING": "utf-8"
+      }
     }
   }
 }
 ```
 
-### Available Tools (17+)
-
-| Category | Tools |
-|----------|-------|
-| **Discovery** | `list_tokens`, `find_token_by_color`, `get_token_impact`, `get_token_siblings`, `get_naming_convention` |
-| **Editing** | `set_token`, `add_token`, `rollback_last` |
-| **Refactoring** | `detect_conditional_variants`, `replace_pattern`, `rollback_pattern`, `global_color_edit`, `split_token_for_element` |
-| **Build** | `run_gradle_build`, `list_allowed_gradle_tasks` |
-| **Change Mgmt**| `list_modified_files`, `approve_all_files`, `reject_all_files` |
+### Overview of MCP Tools (27 Tools):
+- **Token Discovery & Analysis:** `list_tokens`, `find_token_by_color`, `get_token_impact`, `get_token_siblings`, `get_all_token_groups`, `list_orphans`, `get_naming_convention`.
+- **Surgical Code Editing:** `set_token`, `set_text`, `add_token`, `rollback_last`.
+- **Pattern Refactoring:** `replace_pattern`, `list_applied_patterns`, `rollback_pattern`, `suggest_token_split`, `detect_conditional_variants`.
+- **Change Management:** `list_modified_files`, `get_file_diff`, `approve_file_changes`, `reject_file_changes`, `approve_all_files`, `reject_all_files`, `reject_all_files_force`.
+- **Build Verification:** `run_gradle_build`, `list_allowed_gradle_tasks`, `trigger_user_sync`, `get_sync_status`.
 
 ---
 
-## ⚠️ Platform Support (v1.1.2)
+## ⚠️ Known Limitations
 
-| Feature | Android | Desktop | iOS |
-|---------|:-------:|:-------:|:---:|
-| **MCP Server (AI)** | ✅ | ✅ | ✅ |
-| **IDE Plugin (5 Tabs)** | ✅ | ✅ | ✅ |
-| **Phone Live Editing** | ✅ | ❌ | ❌ |
-
-*Desktop and iOS on-device overlays are planned for v1.1.1.*
+- **Platform Target:** Live on-device inspection currently supports **Android** (API 24+). Kotlin Multiplatform Desktop and iOS overlays are in active development.
+- **Python Requirement:** The local bridge server requires **Python 3.10 or newer**.
+- **USB Port Forwarding:** When testing on a physical device over USB, port forwarding is required (`adb reverse tcp:8711 tcp:8711`). The Studio plugin runs this automatically on startup.
+- **Initial Rebuild on New Tokens:** When converting a hardcoded literal to an entirely new named token for the first time, one standard Gradle compile is required so the Kotlin compiler emits the new getter bytecode. Subsequent live tweaks to that token are instantaneous.
 
 ---
 
-## 🔎 Search Terms This Project Solves
-- Jetpack Compose edit without recompile
-- Compose hot reload alternative
-- Interactive layout inspector for Android
-- Live UI tweaking on a real Android device
-- Sync design tokens to Kotlin source
-- Generate Compose UI from a JSON schema
+## 🔧 Troubleshooting & FAQ
+
+### 1. The phone shows `[WS] Connection failed`
+- Ensure the bridge server is running (`🟢 Bridge Running` in Studio or `python server.py` in terminal).
+- If using USB, verify ADB reverse is active by running:
+  ```bash
+  adb reverse tcp:8711 tcp:8711
+  ```
+- If using Wi-Fi without USB, specify your workstation's LAN IP when calling `ComposeBridgeAgent.start(serverUrl = "ws://192.168.1.X:8711")`.
+
+### 2. Build error: `Duplicate class found in modules`
+- Make sure `composebridge-runtime-release.aar` is added under `implementation(...)` and `composebridge-agent-release.aar` is added under `debugImplementation(...)`. Do not include the agent in release configurations.
+
+### 3. Edits do not show in Android Studio
+- Ensure you have the project root properly set in `composebridge.json` or pass `--project <path>` when launching `server.py`.
+- Check the **Changes** tab in the ComposeBridge tool window to review pending file diffs.
+
+---
+
+## 🤝 Contributing & Community
+
+We welcome contributions! Please review our:
+- **[Contributing Guidelines](CONTRIBUTING.md)**: Development setup, coding standards, and PR process.
+- **[Security Policy](SECURITY.md)**: Supported versions and vulnerability disclosure guidelines.
+- **[Architectural Vision (RFC-001)](docs/architecture/RFC-001-vision.md)**: Technical roadmap and core invariants.
 
 ---
 
 ## 📜 License
-Distributed under the [Apache License 2.0](https://github.com/JALAL591/compose-bridge/blob/main/LICENSE).
+
+Distributed under the **[Apache License 2.0](LICENSE)**.

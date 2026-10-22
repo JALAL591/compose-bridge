@@ -16,6 +16,7 @@ from core.pattern_detector import PatternDetector
 from core.ast_finder import surgical_edit
 from common.file_ops import acquire_write_lock
 
+@app.tool()
 def replace_pattern(pattern_id: str, dry_run: bool = False) -> str:
     """
     DESTRUCTIVE BATCH OPERATION: Replaces ALL occurrences of a pattern across the project.
@@ -240,6 +241,7 @@ def replace_pattern(pattern_id: str, dry_run: bool = False) -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
+@app.tool()
 def list_applied_patterns() -> str:
     """List all applied patterns that can be rolled back."""
     from core.pattern_journal import PatternJournal
@@ -255,6 +257,7 @@ def list_applied_patterns() -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
+@app.tool()
 def rollback_pattern(pattern_id: str) -> str:
     """
     Rolls back ALL changes made by a specific replace_pattern call.

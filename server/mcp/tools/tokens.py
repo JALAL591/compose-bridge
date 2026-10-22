@@ -23,6 +23,10 @@ from core.state_editor import update_token_default
 from core.project_root import get_project_root
 from common.file_ops import acquire_write_lock
 
+@app.tool(
+    name="find_token_by_color",
+    description="Reverse lookup: Find token(s) matching an exact hex color.",
+)
 def find_token_by_color(hex_color: str) -> str:
     """
     Reverse lookup: Find token(s) matching a hex color. Match is EXACT (case-insensitive).
@@ -47,6 +51,7 @@ def find_token_by_color(hex_color: str) -> str:
         return json.dumps({"error": str(e)})
 
 
+@app.tool()
 def add_token(
     file: str,
     line: int,
@@ -156,6 +161,7 @@ def add_token(
         }, indent=2, ensure_ascii=False)
 
 
+@app.tool()
 def get_naming_convention(token_type: str = "dimension") -> str:
     """
     Read-only analysis. Detects if project uses camelCase, snake_case, or PascalCase for tokens.
@@ -191,6 +197,7 @@ def get_naming_convention(token_type: str = "dimension") -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
+@app.tool()
 def list_tokens(project_path: str = None) -> str:
     """
     List all design tokens in the project.
@@ -262,6 +269,7 @@ def list_tokens(project_path: str = None) -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
+@app.tool()
 def set_token(token_name: str, value: str) -> str:
     """
     DESTRUCTIVE: Modifies .kt files. Surgically edit a design token value in source code.
@@ -370,6 +378,7 @@ def set_token(token_name: str, value: str) -> str:
             return json.dumps({"error": str(e)})
 
 
+@app.tool()
 def list_orphans(project_path: str = None) -> str:
     """
     List all orphan tokens (registered but never used).
@@ -409,6 +418,7 @@ def list_orphans(project_path: str = None) -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
+@app.tool()
 def get_token_impact(token_name: str, project_path: str = None) -> str:
     """
     Get impact analysis for a specific token.
@@ -469,6 +479,7 @@ def get_token_impact(token_name: str, project_path: str = None) -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
+@app.tool()
 def suggest_token_split(token_name: str = None, project_path: str = None) -> str:
     """
     Read-only analysis. Suggests splitting tokens used in multiple contexts.
@@ -521,6 +532,7 @@ def suggest_token_split(token_name: str = None, project_path: str = None) -> str
         return json.dumps({"success": False, "error": str(e)})
 
 
+@app.tool()
 def detect_conditional_variants(token_name: str = None) -> str:
     """
     Detect repeated patterns like:
@@ -562,6 +574,7 @@ def detect_conditional_variants(token_name: str = None) -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
+@app.tool()
 def get_token_siblings(token_name: str) -> str:
     """
     Read-only. Returns semantically related tokens (e.g., Primary → PrimaryDark, PrimaryLight).
@@ -589,6 +602,7 @@ def get_token_siblings(token_name: str) -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
+@app.tool()
 def get_all_token_groups() -> str:
     """
     Read-only. Returns ALL semantic token groups in the project (e.g., 'Actions', 'Dashboard', 'Settings').

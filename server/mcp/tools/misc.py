@@ -87,6 +87,7 @@ def run_async(coro):
         return asyncio.run(coro)
 
 
+@app.tool()
 def set_text(token_name: str, new_value: str, file_path: str = None, line: int = None) -> str:
     """
     DESTRUCTIVE: Modifies .kt files. Surgically edit text content with automatic BridgeTextRegistry wrapping.

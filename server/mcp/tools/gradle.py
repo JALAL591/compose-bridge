@@ -29,6 +29,7 @@ def is_gradle_task_allowed(task: str) -> bool:
     return base_task in ALLOWED_GRADLE_TASKS
 
 
+@app.tool()
 def run_gradle_build(
     task: str = "assembleDebug",
     timeout_seconds: int = 300,
@@ -61,6 +62,7 @@ def run_gradle_build(
         return json.dumps({"success": False, "error": str(e)})
 
 
+@app.tool()
 def list_allowed_gradle_tasks() -> str:
     """List gradle tasks that can be run via run_gradle_build."""
     return json.dumps({
@@ -69,6 +71,7 @@ def list_allowed_gradle_tasks() -> str:
     }, indent=2, ensure_ascii=False)
 
 
+@app.tool()
 def trigger_user_sync() -> str:
     """
     Trigger user_sync on the Bridge Server.
@@ -87,6 +90,7 @@ def trigger_user_sync() -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
+@app.tool()
 def get_sync_status() -> str:
     """
     Get the current sync status from the Bridge Server:

@@ -14,6 +14,10 @@ from core.pattern_journal import PatternJournal
 from core.state_editor import rollback_last as _rollback_last
 from common.file_ops import acquire_write_lock
 
+@app.tool(
+    name="rollback_last",
+    description="Reverts the LAST surgical edit made in the current session.",
+)
 def rollback_last() -> str:
     """
     Reverts the LAST surgical edit made in the current session.
@@ -36,6 +40,7 @@ def rollback_last() -> str:
         return json.dumps({"error": str(e)})
 
 
+@app.tool()
 def list_modified_files() -> str:
     """
     Read-only. Lists files modified by recent replace_pattern operations in the current session.
@@ -61,6 +66,7 @@ def list_modified_files() -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
+@app.tool()
 def reject_file_changes(file_path: str) -> str:
     """
     Destructive: Reverts pending changes for a SINGLE file using .bridge.bak backup.
@@ -85,6 +91,7 @@ def reject_file_changes(file_path: str) -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
+@app.tool()
 def approve_file_changes(file_path: str) -> str:
     """
     Approves pending changes for a SPECIFIC file. Removes its entry from journal.
@@ -109,6 +116,7 @@ def approve_file_changes(file_path: str) -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
+@app.tool()
 def approve_all_files() -> str:
     """
     Destructive: Approves ALL pending changes permanently. Removes them from journal.
@@ -132,6 +140,7 @@ def approve_all_files() -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
+@app.tool()
 def reject_all_files() -> str:
     """
     Destructive: Reverts ALL pending changes using byte-level backup (.bridge.bak).
@@ -155,6 +164,7 @@ def reject_all_files() -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
+@app.tool()
 def reject_all_files_force() -> str:
     """
     Destructive + Forceful. Clears the entire journal EVEN IF some rollbacks fail.
@@ -178,6 +188,7 @@ def reject_all_files_force() -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
+@app.tool()
 def get_file_diff(file_path: str) -> str:
     """
     Read-only. Returns before/after content and unified diff for a specific modified file.
