@@ -36,6 +36,24 @@
 
 ---
 
+## 📸 Visual Demo
+
+Watch ComposeBridge visually edit a running Jetpack Compose UI live:
+
+<p align="center">
+  <a href="https://www.youtube.com/watch?v=Hywyq7cBdDM">
+    <img src="https://img.youtube.com/vi/Hywyq7cBdDM/maxresdefault.jpg" alt="Watch ComposeBridge Demo" width="75%" style="border-radius: 8px;" />
+  </a>
+</p>
+
+### Screenshots
+
+| 1. Studio ToolWindow & Token Scanner | 2. Surgical Pattern Refactoring & Diff | 3. Live On-Device Preview & Inspector |
+|:---:|:---:|:---:|
+| [![Studio ToolWindow](docs/screenshots/1_composebridge_main_ui.jpg)](docs/screenshots/1_composebridge_main_ui.jpg) | [![Pattern Refactoring](docs/screenshots/2_composebridge_patterns_diff.jpg)](docs/screenshots/2_composebridge_patterns_diff.jpg) | [![Live Device Sync](docs/screenshots/3_composebridge_live_device_sync.jpg)](docs/screenshots/3_composebridge_live_device_sync.jpg) |
+
+---
+
 ## ⚡ Quick Start in 60 Seconds
 
 ### Step 1: Install IDE Plugin
