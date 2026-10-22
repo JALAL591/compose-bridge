@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.composebridge.plugin"
-version = "1.1.1"
+version = "1.1.2"
 
 repositories {
     mavenCentral()
@@ -19,7 +19,7 @@ dependencies {
 // Resolved dynamically from ANDROID_STUDIO_HOME env var or androidStudioLocalPath in gradle.properties
 val studioHome: String = System.getenv("ANDROID_STUDIO_HOME")
     ?: (project.findProperty("androidStudioLocalPath") as? String)
-    ?: "C:/Users/thinkpad/AndroidStudioLocal"
+    ?: (System.getProperty("user.home") + "/AndroidStudioLocal")
 
 intellij {
     localPath.set(studioHome)

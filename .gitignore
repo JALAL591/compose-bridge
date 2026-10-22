@@ -31,9 +31,9 @@ dist/*.aar
 dist/*.zip
 !dist/composebridge-runtime-release.aar
 !dist/composebridge-agent-release.aar
-!dist/ComposeBridgeIntelliJ-1.1.1.zip
-!dist/composebridge-server-1.1.1.zip
-!dist/ComposeBridge-v1.1.1-AllInOne.zip
+!dist/ComposeBridgeIntelliJ-1.1.2.zip
+!dist/composebridge-server-1.1.2.zip
+!dist/ComposeBridge-v1.1.2-AllInOne.zip
 
 # Python
 __pycache__/

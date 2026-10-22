@@ -41,7 +41,7 @@ def _resolve_app_strings_value(project_root: Optional[Path], ref_key: str, runti
 
         if not candidates:
             # Check common directories
-            for base in [Path.cwd(), Path.cwd().parent, Path(r"C:\Users\thinkpad\StudioProjects\MyTeacher-App")]:
+            for base in [Path.cwd(), Path.cwd().parent]:
                 if base.exists():
                     c_list = [c for c in base.rglob("AppStrings.kt") if "build" not in str(c) and ".composebridge" not in str(c) and ".bak" not in str(c)]
                     if c_list:

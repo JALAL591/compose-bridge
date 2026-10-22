@@ -371,8 +371,6 @@ object BridgeHitTester {
             } catch (_: Throwable) {}
         }
 
-        // 3. Fallbacks
-        candidates.add("com.edu.teacher.ui.theme.AppStrings")
 
         for (className in candidates) {
             try {
