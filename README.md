@@ -42,7 +42,7 @@ Watch ComposeBridge visually edit a running Jetpack Compose UI live:
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=Hywyq7cBdDM">
-    <img src="https://img.youtube.com/vi/Hywyq7cBdDM/maxresdefault.jpg" alt="Watch ComposeBridge Demo" width="75%" style="border-radius: 8px;" />
+    <img src="https://img.youtube.com/vi/Hywyq7cBdDM/hqdefault.jpg" alt="Watch ComposeBridge Demo" width="75%" style="border-radius: 8px;" />
   </a>
 </p>
 
