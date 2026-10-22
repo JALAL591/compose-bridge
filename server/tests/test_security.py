@@ -10,7 +10,9 @@ import sys
 from pathlib import Path
 
 # Add server directory to path
-sys.path.insert(0, str(Path(__file__).parent))
+_SERVER_DIR = Path(__file__).resolve().parent.parent
+if str(_SERVER_DIR) not in sys.path:
+    sys.path.insert(0, str(_SERVER_DIR))
 
 import mcp_server
 from core.gradle_runner import is_task_allowed, ALLOWED_TASKS
@@ -145,7 +147,7 @@ class TestSecurity(unittest.TestCase):
 
     def test_no_sleep_in_mcp_server(self):
         """time.sleep(0.8) must be removed from mcp_server.py."""
-        server_path = Path(__file__).parent / 'mcp_server.py'
+        server_path = (Path(__file__).parent.parent / 'mcp_server.py') if (Path(__file__).parent.parent / 'mcp_server.py').exists() else (Path(__file__).parent / 'mcp_server.py')
         text = server_path.read_text(encoding='utf-8')
         self.assertNotIn('time.sleep(0.8)', text)
 

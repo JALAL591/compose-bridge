@@ -6,7 +6,9 @@ Test script — اختبار تحويل utf16Offset إلى byte_offset.
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
+_SERVER_DIR = Path(__file__).resolve().parent.parent
+if str(_SERVER_DIR) not in sys.path:
+    sys.path.insert(0, str(_SERVER_DIR))
 
 from core.utils import utf16_to_byte_offset, read_file_as_utf8
 from core.ast_finder import parse_file, find_node_at_byte, find_all_call_expressions

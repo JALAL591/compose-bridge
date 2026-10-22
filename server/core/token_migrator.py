@@ -16,33 +16,16 @@ from pathlib import Path
 from typing import Optional, Tuple, Dict, List
 from datetime import datetime
 
+try:
+    from common.file_ops import _atomic_write_text, _find_registry_file
+except ImportError:
+    try:
+        from server.common.file_ops import _atomic_write_text, _find_registry_file
+    except ImportError:
+        from ..common.file_ops import _atomic_write_text, _find_registry_file
 from .write_lock import acquire_write_lock
 
 
-
-def _atomic_write_text(file_path: Path, text: str):
-    """Write text to file atomically using a temporary file in the same directory."""
-    import tempfile
-    import os
-    import time
-    file_path = Path(file_path)
-    file_path.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile("w", encoding="utf-8", newline="", delete=False, dir=file_path.parent) as tf:
-        tf.write(text)
-        temp_name = tf.name
-
-    replaced = False
-    last_err = None
-    for attempt in range(10):
-        try:
-            os.replace(temp_name, file_path)
-            replaced = True
-            break
-        except PermissionError as pe:
-            last_err = pe
-            time.sleep(0.05 * (attempt + 1))
-    if not replaced and last_err:
-        raise last_err
 
 class TokenMigrator:
     """Migrate hardcoded value to a design token."""

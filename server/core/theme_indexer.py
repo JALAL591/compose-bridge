@@ -1,7 +1,8 @@
+# -*- coding: utf-8 -*-
 import os
 """
-Theme Indexer — يفهرس AppColors.kt و AppStrings.kt
-يبني خريطة عكسية: color value → token key
+Theme Indexer — يفهرس AppColors.kt و DesignSystem.kt و AppStrings.kt
+يبني خريطة عكسية: color value -> token key
 """
 
 import re
@@ -9,17 +10,37 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+from core.project_root import get_project_root
 
 # ============================================================
-# المسارات
+# المسارات والبحث الديناميكي
 # ============================================================
 
-PROJECT_ROOT = Path(os.environ.get("COMPOSEBRIDGE_ROOT", "."))
-THEME_DIR = (
-    PROJECT_ROOT / "app" / "src" / "main"
-    / "java" / "com" / "student" / "app" / "ui" / "theme"
-)
-APP_COLORS_FILE = THEME_DIR / "AppColors.kt"
+PROJECT_ROOT = get_project_root()
+
+
+def find_theme_file(root: Optional[Path] = None) -> Optional[Path]:
+    """
+    يبحث ديناميكياً عن ملف الثيم (AppColors.kt أو DesignSystem.kt) داخل مجلد المشروع.
+    يتجاهل مجلدات build و .git و .gradle والنسخ الاحتياطية .bak.
+    """
+    if root is None:
+        root = get_project_root()
+    if not root.exists():
+        return None
+
+    for pattern in ("AppColors.kt", "DesignSystem.kt"):
+        for path in root.rglob(pattern):
+            parts = path.parts
+            s = str(path)
+            if "build" in parts or ".git" in parts or ".gradle" in parts or ".bak" in s:
+                continue
+            if path.is_file():
+                return path
+    return None
+
+
+APP_COLORS_FILE = find_theme_file() or (PROJECT_ROOT / "AppColors.kt")
 
 
 # ============================================================
@@ -44,21 +65,25 @@ class ThemeIndex:
     """خريطة Theme Tokens في الذاكرة."""
 
     def __init__(self):
-        # token_key → {"name": "PrimaryDark", "hex": "0xFF010D2A", "kind": "color"}
+        # token_key -> {"name": "PrimaryDark", "hex": "0xFF010D2A", "kind": "color"}
         self.tokens = {}
-        # reverse: hex → token_key
+        # reverse: hex -> token_key
         self.reverse_color = {}
 
-    def reload(self) -> bool:
-        """يعيد قراءة AppColors.kt ويحدّث الفهرس."""
+    def reload(self, file_path: Optional[Path] = None) -> bool:
+        """يعيد قراءة ملف الثيم ويحدّث الفهرس ديناميكياً."""
         self.tokens.clear()
         self.reverse_color.clear()
 
-        if not APP_COLORS_FILE.exists():
-            sys.stderr.write(f"[ThemeIndexer] File not found: {APP_COLORS_FILE}\n")
+        target_file = file_path or find_theme_file()
+        if not target_file or not target_file.exists():
+            # إذا لم يتم العثور على الملف، نتخطى بهدوء دون إظهار خطأ فادح
             return False
 
-        content = APP_COLORS_FILE.read_text(encoding="utf-8")
+        try:
+            content = target_file.read_text(encoding="utf-8")
+        except Exception:
+            return False
 
         matches = COLOR_PATTERN.findall(content)
 
@@ -80,7 +105,7 @@ class ThemeIndex:
             # Reverse: نستخدم uppercase للمقارنة
             self.reverse_color[hex_value.upper()] = full_key
 
-        sys.stderr.write(f"[ThemeIndexer] Indexed {len(self.tokens)} tokens\n")
+        sys.stderr.write(f"[ThemeIndexer] Indexed {len(self.tokens)} tokens from {target_file.name}\n")
         return True
 
     def find_token_by_color(self, hex_value: str) -> Optional[str]:
@@ -169,14 +194,13 @@ def init():
 
 
 if __name__ == "__main__":
-    # اختبار
     init()
     print()
     print("=" * 60)
     print("Theme Index")
     print("=" * 60)
     for key, info in _INDEX.get_all_tokens().items():
-        print(f"  {key:40} → {info['hex']} (copy={info['has_copy']})")
+        print(f"  {key:40} -> {info['hex']} (copy={info['has_copy']})")
     print()
     print(f"Total: {len(_INDEX.tokens)} tokens")
     print()

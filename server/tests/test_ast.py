@@ -7,7 +7,9 @@ import sys
 from pathlib import Path
 
 # إضافة الجذر للمسار
-sys.path.insert(0, str(Path(__file__).parent))
+_SERVER_DIR = Path(__file__).resolve().parent.parent
+if str(_SERVER_DIR) not in sys.path:
+    sys.path.insert(0, str(_SERVER_DIR))
 
 from core.ast_finder import (
     parse_file,

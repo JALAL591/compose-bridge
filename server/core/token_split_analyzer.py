@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 from typing import List, Dict, Optional
 from .scanner_models import TokenImpact, SplitSuggestion
-from .token_migrator import CONTEXT_RULES, COLOR_CONTEXT_RULES
+# CONTEXT_RULES imported locally inside __init__ to prevent circular import cycles
 
 INTERNAL_UI_ELEMENTS = {
     "Card", "Button", "Column", "Row", "Box", "Spacer", "Text", "Icon",
@@ -27,6 +27,7 @@ def to_snake_case(name: str) -> str:
 class TokenSplitAnalyzer:
     def __init__(self, project_root: Path):
         self.project_root = project_root
+        from .token_migrator import CONTEXT_RULES, COLOR_CONTEXT_RULES
         self.dim_context_rules = CONTEXT_RULES
         self.color_context_rules = COLOR_CONTEXT_RULES
 

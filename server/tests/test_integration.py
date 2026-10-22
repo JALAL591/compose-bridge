@@ -1,6 +1,12 @@
 import os
 # -*- coding: utf-8 -*-
 """
+from pathlib import Path
+import sys
+_SERVER_DIR = Path(__file__).resolve().parent.parent
+if str(_SERVER_DIR) not in sys.path:
+    sys.path.insert(0, str(_SERVER_DIR))
+
 End-to-End Integration Test
 
 Simulates a full User+Agent workflow with conflict resolution.
