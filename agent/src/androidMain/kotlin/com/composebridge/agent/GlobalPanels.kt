@@ -428,6 +428,54 @@ fun GlobalPanels() {
     }
 }
 
+
+    // ═══ External Modification Warning Dialog ═══
+    val activeWarning = BridgeState.activeWarningDialog
+    if (activeWarning != null) {
+        AlertDialog(
+            onDismissRequest = { BridgeState.activeWarningDialog = null },
+            title = {
+                Text("⚠️ تحذير: كشف تعديلات خارجية", fontWeight = FontWeight.Bold)
+            },
+            text = {
+                Text(activeWarning.message)
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val targetFile = activeWarning.file
+                        BridgeState.activeWarningDialog = null
+                        ComposeBridgeAgent.transport?.send("{\"type\": \"reject_file_force\", \"file\": \"$targetFile\"}")
+                    }
+                ) {
+                    Text("استعادة على أي حال", color = Color(0xFFDC2626), fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(
+                        onClick = {
+                            val targetFile = activeWarning.file
+                            BridgeState.activeWarningDialog = null
+                            ComposeBridgeAgent.transport?.send("{\"type\": \"approve_file\", \"file\": \"$targetFile\"}")
+                        }
+                    ) {
+                        Text("الاحتفاظ بالتعديلات الحالية")
+                    }
+                    Spacer(Modifier.width(4.dp))
+                    TextButton(
+                        onClick = {
+                            BridgeState.activeWarningDialog = null
+                            BridgeState.showSnackbar("📄 فحص الفروقات: ${activeWarning.file}")
+                        }
+                    ) {
+                        Text("عرض الفروقات")
+                    }
+                }
+            }
+        )
+    }
+
     // ═══ Dialog for Shared Colors and Tokens ═══
     val pendingColor = colorPendingChange
     val newHex = pendingNewHex
@@ -1220,43 +1268,6 @@ fun GlobalPanels() {
                         ) { Text("Cancel") }
                     }
                 },
-            )
-        }
-    }
-
-    // ═══ FAB Sync Button (When Pending Edits Exist) ═══
-    if (DesignModeRegistry.isActive && BridgeState.pendingCount > 0) {
-        Box(modifier = Modifier.fillMaxSize()) {
-            ExtendedFloatingActionButton(
-                onClick = {
-                    val edits = BridgeState.pendingEdits.toList()
-                    if (edits.isNotEmpty() && !BridgeState.syncInProgress) {
-                        BridgeState.syncInProgress = true
-                        BridgeState.showSnackbar("⏳ Processing ${edits.size} change(s)...")
-                        ComposeBridgeAgent.sendBatchEdits(edits)
-                    }
-                },
-                icon = {
-                    if (BridgeState.syncInProgress) {
-                        CircularProgressIndicator(
-                            color = Color.White,
-                            modifier = Modifier.size(18.dp),
-                            strokeWidth = 2.dp
-                        )
-                    }
-                },
-                text = {
-                    Text(
-                        if (BridgeState.syncInProgress) "Syncing..."
-                        else "🔄 Sync (${BridgeState.pendingCount})",
-                        fontWeight = FontWeight.Bold
-                    )
-                },
-                containerColor = Color(0xFF6366F1),
-                contentColor = Color.White,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(16.dp)
             )
         }
     }

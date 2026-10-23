@@ -56,8 +56,11 @@ def _build_color_pattern(key: str) -> str:
     يبني regex pattern لاستخراج قيمة لون من DesignSystem.kt أو AppColors.kt
     """
     import re
+    clean_key = key.split(".")[-1] if "." in key else key
+    keys = list(dict.fromkeys([key, clean_key]))
+    escaped_keys = "|".join(re.escape(k) for k in keys)
     return (
-        rf'((?:BridgeThemeRegistry\.getColor\("{re.escape(key)}",\s*Color\(|val\s+{re.escape(key)}\s*(?::\s*Color)?\s*=\s*Color\())'
+        rf'((?:BridgeThemeRegistry\.getColor\("(?:{escaped_keys})",\s*Color\(|val\s+(?:{escaped_keys})\s*(?::\s*Color)?\s*=\s*Color\())'
         rf'(0x[0-9A-Fa-f]+)'
         rf'(\))'
     )
@@ -96,7 +99,7 @@ def _find_color_file_for_key(key: str, project_root: Optional[Path] = None) -> O
     return None
 
 
-def update_theme_color(key: str, new_hex: str) -> tuple:
+def update_theme_color(key: str, new_hex: str, expected_checksum: Optional[str] = None) -> tuple:
     """
     يعدّل قيمة لون في AppColors.kt أو DesignSystem.kt.
 
@@ -112,9 +115,33 @@ def update_theme_color(key: str, new_hex: str) -> tuple:
     import os
     import re
 
-    file_path = _find_color_file_for_key(key)
+    from common.file_ops import _find_registry_file
+    from core.project_root import get_project_root
+    p_root = get_project_root()
+    clean_key = key.split(".")[-1] if "." in key else key
+
+    file_path = _find_color_file_for_key(key, p_root) or _find_color_file_for_key(clean_key, p_root)
     if not file_path or not file_path.exists():
-        if APP_COLORS_FILE.exists():
+        for cand in ["DesignSystem.kt", "AppColors.kt", "Theme.kt", "Color.kt", "Colors.kt"]:
+            p = _find_registry_file(cand, p_root)
+            if p and p.exists():
+                try:
+                    txt = p.read_text(encoding="utf-8")
+                    if clean_key in txt:
+                        file_path = p
+                        break
+                except Exception:
+                    pass
+
+    if not file_path or not file_path.exists():
+        for cand in ["DesignSystem.kt", "AppColors.kt", "Theme.kt", "Color.kt", "Colors.kt"]:
+            p = _find_registry_file(cand, p_root)
+            if p and p.exists():
+                file_path = p
+                break
+
+    if not file_path or not file_path.exists():
+        if APP_COLORS_FILE and APP_COLORS_FILE.exists():
             file_path = APP_COLORS_FILE
         else:
             return (False, f"Color file not found for key: {key}", None)
@@ -128,15 +155,53 @@ def update_theme_color(key: str, new_hex: str) -> tuple:
 
     normalized_hex = f"0x{cleaned.upper()}"
 
+    # Dirty buffer guard
+    from common.file_ops import is_file_dirty_in_ide
+    if is_file_dirty_in_ide(file_path, project_root=PROJECT_ROOT):
+        return (
+            False,
+            f"الملف '{file_path.name}' مفتوح في IDE وفيه تعديلات غير محفوظة. احفظ أولاً.",
+            {
+                "error_code": "DIRTY_BUFFER_DETECTED",
+                "file": str(file_path),
+            }
+        )
+
     # 2. اقرأ الملف
     with open(file_path, "r", encoding="utf-8", newline="") as f:
         content = f.read()
+
+    import hashlib
+    curr_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+    if expected_checksum and curr_hash != expected_checksum:
+        return (
+            False,
+            f"⚠️ تحذير: الملف '{file_path.name}' تم تعديله خارج الأداة (يدوياً أو بواسطة وكيل آخر).\nاستعادة النسخة الاحتياطية ستحذف هذه التعديلات.\nهل أنت متأكد؟",
+            {
+                "error_code": "EXTERNAL_MODIFICATION_DETECTED",
+                "suggested_action": "confirm_restore",
+                "file": str(file_path),
+                "expected_checksum": expected_checksum,
+                "current_checksum": curr_hash,
+            }
+        )
 
     # 3. ابحث عن النمط
     pattern = _build_color_pattern(key)
     match = re.search(pattern, content)
 
     if not match:
+        bak_path = Path(str(file_path) + ".bridge.bak")
+        if bak_path.exists():
+            return (
+                False,
+                f"⚠️ تحذير: الملف '{file_path.name}' تم تعديله خارج الأداة (يدوياً أو بواسطة وكيل آخر).\nاستعادة النسخة الاحتياطية ستحذف هذه التعديلات.\nهل أنت متأكد؟",
+                {
+                    "error_code": "EXTERNAL_MODIFICATION_DETECTED",
+                    "suggested_action": "confirm_restore",
+                    "file": str(file_path),
+                }
+            )
         return (False, f"Pattern not found for key: {key}", None)
 
     old_hex = match.group(2)

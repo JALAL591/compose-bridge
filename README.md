@@ -24,15 +24,15 @@
 
 ---
 
-### 📥 Direct Downloads (v1.1.2)
+### 📥 Direct Downloads (v1.1.3)
 
 | Package | Asset | Purpose |
 |---|---|---|
 | **IDE Plugin (Android Studio / IntelliJ)** | [📥 **ComposeBridgeIntelliJ-1.1.2.zip**](dist/ComposeBridgeIntelliJ-1.1.2.zip) | Install in IDE: `Settings` ➔ `Plugins` ➔ `⚙️` ➔ `Install Plugin from Disk...` |
 | **Compose Runtime Library (Release & Debug)** | [📦 **composebridge-runtime-release.aar**](dist/composebridge-runtime-release.aar) | Core registries (~9KB). Required in `implementation` for production-safe APK builds |
 | **Compose Agent Library (Debug Only)** | [📦 **composebridge-agent-release.aar**](dist/composebridge-agent-release.aar) | Visual overlays, touch inspector, and WebSocket bridge. Put in `debugImplementation` |
-| **Python Server & MCP Package** | [📦 **composebridge-server-1.1.2.zip**](dist/composebridge-server-1.1.2.zip) | Modular WebSocket hub & MCP server for AI agents |
-| **All-in-One Distribution** | [📦 **ComposeBridge-v1.1.2-AllInOne.zip**](dist/ComposeBridge-v1.1.2-AllInOne.zip) | Bundles Plugin, Runtime, Agent, and Server together |
+| **Python Server & MCP Package** | [📦 **composebridge-server-1.1.3.zip**](dist/composebridge-server-1.1.3.zip) | Modular WebSocket hub & MCP server for AI agents |
+| **All-in-One Distribution** | [📦 **ComposeBridge-v1.1.3-AllInOne.zip**](dist/ComposeBridge-v1.1.3-AllInOne.zip) | Bundles Plugin, Runtime, Agent, and Server together |
 
 ---
 
@@ -155,24 +155,39 @@ ComposeBridge coordinates three interconnected components over a fast local loop
 
 ---
 
-## 🤖 MCP Server (AI Coding Assistants)
+## 🤖 AI Agent Integration (MCP)
 
 ComposeBridge exposes 27 deep-inspection and code refactoring tools to any AI assistant supporting the **Model Context Protocol (MCP)**. **No physical phone is required to use MCP tools.**
 
+> 💡 **Ultra-Lightweight Context Window:**
+> ComposeBridge uses Lazy Loading, so 27 MCP tools consume only ~176 tokens (<1% of context window).
+
 ### Compatible AI Clients:
 - ✅ **Google Antigravity IDE**
-- ✅ **Claude Desktop**
 - ✅ **Cursor**
+- ✅ **Claude Desktop**
 - ✅ **Windsurf / Continue**
 
-### Configuration (`mcp_config.json`):
+### Integration Steps:
+
+#### Step 1: Run the MCP Server
+Make sure server dependencies are installed and the server is executable from your `server` directory:
+```bash
+cd server
+pip install -r requirements.txt
+```
+
+#### Step 2: Configure `mcp_config.json`
+Add the ComposeBridge server configuration to your AI agent's config file (e.g. in `~/.gemini/config/mcp_config.json` or your IDE configuration):
+
 ```json
 {
   "mcpServers": {
     "composebridge": {
       "command": "python",
-      "args": ["-u", "C:\path\to\compose-bridge\server\mcp_server.py"],
+      "args": ["-u", "C:\Users\thinkpad\StudioProjects\compose-bridge\server\mcp_server.py"],
       "env": {
+        "COMPOSEBRIDGE_ROOT": "C:\Users\thinkpad\StudioProjects\MyTeacher-App",
         "PYTHONIOENCODING": "utf-8"
       }
     }
@@ -180,12 +195,14 @@ ComposeBridge exposes 27 deep-inspection and code refactoring tools to any AI as
 }
 ```
 
+> ⚠️ **Important:** Any changes made to `mcp_config.json` require starting a **New Chat** in your AI agent interface so that all 27 MCP tools are freshly discovered and initialized.
+
 ### Overview of MCP Tools (27 Tools):
 - **Token Discovery & Analysis:** `list_tokens`, `find_token_by_color`, `get_token_impact`, `get_token_siblings`, `get_all_token_groups`, `list_orphans`, `get_naming_convention`.
 - **Surgical Code Editing:** `set_token`, `set_text`, `add_token`, `rollback_last`.
 - **Pattern Refactoring:** `replace_pattern`, `list_applied_patterns`, `rollback_pattern`, `suggest_token_split`, `detect_conditional_variants`.
 - **Change Management:** `list_modified_files`, `get_file_diff`, `approve_file_changes`, `reject_file_changes`, `approve_all_files`, `reject_all_files`, `reject_all_files_force`.
-- **Build Verification:** `run_gradle_build`, `list_allowed_gradle_tasks`, `trigger_user_sync`, `get_sync_status`.
+- **Build Verification & Sync:** `run_gradle_build`, `list_allowed_gradle_tasks`, `trigger_user_sync`, `get_sync_status`.
 
 ---
 

@@ -48,6 +48,33 @@ async def notify_bridge_server(token: str, value: str) -> bool:
         return False
 
 
+async def notify_refresh_to_bridge() -> bool:
+    """
+    Notify Bridge Server to broadcast refresh_element_request to IDE Plugin and Phone.
+    """
+    try:
+        async with websockets.connect(
+            "ws://127.0.0.1:8711",
+            open_timeout=2,
+        ) as ws:
+            # Auth
+            await ws.send(json.dumps({
+                "type": "auth",
+                "token": get_or_create_auth_token(PROJECT_ROOT),
+            }))
+            await asyncio.wait_for(ws.recv(), timeout=2)
+
+            # Send refresh_element_request
+            await ws.send(json.dumps({
+                "type": "refresh_element_request",
+            }))
+            ack = await asyncio.wait_for(ws.recv(), timeout=2)
+            return True
+    except Exception as e:
+        print(f"[MCP] Bridge refresh notify failed: {e}", file=sys.stderr)
+        return False
+
+
 async def notify_agent_lifecycle(event: str) -> bool:
     """
     Notify Bridge Server about agent session start/end.
@@ -77,14 +104,27 @@ async def notify_agent_lifecycle(event: str) -> bool:
 
 
 def run_async(coro):
-    """Run async coroutine safely from sync context."""
+    """Run async coroutine safely from sync or running event loop context."""
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            return asyncio.create_task(coro)
-        return loop.run_until_complete(coro)
+        loop = asyncio.get_running_loop()
     except RuntimeError:
+        loop = None
+
+    if loop and loop.is_running():
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            return executor.submit(asyncio.run, coro).result()
+    else:
         return asyncio.run(coro)
+
+
+def send_refresh_signal() -> bool:
+    """Send refresh_element_request to Bridge Server safely from any context."""
+    try:
+        return run_async(notify_refresh_to_bridge())
+    except Exception as e:
+        print(f"[MCP] send_refresh_signal failed: {e}", file=sys.stderr)
+        return False
 
 
 @app.tool()
@@ -158,9 +198,13 @@ def set_text(token_name: str, new_value: str, file_path: str = None, line: int =
             if not ok:
                 return json.dumps({"success": False, "error": msg})
                 
-            # Notify Bridge server for live update
+            # Notify Bridge server for live update and IDE plugin refresh
             try:
                 run_async(notify_bridge_server(ref_key or f"text_{file_path}_{line}", new_value))
+            except Exception:
+                pass
+            try:
+                send_refresh_signal()
             except Exception:
                 pass
                 

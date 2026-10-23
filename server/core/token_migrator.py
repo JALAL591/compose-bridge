@@ -479,7 +479,14 @@ class TokenMigrator:
         except Exception:
             return "top-level"
         
-        if "BridgeDimensionRegistry" in content or "BridgeThemeRegistry" in content:
+        fname = registry_file.name
+        if (
+            "BridgeDimensionRegistry" in content or
+            "BridgeThemeRegistry" in content or
+            fname in ("DesignSystem.kt", "AppColors.kt", "AppDimens.kt") or
+            "object AppColors" in content or
+            "object AppDimens" in content
+        ):
             return "registry"
         
         if re.search(r'\bobject\s+\w+\s*\{', content):
@@ -622,8 +629,10 @@ class TokenMigrator:
         if token_type == "dimension":
             if "import androidx.compose.ui.unit.dp" not in reg_content:
                 reg_content = self._add_import(reg_content, "import androidx.compose.ui.unit.dp")
-            if style == "registry" and "import androidx.compose.ui.unit.Dp" not in reg_content:
+            if "import androidx.compose.ui.unit.Dp" not in reg_content:
                 reg_content = self._add_import(reg_content, "import androidx.compose.ui.unit.Dp")
+            if "import com.composebridge.agent.BridgeDimensionRegistry" not in reg_content:
+                reg_content = self._add_import(reg_content, "import com.composebridge.agent.BridgeDimensionRegistry")
         elif token_type == "color":
             if "import androidx.compose.ui.graphics.Color" not in reg_content:
                 reg_content = self._add_import(reg_content, "import androidx.compose.ui.graphics.Color")
@@ -941,12 +950,19 @@ class TokenMigrator:
         matches = self._find_existing_tokens(value, token_type)
         return ", ".join(matches) if matches else None
 
-    def _find_registry_insertion_point(self, registry_content: str, style: str = "registry") -> int:
+    def _find_registry_insertion_point(self, registry_content: str, token_type: str = "color", style: str = "registry") -> int:
         """Find the line to insert the new token."""
         lines = registry_content.splitlines()
         
         if style == "registry":
+            target_reg = "BridgeThemeRegistry.getColor" if token_type == "color" else "BridgeDimensionRegistry.get"
             last_idx = -1
+            for i, line in enumerate(lines):
+                if target_reg in line:
+                    last_idx = i
+            if last_idx != -1:
+                return last_idx + 1
+
             for i, line in enumerate(lines):
                 if "BridgeDimensionRegistry.get" in line or "BridgeThemeRegistry.getColor" in line:
                     last_idx = i
@@ -954,12 +970,22 @@ class TokenMigrator:
                 return last_idx + 1
 
         if style in ("registry", "object"):
-            # Look for closing brace of object
+            pref_names = ["AppColors", "Colors", "Theme"] if token_type == "color" else ["AppDimens", "AppDesign", "AppDimensions", "Dimensions", "Spacing"]
             obj_idx = -1
-            for i, line in enumerate(lines):
-                if re.search(r'\bobject\s+\w+', line):
-                    obj_idx = i
+            for p_name in pref_names:
+                for i, line in enumerate(lines):
+                    if re.search(rf'\bobject\s+{re.escape(p_name)}\b', line):
+                        obj_idx = i
+                        break
+                if obj_idx != -1:
                     break
+
+            if obj_idx == -1:
+                for i, line in enumerate(lines):
+                    if re.search(r'\bobject\s+\w+', line):
+                        obj_idx = i
+                        break
+
             if obj_idx != -1:
                 brace_count = 0
                 started = False
@@ -1293,7 +1319,7 @@ class TokenMigrator:
             # ═══ 6. Find registry file ═══
             if preferred_token_file:
                 # ابحث عن الملف المحدد
-                matches = list(self.project_root.rglob(preferred_token_file))
+                matches = list(self.project_root.rglob(Path(preferred_token_file).name))
                 registry_file = next(
                     (m for m in matches if "build" not in str(m) and ".composebridge-state" not in str(m)),
                     None,
@@ -1325,10 +1351,16 @@ class TokenMigrator:
             try:
                 reg_content = registry_file.read_text(encoding="utf-8")
                 reg_content = self._ensure_registry_imports(reg_content, token_type, style)
-                insert_idx = self._find_registry_insertion_point(reg_content, style=style)
+                insert_idx = self._find_registry_insertion_point(reg_content, token_type=token_type, style=style)
                 reg_lines = reg_content.splitlines()
                 reg_lines.insert(insert_idx, new_entry)
                 _atomic_write_text(registry_file, "\n".join(reg_lines) + "\n")
+
+                # Verify token definition exists in registry file
+                saved_reg = registry_file.read_text(encoding="utf-8")
+                if token_name not in saved_reg:
+                    shutil.copy2(registry_backup, registry_file)
+                    return (False, f"Verification failed: token '{token_name}' was not found in {registry_file.name} after write", None)
             except Exception as e:
                 # Rollback registry
                 shutil.copy2(registry_backup, registry_file)

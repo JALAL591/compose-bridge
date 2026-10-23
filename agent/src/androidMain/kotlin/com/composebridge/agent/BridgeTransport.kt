@@ -242,6 +242,13 @@ class BridgeTransport(
 
                 println("[BridgeTransport] type=$type, action=$action")
 
+                if (type == "warning_dialog") {
+                    val file = obj["file"]?.jsonPrimitive?.contentOrNull ?: ""
+                    val msg = obj["message"]?.jsonPrimitive?.contentOrNull ?: ""
+                    BridgeState.activeWarningDialog = WarningDialogInfo(file, msg)
+                    println("[BridgeTransport] ⚠️ Warning dialog received: $file")
+                    return@post
+                }
                 // ========================================
                 // Informational messages — no response required
                 // ========================================

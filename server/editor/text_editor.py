@@ -62,6 +62,7 @@ def update_text_in_source(
     new_text: str,
     ref_key: Optional[str] = None,
     project_root: Optional[Path] = None,
+    expected_checksum: Optional[str] = None,
 ) -> tuple:
     r"""
     يقوم بالتعديل الجراحي للنصوص في الكود المصدري عبر حالتين:
@@ -143,8 +144,34 @@ def update_text_in_source(
                 return (False, f"AppStrings.kt not found in project {project_root}", None)
 
             strings_file = candidates[0]
+            from common.file_ops import is_file_dirty_in_ide
+            if is_file_dirty_in_ide(strings_file, project_root):
+                return (
+                    False,
+                    f"الملف '{strings_file.name}' مفتوح في IDE وفيه تعديلات غير محفوظة. احفظ أولاً.",
+                    {
+                        "error_code": "DIRTY_BUFFER_DETECTED",
+                        "file": str(strings_file),
+                    }
+                )
+
             with open(strings_file, "r", encoding="utf-8", newline="") as f:
                 content = f.read()
+
+            import hashlib
+            curr_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+            if expected_checksum and curr_hash != expected_checksum:
+                return (
+                    False,
+                    f"⚠️ تحذير: الملف '{strings_file.name}' تم تعديله خارج الأداة (يدوياً أو بواسطة وكيل آخر).\nاستعادة النسخة الاحتياطية ستحذف هذه التعديلات.\nهل أنت متأكد؟",
+                    {
+                        "error_code": "EXTERNAL_MODIFICATION_DETECTED",
+                        "suggested_action": "confirm_restore",
+                        "file": str(strings_file),
+                        "expected_checksum": expected_checksum,
+                        "current_checksum": curr_hash,
+                    }
+                )
 
             parts = target_ref.split(".")
             var_name = parts[-1]
@@ -358,8 +385,34 @@ def update_text_in_source(
         if not full_path or not full_path.exists():
             return (False, f"Source file not found: {file_path}", None)
 
+        from common.file_ops import is_file_dirty_in_ide
+        if is_file_dirty_in_ide(full_path, project_root):
+            return (
+                False,
+                f"الملف '{full_path.name}' مفتوح في IDE وفيه تعديلات غير محفوظة. احفظ أولاً.",
+                {
+                    "error_code": "DIRTY_BUFFER_DETECTED",
+                    "file": str(full_path),
+                }
+            )
+
         with open(full_path, "r", encoding="utf-8", newline="") as f:
             content = f.read()
+
+        import hashlib
+        curr_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        if expected_checksum and curr_hash != expected_checksum:
+            return (
+                False,
+                f"⚠️ تحذير: الملف '{full_path.name}' تم تعديله خارج الأداة (يدوياً أو بواسطة وكيل آخر).\nاستعادة النسخة الاحتياطية ستحذف هذه التعديلات.\nهل أنت متأكد؟",
+                {
+                    "error_code": "EXTERNAL_MODIFICATION_DETECTED",
+                    "suggested_action": "confirm_restore",
+                    "file": str(full_path),
+                    "expected_checksum": expected_checksum,
+                    "current_checksum": curr_hash,
+                }
+            )
 
         lines_with_ends = content.splitlines(keepends=True)
         if not lines_with_ends:
@@ -405,6 +458,17 @@ def update_text_in_source(
                     break
 
         if target_idx == -1 or not target_literal:
+            bak_path = Path(str(full_path) + ".bridge.bak")
+            if bak_path.exists():
+                return (
+                    False,
+                    f"⚠️ تحذير: الملف '{full_path.name}' تم تعديله خارج الأداة (يدوياً أو بواسطة وكيل آخر).\nاستعادة النسخة الاحتياطية ستحذف هذه التعديلات.\nهل أنت متأكد؟",
+                    {
+                        "error_code": "EXTERNAL_MODIFICATION_DETECTED",
+                        "suggested_action": "confirm_restore",
+                        "file": str(full_path),
+                    }
+                )
             return (False, f"Text '{old_text}' not found near line {line} in {full_path.name}", None)
 
         target_line_str = lines_with_ends[target_idx]

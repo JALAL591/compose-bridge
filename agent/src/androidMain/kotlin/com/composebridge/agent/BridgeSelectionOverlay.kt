@@ -111,7 +111,7 @@ class BridgeSelectionOverlay(
         // DesignModeButton is a horizontal Row (~210dp width) aligned to TopEnd with 16dp end padding.
         // In RTL: TopEnd is at screen LEFT (x around 0..250dp).
         // In LTR: TopEnd is at screen RIGHT (x around width - 250dp..width).
-        val toolbarWidth = (250 * density).toInt()
+        val toolbarWidth = (320 * density).toInt()
         val isRtl = resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL ||
                 BridgeOverlayManager.attachedActivity?.window?.decorView?.layoutDirection == View.LAYOUT_DIRECTION_RTL
 

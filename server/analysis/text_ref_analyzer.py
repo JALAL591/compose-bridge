@@ -36,8 +36,16 @@ def _resolve_app_strings_value(project_root: Optional[Path], ref_key: str, runti
 
         candidates = []
         if effective_root and effective_root.exists():
-            candidates = list(effective_root.rglob("AppStrings.kt"))
-            candidates = [c for c in candidates if "build" not in str(c) and ".composebridge" not in str(c) and ".bak" not in str(c)]
+            try:
+                from common.project_cache import PROJECT_CACHE
+                cached_app_strings = PROJECT_CACHE.find_file("AppStrings.kt", effective_root)
+                if cached_app_strings and cached_app_strings.exists():
+                    candidates = [cached_app_strings]
+            except Exception:
+                pass
+            if not candidates:
+                candidates = list(effective_root.rglob("AppStrings.kt"))
+                candidates = [c for c in candidates if "build" not in str(c) and ".composebridge" not in str(c) and ".bak" not in str(c)]
 
         if not candidates:
             # Check common directories

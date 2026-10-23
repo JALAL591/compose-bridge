@@ -9,7 +9,14 @@ from editor.state_editor_core import *
 from editor.color_editor import *
 from editor.dimension_editor import *
 from editor.text_editor import *
-from common.file_ops import _atomic_write_text, _find_registry_file
+from common.file_ops import (
+    _atomic_write_text,
+    _find_registry_file,
+    is_file_dirty_in_ide,
+    mark_file_dirty_in_ide,
+    DIRTY_BUFFER_WARNING_AR,
+    EXTERNAL_MODIFICATION_WARNING_TEMPLATE_AR,
+)
 
 # Explicit re-exports for IDEs and type-checkers
 from editor.journal_helpers import (
@@ -92,4 +99,8 @@ __all__ = [
     "update_text_in_source",
     "_atomic_write_text",
     "_find_registry_file",
+    "is_file_dirty_in_ide",
+    "mark_file_dirty_in_ide",
+    "DIRTY_BUFFER_WARNING_AR",
+    "EXTERNAL_MODIFICATION_WARNING_TEMPLATE_AR",
 ]

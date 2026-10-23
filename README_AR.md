@@ -26,12 +26,15 @@
 
 ---
 
-### 📥 التحميل المباشر والتثبيت السريع (v1.1.1)
+### 📥 التحميل المباشر والتثبيت السريع (v1.1.3)
 
 | الحزمة | ملف التثبيت (.zip / .aar) | طريقة التثبيت السريع |
 |---|---|---|
-| **إضافة بيئة التطوير (Android Studio / IntelliJ)** | [📥 **تحميل ComposeBridgeIntelliJ-1.1.1.zip**](https://github.com/JALAL591/compose-bridge/raw/main/dist/ComposeBridgeIntelliJ-1.1.1.zip) | في Android Studio: انتقل إلى `Settings` ➔ `Plugins` ➔ `⚙️` ➔ `Install Plugin from Disk...` |
-| **مكتبة أندرويد لـ Jetpack Compose** | [📦 **تحميل composebridge-agent-release.aar**](https://github.com/JALAL591/compose-bridge/raw/main/dist/composebridge-agent-release.aar) | انسخ الملف إلى مجلد `app/libs/` في مشروعك |
+| **إضافة بيئة التطوير (Android Studio / IntelliJ)** | [📥 **تحميل ComposeBridgeIntelliJ-1.1.2.zip**](dist/ComposeBridgeIntelliJ-1.1.2.zip) | في Android Studio: انتقل إلى `Settings` ➔ `Plugins` ➔ `⚙️` ➔ `Install Plugin from Disk...` |
+| **مكتبة أندرويد لـ Jetpack Compose (Agent)** | [📦 **تحميل composebridge-agent-release.aar**](dist/composebridge-agent-release.aar) | انسخ الملف إلى مجلد `app/libs/` أو ضعه في `debugImplementation` |
+| **مكتبة أندرويد الأساسية (Runtime)** | [📦 **تحميل composebridge-runtime-release.aar**](dist/composebridge-runtime-release.aar) | ضعه في `implementation` لضمان أمان البناء |
+| **سيرفر بايثون و MCP** | [📦 **تحميل composebridge-server-1.1.3.zip**](dist/composebridge-server-1.1.3.zip) | خادم المزامنة ووكلاء الذكاء الاصطناعي |
+| **الحزمة الشاملة المتكاملة (All-in-One)** | [📦 **تحميل ComposeBridge-v1.1.3-AllInOne.zip**](dist/ComposeBridge-v1.1.3-AllInOne.zip) | تجمع الإضافة، العميل، مكتبة الـ Runtime، والسيرفر |
 
 **ComposeBridge** هي حزمة أدوات للمطورين تربط تطبيق Compose (KMP/Android) بمحرر الأكواد أو وكيل الذكاء الاصطناعي الخاص بك.
 
@@ -156,46 +159,56 @@ override fun onCreate(savedInstanceState: Bundle?) {
 
 ---
 
-## 🤖 خادم MCP (لوكلاء الذكاء الاصطناعي)
+## 🤖 AI Agent Integration (MCP) - تكامل وكلاء الذكاء الاصطناعي
 
-يعرض ComposeBridge أدواته لوكلاء الذكاء الاصطناعي عبر بروتوكول Model Context Protocol (MCP). **لا يُشترط وجود هاتف لاستخدام MCP.**
+يعرض ComposeBridge أدواته الـ 27 لوكلاء الذكاء الاصطناعي عبر بروتوكول Model Context Protocol (MCP). **لا يُشترط وجود هاتف لاستخدام MCP.**
+
+> 💡 **كفاءة استهلاك السياق (Context Window):**
+> "ComposeBridge uses Lazy Loading, so 27 MCP tools consume only ~176 tokens (<1% of context window)."
 
 ### العملاء المدعومون
-- ✅ Antigravity IDE (Gemini)
-- ✅ Claude Desktop
-- ✅ Cursor
-- ✅ Cline / Continue
+- ✅ **Google Antigravity IDE**
+- ✅ **Cursor**
+- ✅ **Claude Desktop**
+- ✅ **Cline / Continue**
 
-### الإعداد
+### خطوات الإعداد والتكامل:
 
-**1. تثبيت التبعيات**
+#### الخطوة 1: تشغيل سيرفر MCP
+تأكد من تثبيت مكتبات السيرفر من مجلد `server`:
 ```bash
 cd server
 pip install -r requirements.txt
 ```
 
-**2. تهيئة عميل الذكاء الاصطناعي الخاص بك**
-Antigravity IDE — قم بتعديل `~/.gemini/config/mcp_config.json`:
+#### الخطوة 2: إعداد ملف `mcp_config.json`
+أضف الإعداد التالي في ملف `mcp_config.json` داخل مجلد `.gemini/config/` أو مجلد إعدادات IDE / العميل الخاص بك:
 ```json
 {
   "mcpServers": {
     "composebridge": {
       "command": "python",
-      "args": ["C:\\path\\to\\composebridge\\server\\mcp_server.py"]
+      "args": ["-u", "C:\Users\thinkpad\StudioProjects\compose-bridge\server\mcp_server.py"],
+      "env": {
+        "COMPOSEBRIDGE_ROOT": "C:\Users\thinkpad\StudioProjects\MyTeacher-App",
+        "PYTHONIOENCODING": "utf-8"
+      }
     }
   }
 }
 ```
 
-### الأدوات المتاحة (أكثر من 17)
+> ⚠️ **ملاحظة هامة جداً:** أي تعديل على `mcp_config.json` يتطلب بدء محادثة جديدة (**New Chat**) في الوكيل حتى يتم تحميل الأدوات الـ 27 تلقائياً.
+
+### الأدوات المتاحة (27 أداة MCP)
 
 | الفئة | الأدوات |
 |-------|---------|
-| **الاستكشاف** | `list_tokens`, `find_token_by_color`, `get_token_impact`, `get_token_siblings`, `get_naming_convention` |
-| **التعديل** | `set_token`, `add_token`, `rollback_last` |
-| **إعادة الهيكلة** | `detect_conditional_variants`, `replace_pattern`, `rollback_pattern`, `global_color_edit`, `split_token_for_element` |
-| **البناء** | `run_gradle_build`, `list_allowed_gradle_tasks` |
-| **إدارة التغييرات**| `list_modified_files`, `approve_all_files`, `reject_all_files` |
+| **الاستكشاف والتحليل** | `list_tokens`, `find_token_by_color`, `get_token_impact`, `get_token_siblings`, `get_all_token_groups`, `list_orphans`, `get_naming_convention` |
+| **التعديل الجراحي** | `set_token`, `set_text`, `add_token`, `rollback_last` |
+| **إعادة الهيكلة والأنماط** | `detect_conditional_variants`, `replace_pattern`, `list_applied_patterns`, `rollback_pattern`, `suggest_token_split` |
+| **إدارة التغييرات** | `list_modified_files`, `get_file_diff`, `approve_file_changes`, `reject_file_changes`, `approve_all_files`, `reject_all_files`, `reject_all_files_force` |
+| **البناء والمزامنة** | `run_gradle_build`, `list_allowed_gradle_tasks`, `trigger_user_sync`, `get_sync_status` |
 
 ---
 

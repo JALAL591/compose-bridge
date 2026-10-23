@@ -31,6 +31,7 @@ from handlers.dimension_handler import _apply_dimension_edit
 
 from network.ws_server import (
     broadcast,
+    broadcast_refresh,
     safe_send,
     log_info,
     log_error,
@@ -204,6 +205,19 @@ async def handle_message(websocket: WebSocketServerProtocol, raw: str) -> None:
                     "forwarded_to": forwarded,
                 })
                 return
+
+    # ---------------------------------------------------------
+    # ⭐ refresh_element_request — بث تحديث للإضافة والهاتف
+    # ---------------------------------------------------------
+    if msg_type == "refresh_element_request":
+        forwarded = await broadcast_refresh(exclude=websocket)
+        log_info(f"[BROADCAST] refresh_element_request (forwarded to {forwarded} client(s))")
+        await safe_send(websocket, {
+            "type": "refresh_element_ack",
+            "status": "ok",
+            "forwarded_to": forwarded,
+        })
+        return
 
     # ---------------------------------------------------------
     # MCP State Update — من mcp_server.py
@@ -1378,6 +1392,49 @@ async def handle_message(websocket: WebSocketServerProtocol, raw: str) -> None:
         return
 
     # ---------------------------------------------------------
+    # ---------------------------------------------------------
+    # ⭐ reject_file_force — استعادة ملف بالقوة عند تأكيد المستخدم
+    # ---------------------------------------------------------
+    if msg_type == "reject_file_force":
+        file_to_reject = message.get("file", "")
+        from core.pattern_journal import PatternJournal
+        journal = PatternJournal(PROJECT_ROOT)
+        result = journal.reject_file_changes(file_to_reject, force=True)
+        await safe_send(websocket, {
+            "type": "reject_file_ack",
+            "file": file_to_reject,
+            "result": result,
+        })
+        return
+
+    # ---------------------------------------------------------
+    # ⭐ approve_file — الاحتفاظ بالتعديلات الحالية للملف
+    # ---------------------------------------------------------
+    if msg_type == "approve_file":
+        file_to_approve = message.get("file", "")
+        from core.pattern_journal import PatternJournal
+        journal = PatternJournal(PROJECT_ROOT)
+        result = journal.approve_file_changes(file_to_approve)
+        await safe_send(websocket, {
+            "type": "approve_file_ack",
+            "file": file_to_approve,
+            "result": result,
+        })
+        return
+
+    # ---------------------------------------------------------
+    # ⭐ warning_dialog — بث تحذير تعديل خارجي أو dirty buffer للعملاء
+    # ---------------------------------------------------------
+    if msg_type == "warning_dialog":
+        forwarded = await broadcast(raw, exclude=websocket)
+        await safe_send(websocket, {
+            "type": "warning_dialog_ack",
+            "status": "ok",
+            "forwarded_to": forwarded,
+        })
+        log_send(f"warning_dialog broadcasted (forwarded={forwarded})")
+        return
+
     # edit_request — من الهاتف
     # ---------------------------------------------------------
     if msg_type == "edit_request":

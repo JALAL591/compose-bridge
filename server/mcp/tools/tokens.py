@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 from mcp.app import app, log, PROJECT_ROOT, state_manager
-from mcp.tools.misc import notify_bridge_server, notify_agent_lifecycle
+from mcp.tools.misc import notify_bridge_server, notify_agent_lifecycle, notify_refresh_to_bridge, run_async, send_refresh_signal
 
 from core.token_migrator import TokenMigrator
 from core.theme_indexer import get_index
@@ -85,9 +85,23 @@ def add_token(
         JSON with success status and details.
     """
     from core.token_migrator import TokenMigrator
-    
+    from core.project_root import get_project_root
+    p_root = get_project_root()
+
+    if not preferred_token_file:
+        if token_type == "color":
+            for cand in ["DesignSystem.kt", "AppColors.kt", "Theme.kt", "Color.kt", "Colors.kt"]:
+                if list(p_root.rglob(cand)):
+                    preferred_token_file = cand
+                    break
+        elif token_type == "dimension":
+            for cand in ["AppDimens.kt", "DesignSystem.kt", "Dimens.kt", "Dimensions.kt", "Spacing.kt"]:
+                if list(p_root.rglob(cand)):
+                    preferred_token_file = cand
+                    break
+
     try:
-        migrator = TokenMigrator(PROJECT_ROOT)
+        migrator = TokenMigrator(p_root)
         success, message, info = migrator.migrate(
             file_name=file,
             line=line,
@@ -113,11 +127,13 @@ def add_token(
             )
             state_manager.save_all()
             
-            # Notify bridge for phone
+            # Notify bridge for phone & IDE plugin refresh
             try:
-                asyncio.run(notify_bridge_server(
-                    token_name, value
-                ))
+                run_async(notify_bridge_server(token_name, value))
+            except Exception:
+                pass
+            try:
+                send_refresh_signal()
             except Exception:
                 pass
             
@@ -300,7 +316,23 @@ def set_token(token_name: str, value: str) -> str:
             # Agent session active (coordinated via state_queue)
             
             # ═══ 2. Apply surgical edit ═══
-            ok, msg, info = update_token_default(token_name, value)
+            from core.state_editor import update_theme_color
+            val_clean = value.strip()
+            is_color = (
+                val_clean.startswith(('#', '0x', '0X')) or
+                val_clean.startswith('Color(') or
+                val_clean.startswith('Color.') or
+                token_name.startswith('AppColors.')
+            )
+
+            if is_color:
+                color_val = val_clean
+                if color_val.startswith('Color(') and color_val.endswith(')'):
+                    color_val = color_val[6:-1].strip()
+                color_key = token_name.split('.')[-1] if '.' in token_name else token_name
+                ok, msg, info = update_theme_color(color_key, color_val)
+            else:
+                ok, msg, info = update_token_default(token_name, value)
             
             if not ok:
                 state_manager.failures.record(
@@ -343,7 +375,12 @@ def set_token(token_name: str, value: str) -> str:
             except Exception as e:
                 print(f"[MCP] notify error: {e}", file=sys.stderr)
             
-            # ═══ 5. Notify Bridge: agent_end ═══
+            # ═══ 5. Notify Bridge: agent_end & refresh ═══
+            try:
+                send_refresh_signal()
+            except Exception as e:
+                print(f"[MCP] refresh notify error: {e}", file=sys.stderr)
+
             ended = False
             try:
                 ended = asyncio.run(notify_agent_lifecycle("agent_end"))

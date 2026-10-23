@@ -27,7 +27,14 @@ enum class EditMode {
     TEXT
 }
 
+data class WarningDialogInfo(
+    val file: String,
+    val message: String,
+)
+
 object BridgeState {
+    var activeWarningDialog by mutableStateOf<WarningDialogInfo?>(null)
+
     var currentMode: EditMode by mutableStateOf(EditMode.COLOR)
     var currentEditMode: EditMode
         get() = currentMode

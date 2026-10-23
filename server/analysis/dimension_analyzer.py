@@ -65,22 +65,31 @@ def _find_dimension_usage(project_root: Path, value: float, kind: str, kt_cache:
     locations = []
     
     if kt_cache is None:
-        kt_cache = []
-        for kt_file in project_root.rglob("*.kt"):
-            if any(x in str(kt_file).lower() for x in ["build", "backup", ".composebridge", ".bak"]):
-                continue
-            try:
-                kt_cache.append((str(kt_file.relative_to(project_root)).replace("\\", "/"), kt_file.read_text(encoding="utf-8")))
-            except Exception:
-                pass
+        try:
+            from common.project_cache import PROJECT_CACHE
+            kt_cache = PROJECT_CACHE.get_kt_cache(project_root)
+        except Exception:
+            kt_cache = []
+            for kt_file in project_root.rglob("*.kt"):
+                if any(x in str(kt_file).lower() for x in ["build", "backup", ".composebridge", ".bak"]):
+                    continue
+                try:
+                    kt_cache.append((str(kt_file.relative_to(project_root)).replace("\\", "/"), kt_file.read_text(encoding="utf-8")))
+                except Exception:
+                    pass
                 
+    compiled_patterns = [re.compile(rf'\b{re.escape(v)}\.{kind}\b') for v in variants]
     for rel_file, content in kt_cache:
+        # Fast preliminary check: skip file if neither kind nor any variant substring exists
+        if f".{kind}" not in content:
+            continue
         lines = content.splitlines()
         for line_idx, line in enumerate(lines, 1):
+            if f".{kind}" not in line or line.strip().startswith("//"):
+                continue
             found_in_line = False
-            for variant in variants:
-                pattern = rf'\b{re.escape(variant)}\.{kind}\b'
-                matches = list(re.finditer(pattern, line))
+            for pattern in compiled_patterns:
+                matches = list(pattern.finditer(line))
                 if matches:
                     count += len(matches)
                     if not found_in_line:

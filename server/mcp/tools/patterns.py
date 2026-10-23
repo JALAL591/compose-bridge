@@ -231,6 +231,12 @@ def replace_pattern(pattern_id: str, dry_run: bool = False) -> str:
                     "suggested_value": pattern.suggested_token_value,
                 })
 
+            try:
+                from mcp.tools.misc import send_refresh_signal
+                send_refresh_signal()
+            except Exception:
+                pass
+
             return json.dumps({
                 "success": True,
                 "token_name": pattern.suggested_token_name,
@@ -277,6 +283,13 @@ def rollback_pattern(pattern_id: str) -> str:
         with acquire_write_lock():
             journal = PatternJournal(PROJECT_ROOT)
             result = journal.rollback_pattern(pattern_id)
+            if result.get("success"):
+                try:
+                    from mcp.tools.misc import notify_refresh_to_bridge
+                    import asyncio
+                    asyncio.run(notify_refresh_to_bridge())
+                except Exception:
+                    pass
             return json.dumps(result, indent=2, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})

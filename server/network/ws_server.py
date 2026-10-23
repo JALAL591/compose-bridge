@@ -68,6 +68,15 @@ def log_send(msg): _safe_print(f"{Color.YELLOW}[->]{Color.END}", msg)
 def log_forward(msg): _safe_print(f"{Color.MAGENTA}[>>]{Color.END}", msg)
 
 
+async def broadcast_refresh(exclude: WebSocketServerProtocol = None) -> int:
+    """
+    يرسل refresh_element_request لجميع العملاء المتصلين (الهاتف وإضافة IDE).
+    """
+    return await broadcast(json.dumps({
+        "type": "refresh_element_request",
+    }, ensure_ascii=False), exclude=exclude)
+
+
 async def broadcast(message: str, exclude: WebSocketServerProtocol = None) -> int:
     """
     يرسل رسالة لجميع العملاء المتصلين عدا المُرسِل.

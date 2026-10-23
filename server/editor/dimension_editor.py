@@ -153,9 +153,23 @@ def update_token_default(token_name: str, value: str) -> tuple:
     import tempfile
     import os
 
-    file_path = _find_registry_file("AppDimens.kt")
+    file_path = None
+    for candidate in ["AppDimens.kt", "DesignSystem.kt", "Dimens.kt", "Dimensions.kt", "Spacing.kt"]:
+        candidate_path = _find_registry_file(candidate)
+        if candidate_path and candidate_path.exists():
+            try:
+                txt = candidate_path.read_text(encoding="utf-8")
+                if f'"{token_name}"' in txt:
+                    file_path = candidate_path
+                    break
+            except Exception:
+                pass
+
     if not file_path or not file_path.exists():
-        return (False, f"AppDimens.kt not found in project: {PROJECT_ROOT}", None)
+        file_path = _find_registry_file("AppDimens.kt")
+
+    if not file_path or not file_path.exists():
+        return (False, f"Registry file for token '{token_name}' not found in project: {PROJECT_ROOT}", None)
 
     with open(file_path, "r", encoding="utf-8", newline="") as f:
         content = f.read()

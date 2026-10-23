@@ -157,27 +157,50 @@ def _extract_composable_scope(
             start_idx = i
             break
     
-    # إذا لم نجدها في نفس الملف، ابحث في ملفات المشروع
+    # إذا لم نجدها في نفس الملف، ابحث في ملفات المشروع عبر الكاش
     if start_idx < 0 and project_root:
-        from core.project_scanner import ProjectScanner
-        scanner = ProjectScanner(project_root)
-        kt_finder = getattr(scanner, "find_kt_files", None) or getattr(scanner, "_find_kt_files")
-        for kt_file in kt_finder():
-            if "backup" in str(kt_file).lower() or "build" in str(kt_file).lower():
-                continue
-            try:
-                c = kt_file.read_text(encoding="utf-8")
+        try:
+            from common.project_cache import PROJECT_CACHE
+            kt_cache = PROJECT_CACHE.get_kt_cache(project_root)
+        except Exception:
+            kt_cache = None
+
+        if kt_cache is not None:
+            fn_regex = re.compile(rf'\b(fun|private\s+fun|public\s+fun|internal\s+fun)\s+{re.escape(composable_name)}\s*\(')
+            for rel_file, c in kt_cache:
+                if "backup" in rel_file.lower() or "build" in rel_file.lower():
+                    continue
+                if composable_name not in c:
+                    continue
                 c_lines = c.splitlines()
                 for i, line in enumerate(c_lines):
-                    if re.search(rf'\b(fun|private\s+fun|public\s+fun|internal\s+fun)\s+{re.escape(composable_name)}\s*\(', line):
+                    if fn_regex.search(line):
                         start_idx = i
                         target_lines = c_lines
-                        found_file = str(kt_file.relative_to(project_root)).replace("\\", "/")
+                        found_file = rel_file
                         break
                 if start_idx >= 0:
                     break
-            except Exception:
-                continue
+        else:
+            from core.project_scanner import ProjectScanner
+            scanner = ProjectScanner(project_root)
+            kt_finder = getattr(scanner, "find_kt_files", None) or getattr(scanner, "_find_kt_files")
+            for kt_file in kt_finder():
+                if "backup" in str(kt_file).lower() or "build" in str(kt_file).lower():
+                    continue
+                try:
+                    c = kt_file.read_text(encoding="utf-8")
+                    c_lines = c.splitlines()
+                    for i, line in enumerate(c_lines):
+                        if re.search(rf'\b(fun|private\s+fun|public\s+fun|internal\s+fun)\s+{re.escape(composable_name)}\s*\(', line):
+                            start_idx = i
+                            target_lines = c_lines
+                            found_file = str(kt_file.relative_to(project_root)).replace("\\", "/")
+                            break
+                    if start_idx >= 0:
+                        break
+                except Exception:
+                    continue
 
     if start_idx < 0:
         return "", 0, 0, ""
@@ -207,17 +230,39 @@ def _extract_composable_scope(
 def _count_function_calls(
     project_root: Path,
     composable_name: str,
+    kt_cache: Optional[List[Tuple[str, str]]] = None,
 ) -> int:
     """احسب عدد مرات استدعاء الدالة في المشروع."""
     count = 0
     pattern = rf'\b{re.escape(composable_name)}\s*\('
     
+    if kt_cache is None:
+        try:
+            from common.project_cache import PROJECT_CACHE
+            kt_cache = PROJECT_CACHE.get_kt_cache(project_root)
+        except Exception:
+            kt_cache = None
+
+    if kt_cache is not None:
+        for rel_path, content in kt_cache:
+            if any(x in rel_path.lower() for x in ["build", "backup", ".bak", ".composebridge"]):
+                continue
+            try:
+                content_no_def = re.sub(
+                    rf'\bfun\s+{re.escape(composable_name)}\s*\(',
+                    f'_DEF_{composable_name}_',
+                    content,
+                )
+                count += len(re.findall(pattern, content_no_def))
+            except Exception:
+                continue
+        return count
+
     for kt_file in project_root.rglob("*.kt"):
         if any(x in str(kt_file).lower() for x in ["build", "backup", ".bak", ".composebridge"]):
             continue
         try:
             content = kt_file.read_text(encoding="utf-8")
-            # تجاهل تعريف الدالة نفسه
             content_no_def = re.sub(
                 rf'\bfun\s+{re.escape(composable_name)}\s*\(',
                 f'_DEF_{composable_name}_',
@@ -409,10 +454,18 @@ def _find_all_occurrences(project_root: Path, literal: str, token_name: str = ""
 
 
 def _find_file(source_file: str, root: Path = PROJECT_ROOT) -> Optional[Path]:
-    """Finds file in project root."""
+    """Finds file in project root using ProjectCache."""
     full_path = root / source_file
     if full_path.exists():
         return full_path
+
+    try:
+        from common.project_cache import PROJECT_CACHE
+        cached = PROJECT_CACHE.find_file(source_file, root)
+        if cached and cached.exists():
+            return cached
+    except Exception:
+        pass
 
     filename = Path(source_file).name
     candidates = [
@@ -570,11 +623,29 @@ def _validate_modified_file(
 
 
 def get_token_value_map(project_root: Path) -> Dict[str, str]:
-    """Reads DesignSystem.kt / AppColors.kt and returns token_name -> hex_value."""
+    """Reads DesignSystem.kt / AppColors.kt and returns token_name -> hex_value using cache."""
     from .color_analyzer import _clean_hex
+    try:
+        from common.project_cache import PROJECT_CACHE
+        if PROJECT_CACHE._is_valid(project_root) and PROJECT_CACHE._token_map is not None:
+            return PROJECT_CACHE._token_map
+    except Exception:
+        pass
+
     token_map = {}
-    candidates = list(project_root.rglob("DesignSystem.kt")) + list(project_root.rglob("AppColors.kt"))
-    candidates = [c for c in candidates if "build" not in str(c) and ".composebridge" not in str(c)]
+    candidates = []
+    try:
+        from common.project_cache import PROJECT_CACHE
+        for name in ["DesignSystem.kt", "AppColors.kt"]:
+            found = PROJECT_CACHE.find_file(name, project_root)
+            if found and found.exists():
+                candidates.append(found)
+    except Exception:
+        pass
+
+    if not candidates:
+        candidates = list(project_root.rglob("DesignSystem.kt")) + list(project_root.rglob("AppColors.kt"))
+        candidates = [c for c in candidates if "build" not in str(c) and ".composebridge" not in str(c)]
     
     pattern = re.compile(
         r'val\s+(\w+)\s*:\s*Color[\s\r\n]*get\(\)\s*=\s*'
@@ -607,6 +678,11 @@ def get_token_value_map(project_root: Path) -> Dict[str, str]:
         except Exception:
             pass
             
+    try:
+        from common.project_cache import PROJECT_CACHE
+        PROJECT_CACHE._token_map = token_map
+    except Exception:
+        pass
     return token_map
 
 
@@ -625,13 +701,24 @@ def get_global_usage_counts(project_root: Path) -> Dict[str, int]:
         return _USAGE_GLOBAL_CACHE["counts"]
 
     counts: Dict[str, int] = {}
-    for kt_file in project_root.rglob("*.kt"):
-        s = str(kt_file)
-        if "build" in s or ".composebridge" in s or ".gradle" in s or "DesignSystem.kt" in s or "AppColors.kt" in s:
-            continue
-        try:
-            txt = kt_file.read_text(encoding="utf-8")
-        except Exception:
+    try:
+        from common.project_cache import PROJECT_CACHE
+        kt_cache = PROJECT_CACHE.get_kt_cache(project_root)
+    except Exception:
+        kt_cache = None
+
+    if kt_cache is not None:
+        file_entries = [(path, txt) for path, txt in kt_cache]
+    else:
+        file_entries = []
+        for kt_file in project_root.rglob("*.kt"):
+            try:
+                file_entries.append((str(kt_file.relative_to(project_root)), kt_file.read_text(encoding="utf-8")))
+            except Exception:
+                continue
+
+    for s, txt in file_entries:
+        if "build" in s.lower() or ".composebridge" in s.lower() or ".gradle" in s.lower() or "designsystem.kt" in s.lower() or "appcolors.kt" in s.lower():
             continue
 
         # Count tokens: AppColors.(\w+)
@@ -722,6 +809,13 @@ def analyze_element_range(
         return _empty_result(error="Empty scope")
 
     scope_lines = search_scope.splitlines()
+
+    # Pre-warm In-Memory Cache once for the entire analysis
+    try:
+        from common.project_cache import PROJECT_CACHE
+        kt_cache = PROJECT_CACHE.get_kt_cache(root)
+    except Exception:
+        kt_cache = None
 
     # 1. Colors & Tokens
     token_pattern = re.compile(r'\bAppColors\.(\w+)\b')
@@ -838,6 +932,7 @@ def analyze_element_range(
             root,
             primary_occ["value"],
             primary_occ["name"] if primary_occ["is_token"] else None,
+            kt_cache=kt_cache,
         )
 
         is_theme_dep = _is_theme_dependent(
@@ -906,19 +1001,24 @@ def analyze_element_range(
         filtered_dims = dimensions_with_props
 
     # ⭐ 5. حساب عدد مرات الاستخدام في المشروع (usage_global & is_shared & locations)
-    kt_cache = []
-    for kt_file in root.rglob("*.kt"):
-        if any(x in str(kt_file).lower() for x in ["build", "backup", ".composebridge", ".bak"]):
-            continue
+    if kt_cache is None:
         try:
-            kt_cache.append((str(kt_file.relative_to(root)).replace("\\", "/"), kt_file.read_text(encoding="utf-8")))
+            from common.project_cache import PROJECT_CACHE
+            kt_cache = PROJECT_CACHE.get_kt_cache(root)
         except Exception:
-            pass
+            kt_cache = []
+            for kt_file in root.rglob("*.kt"):
+                if any(x in str(kt_file).lower() for x in ["build", "backup", ".composebridge", ".bak"]):
+                    continue
+                try:
+                    kt_cache.append((str(kt_file.relative_to(root)).replace("\\", "/"), kt_file.read_text(encoding="utf-8")))
+                except Exception:
+                    pass
 
     # ⭐ احسب عدد الاستدعاءات للدالة
     call_count = 0
     if composable_name and composable_name not in ["Box", "Column", "Row", "Text", "Icon", "Surface", "Spacer", "_"]:
-        call_count = _count_function_calls(root, composable_name)
+        call_count = _count_function_calls(root, composable_name, kt_cache=kt_cache)
 
     for d in filtered_dims:
         num = d.get("number", 0.0)

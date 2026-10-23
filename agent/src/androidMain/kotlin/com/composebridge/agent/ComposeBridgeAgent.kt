@@ -21,7 +21,7 @@ import kotlinx.serialization.json.*
 object ComposeBridgeAgent {
 
     private val registry = CompositionRegistry()
-    private var transport: BridgeTransport? = null
+    internal var transport: BridgeTransport? = null
 
     @Composable
     fun Root(content: @Composable () -> Unit) {

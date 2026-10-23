@@ -205,6 +205,15 @@ class PatternJournal:
                 merged = True
                 break
 
+        curr_checksum = None
+        try:
+            full_chk = self.project_root / file
+            if full_chk.exists():
+                import hashlib
+                curr_checksum = hashlib.sha256(full_chk.read_bytes()).hexdigest()
+        except Exception:
+            pass
+
         if not merged:
             existing_entries.append({
                 "t": datetime.utcnow().isoformat(),
@@ -216,7 +225,12 @@ class PatternJournal:
                 "old_line": old_line,
                 "new_line": new_line,
                 "pattern_id": pattern_id,
+                "checksum_after": curr_checksum,
             })
+        elif merged and curr_checksum:
+            for e in existing_entries:
+                if e.get("file") == file and e.get("line") == line:
+                    e["checksum_after"] = curr_checksum
 
         self.journal_file.parent.mkdir(parents=True, exist_ok=True)
         with open(self.journal_file, "w", encoding="utf-8") as f:
@@ -233,7 +247,8 @@ class PatternJournal:
                 try:
                     entry = json.loads(line.strip())
                     if entry.get("pattern_id") == pattern_id and entry.get("type") != "token_added":
-                        changes.append(entry)
+                        if entry.get("file") and str(entry.get("file")).strip():
+                            changes.append(entry)
                 except Exception:
                     continue
         return changes
@@ -415,8 +430,8 @@ class PatternJournal:
                     continue
         return changes
 
-    def reject_file_changes(self, file_path: str) -> Dict:
-        """Revert all changes for a specific file."""
+    def reject_file_changes(self, file_path: str, force: bool = False) -> Dict:
+        """Revert all changes for a specific file with external modification guard."""
         changes = self.get_file_changes(file_path)
         full_path = self.project_root / file_path
         if not full_path.exists():
@@ -432,6 +447,66 @@ class PatternJournal:
             if alt_matches:
                 backup_path = alt_matches[0]
 
+        if not backup_path.exists() and not changes:
+            return {"success": False, "error": f"No changes or backup found for {file_path}"}
+
+        curr_content = full_path.read_text(encoding="utf-8")
+        import hashlib
+        curr_checksum = hashlib.sha256(curr_content.encode("utf-8")).hexdigest()
+
+        # Check for external modifications (checksum mismatch or missing content)
+        external_modified = False
+        mismatch_reason = ""
+
+        for ch in changes:
+            if ch.get("checksum_after") and ch["checksum_after"] != curr_checksum:
+                external_modified = True
+                mismatch_reason = "checksum_mismatch"
+                break
+            if ch.get("new") and ch["new"] not in curr_content and ch["new"].strip() not in curr_content:
+                external_modified = True
+                mismatch_reason = "content_missing"
+                break
+
+        if not external_modified and backup_path.exists() and not changes:
+            external_modified = True
+            mismatch_reason = "orphan_backup_modified"
+
+        from common.file_ops import is_file_dirty_in_ide
+        if is_file_dirty_in_ide(full_path, self.project_root):
+            external_modified = True
+            mismatch_reason = "dirty_buffer"
+
+        msg_ar = (
+            f"⚠️ تحذير: الملف '{file_path}' تم تعديله خارج الأداة (يدوياً أو بواسطة وكيل آخر).\n"
+            f"استعادة النسخة الاحتياطية ستحذف هذه التعديلات.\n"
+            f"هل أنت متأكد؟"
+        )
+
+        if external_modified and not force:
+            try:
+                from core.sync_client import send_warning_to_bridge
+                send_warning_to_bridge(
+                    warning_type="external_modification_detected",
+                    file_path=str(file_path),
+                    message=msg_ar,
+                    error_code="EXTERNAL_MODIFICATION_DETECTED",
+                    suggested_action="confirm_restore",
+                )
+            except Exception:
+                pass
+
+            return {
+                "success": False,
+                "error_code": "EXTERNAL_MODIFICATION_DETECTED",
+                "file": file_path,
+                "message": msg_ar,
+                "error": msg_ar,
+                "mismatch_reason": mismatch_reason,
+                "suggested_action": "confirm_restore",
+                "can_force": True,
+            }
+
         reverted = 0
         errors = []
 
@@ -440,10 +515,30 @@ class PatternJournal:
                 shutil.copy2(str(backup_path), str(full_path))
                 backup_path.unlink()
                 reverted += 1
+                # If backup restored cleanly, do not attempt line replacements
+                self._clean_pending_edits(file_path)
+                target_name = Path(file_path).name
+                remaining = []
+                if self.journal_file.exists():
+                    with open(self.journal_file, "r", encoding="utf-8") as f:
+                        for line in f:
+                            try:
+                                entry = json.loads(line.strip())
+                                efile = entry.get("file", "")
+                                if efile != file_path and Path(efile).name != target_name:
+                                    remaining.append(line)
+                            except Exception:
+                                continue
+                    with open(self.journal_file, "w", encoding="utf-8") as f:
+                        f.writelines(remaining)
+                return {
+                    "success": True,
+                    "file": file_path,
+                    "reverted_count": reverted,
+                    "message": f"تمت استعادة الملف '{file_path}' بنجاح.",
+                }
             except Exception as e:
                 errors.append({"file": file_path, "error": f"Failed to restore backup: {e}"})
-        elif not changes:
-            return {"success": False, "error": f"No changes or backup found for {file_path}"}
         for change in reversed(changes):
             try:
                 content = full_path.read_text(encoding="utf-8")
@@ -539,6 +634,13 @@ class PatternJournal:
             "error_count": len(errors),
             "errors": errors,
         }
+
+    def keep_current_file_changes(self, file_path: str) -> Dict:
+        """Keep current on-disk modifications, discard backup, and remove from journal."""
+        res = self.approve_file_changes(file_path)
+        if res.get("success"):
+            res["message"] = f"تم الاحتفاظ بالتعديلات الحالية للملف '{file_path}' بنجاح."
+        return res
 
     def approve_file_changes(self, file_path: str) -> Dict:
         """Mark file changes as approved (just remove from journal)."""
@@ -965,6 +1067,8 @@ class PatternJournal:
         reverted = []
         for change in reversed(changes):
             file_name = change.get("file", "")
+            if not file_name or not str(file_name).strip():
+                continue
             file_path = self.project_root / file_name
             if not file_path.exists():
                 matches = list(self.project_root.rglob(Path(file_name).name))

@@ -1447,18 +1447,59 @@ class ComposeBridgePanel(private val project: Project, private val parentDisposa
         }
         val file = target.first
         val fileName = java.io.File(file).name
-        val choice = Messages.showYesNoDialog(
-            "Revert changes for '$fileName'?\n\nThis will restore this file to its original content before patterns were applied.",
-            "ComposeBridge — Reject File",
-            Messages.getWarningIcon()
-        )
-        if (choice != Messages.YES) return
 
         Thread {
-            val json = pythonRunner.rejectFileChanges(file)
+            val json = pythonRunner.rejectFileChanges(file, force = false)
             SwingUtilities.invokeLater {
                 try {
                     val root = gson.fromJson(extractJson(json), JsonObject::class.java)
+                    val errorCode = root.get("error_code")?.asString
+
+                    if (errorCode == "EXTERNAL_MODIFICATION_DETECTED") {
+                        val warningMsg = root.get("message")?.asString
+                            ?: "⚠️ تحذير: الملف '$fileName' تم تعديله خارج الأداة (يدوياً أو بواسطة وكيل آخر).\nاستعادة النسخة الاحتياطية ستحذف هذه التعديلات.\nهل أنت متأكد؟"
+                        val options = arrayOf("استعادة على أي حال", "الاحتفاظ بالتعديلات الحالية", "عرض الفروقات")
+                        val selectedOption = Messages.showDialog(
+                            project,
+                            warningMsg,
+                            "⚠️ تحذير: كشف تعديلات خارجية",
+                            options,
+                            0,
+                            Messages.getWarningIcon()
+                        )
+                        when (selectedOption) {
+                            0 -> { // Restore anyway
+                                Thread {
+                                    val forceRes = pythonRunner.rejectFileChanges(file, force = true)
+                                    SwingUtilities.invokeLater {
+                                        try {
+                                            val forceRoot = gson.fromJson(extractJson(forceRes), JsonObject::class.java)
+                                            if (forceRoot.get("success")?.asBoolean == true) {
+                                                Messages.showInfoMessage("تمت استعادة الملف '$fileName' بنجاح.", "ComposeBridge")
+                                            } else {
+                                                Messages.showErrorDialog(forceRoot.get("error")?.asString ?: "فشلت الاستعادة", "ComposeBridge")
+                                            }
+                                        } catch (_: Exception) {}
+                                        refreshChanges()
+                                    }
+                                }.start()
+                            }
+                            1 -> { // Keep current
+                                Thread {
+                                    pythonRunner.approveFileChanges(file)
+                                    SwingUtilities.invokeLater {
+                                        Messages.showInfoMessage("تم الاحتفاظ بالتعديلات الحالية للملف '$fileName'.", "ComposeBridge")
+                                        refreshChanges()
+                                    }
+                                }.start()
+                            }
+                            2 -> { // Show Diff
+                                onViewDiffSelectedFile()
+                            }
+                        }
+                        return@invokeLater
+                    }
+
                     if (root.get("success")?.asBoolean == true) {
                         Messages.showInfoMessage("Changes reverted for '$fileName'.", "ComposeBridge")
                     } else {

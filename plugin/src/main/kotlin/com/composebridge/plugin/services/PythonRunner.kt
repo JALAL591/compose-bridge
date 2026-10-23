@@ -217,12 +217,13 @@ class PythonRunner(private val project: Project) {
         return executeCommand(listOf(getPython(), "-c", script), bridge)
     }
 
-    fun rejectFileChanges(filePath: String): String {
+    fun rejectFileChanges(filePath: String, force: Boolean = false): String {
         val bridge = getBridgePath()
         val safePath = filePath.replace("\\", "\\\\").replace("'", "\\'")
+        val forceArg = if (force) ", force=True" else ""
         val script = """
             import mcp_server
-            result = mcp_server.reject_file_changes('$safePath')
+            result = mcp_server.reject_file_changes('$safePath'$forceArg)
             print(result)
         """.trimIndent()
         return executeCommand(listOf(getPython(), "-c", script), bridge)
@@ -322,7 +323,36 @@ class PythonRunner(private val project: Project) {
         return executeCommand(listOf(getPython(), "-c", script), bridge)
     }
 
+    fun syncDirtyFilesToDisk() {
+        try {
+            val fdm = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance()
+            val projectRoot = project.basePath ?: return
+            val dirtyList = mutableListOf<String>()
+            val baseDir = File(projectRoot)
+
+            for (doc in fdm.unsavedDocuments) {
+                val vFile = fdm.getFile(doc) ?: continue
+                val path = vFile.path
+                val rel = try {
+                    File(path).relativeTo(baseDir).path.replace('\\', '/')
+                } catch (e: Exception) {
+                    vFile.name
+                }
+                dirtyList.add(rel)
+            }
+
+            val stateDir = File(projectRoot, ".composebridge-state")
+            if (!stateDir.exists()) stateDir.mkdirs()
+            val dirtyFile = File(stateDir, "dirty_files.json")
+            val json = com.google.gson.Gson().toJson(dirtyList)
+            dirtyFile.writeText(json, Charsets.UTF_8)
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
+
     private fun executeCommand(command: List<String>, workingDir: String): String {
+        syncDirtyFilesToDisk()
         if (workingDir.isBlank() || !File(workingDir).exists()) {
             return """{"status": "error", "error": "ComposeBridge path is not configured or not found. Please configure it in Settings -> Tools -> ComposeBridge."}"""
         }

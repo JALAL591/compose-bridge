@@ -148,37 +148,62 @@ def _find_color_locations(
     project_root: Path,
     hex_value: str,
     token_name: str = None,
+    kt_cache: Optional[List[Tuple[str, str]]] = None,
 ) -> List[Dict]:
     """
     Find all locations where this color appears in the project.
     Returns: [{"file": "...", "line": N, "property": "..."}]
     """
     try:
-        from core.project_scanner import ProjectScanner
-        scanner = ProjectScanner(project_root)
-        
         locations = []
         variants = _normalize_color_literals(hex_value, token_name or "")
         
-        for kt_file in scanner.find_kt_files():
-            if "backup" in str(kt_file).lower() or "build" in str(kt_file).lower():
-                continue
+        if kt_cache is None:
             try:
-                content = kt_file.read_text(encoding="utf-8")
-                for i, line in enumerate(content.splitlines(), 1):
-                    # تجاهل comments
+                from common.project_cache import PROJECT_CACHE
+                kt_cache = PROJECT_CACHE.get_kt_cache(project_root)
+            except Exception:
+                kt_cache = None
+
+        if kt_cache is not None:
+            for rel_path, file_content in kt_cache:
+                if "backup" in rel_path.lower() or "build" in rel_path.lower():
+                    continue
+                for i, line in enumerate(file_content.splitlines(), 1):
                     if line.strip().startswith("//"):
                         continue
-                    
                     for variant in variants:
                         if variant in line:
-                            # استخرج property
                             property_match = re.search(
                                 r'(\w+)\s*[=:]\s*' + re.escape(variant),
                                 line,
                             )
                             prop = property_match.group(1) if property_match else _detect_property(line)
-                            
+                            locations.append({
+                                "file": rel_path,
+                                "line": i,
+                                "property": prop,
+                            })
+                            break
+            return locations
+
+        from core.project_scanner import ProjectScanner
+        scanner = ProjectScanner(project_root)
+        for kt_file in scanner.find_kt_files():
+            if "backup" in str(kt_file).lower() or "build" in str(kt_file).lower():
+                continue
+            try:
+                f_content = kt_file.read_text(encoding="utf-8")
+                for i, line in enumerate(f_content.splitlines(), 1):
+                    if line.strip().startswith("//"):
+                        continue
+                    for variant in variants:
+                        if variant in line:
+                            property_match = re.search(
+                                r'(\w+)\s*[=:]\s*' + re.escape(variant),
+                                line,
+                            )
+                            prop = property_match.group(1) if property_match else _detect_property(line)
                             locations.append({
                                 "file": str(kt_file.relative_to(project_root)),
                                 "line": i,

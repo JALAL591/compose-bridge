@@ -33,6 +33,12 @@ def rollback_last() -> str:
     log("🔧 rollback_last")
     try:
         ok = _rollback_last()
+        if ok:
+            try:
+                from mcp.tools.misc import send_refresh_signal
+                send_refresh_signal()
+            except Exception:
+                pass
         return json.dumps({"rolled_back": ok})
     except Exception as e:
         log(f"❌ rollback_last error: {e}")
@@ -67,7 +73,7 @@ def list_modified_files() -> str:
 
 
 @app.tool()
-def reject_file_changes(file_path: str) -> str:
+def reject_file_changes(file_path: str, force: bool = False) -> str:
     """
     Destructive: Reverts pending changes for a SINGLE file using .bridge.bak backup.
     
@@ -85,7 +91,13 @@ def reject_file_changes(file_path: str) -> str:
     try:
         with acquire_write_lock():
             journal = PatternJournal(PROJECT_ROOT)
-            result = journal.reject_file_changes(file_path)
+            result = journal.reject_file_changes(file_path, force=force)
+            if result.get("success"):
+                try:
+                    from mcp.tools.misc import send_refresh_signal
+                    send_refresh_signal()
+                except Exception:
+                    pass
             return json.dumps(result, indent=2, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
@@ -111,6 +123,12 @@ def approve_file_changes(file_path: str) -> str:
         with acquire_write_lock():
             journal = PatternJournal(PROJECT_ROOT)
             result = journal.approve_file_changes(file_path)
+            if result.get("success"):
+                try:
+                    from mcp.tools.misc import send_refresh_signal
+                    send_refresh_signal()
+                except Exception:
+                    pass
             return json.dumps(result, indent=2, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
@@ -135,6 +153,12 @@ def approve_all_files() -> str:
         with acquire_write_lock():
             journal = PatternJournal(PROJECT_ROOT)
             result = journal.approve_all_files()
+            if result.get("success"):
+                try:
+                    from mcp.tools.misc import send_refresh_signal
+                    send_refresh_signal()
+                except Exception:
+                    pass
             return json.dumps(result, indent=2, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
@@ -159,6 +183,12 @@ def reject_all_files() -> str:
         with acquire_write_lock():
             journal = PatternJournal(PROJECT_ROOT)
             result = journal.reject_all_files()
+            if result.get("success"):
+                try:
+                    from mcp.tools.misc import send_refresh_signal
+                    send_refresh_signal()
+                except Exception:
+                    pass
             return json.dumps(result, indent=2, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
@@ -183,6 +213,12 @@ def reject_all_files_force() -> str:
         with acquire_write_lock():
             journal = PatternJournal(PROJECT_ROOT)
             result = journal.reject_all_files(force=True)
+            if result.get("success"):
+                try:
+                    from mcp.tools.misc import send_refresh_signal
+                    send_refresh_signal()
+                except Exception:
+                    pass
             return json.dumps(result, indent=2, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
