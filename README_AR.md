@@ -200,6 +200,15 @@ pip install -r requirements.txt
 
 > ⚠️ **ملاحظة هامة جداً:** أي تعديل على `mcp_config.json` يتطلب بدء محادثة جديدة (**New Chat**) في الوكيل حتى يتم تحميل الأدوات الـ 27 تلقائياً.
 
+#### خطوات الإعداد داخل Android Studio / Antigravity (UI Steps):
+1. افتح Android Studio / IntelliJ IDEA.
+2. اذهب إلى **Settings** (أو Preferences في الماك) → **Tools** → **AI** → **MCP Servers**.
+3. اضغط على تبويب **Installed**.
+4. اضغط على زر **"Import JSON file"** (أو **"...Add via JSON"** حسب إصدار الـ IDE).
+5. الصق كود الـ JSON المرفق أعلاه.
+6. اضغط **OK** أو **Apply**.
+7. ⚠️ **هام جداً:** ابدأ **محادثة جديدة (New Chat)** أو أعد تشغيل الوكيل لكي يتم تحميل الأدوات الـ 27 الجديدة وتصبح مرئية.
+
 ### الأدوات المتاحة (27 أداة MCP)
 
 | الفئة | الأدوات |

@@ -197,6 +197,15 @@ Add the ComposeBridge server configuration to your AI agent's config file (e.g. 
 
 > ⚠️ **Important:** Any changes made to `mcp_config.json` require starting a **New Chat** in your AI agent interface so that all 27 MCP tools are freshly discovered and initialized.
 
+#### How to set it up in Android Studio / Antigravity:
+1. Open Android Studio / IntelliJ IDEA.
+2. Go to **Settings** (or Preferences on macOS) → **Tools** → **AI** → **MCP Servers**.
+3. Click on the **Installed** tab.
+4. Click on the **"Import JSON file"** button (or **"...Add via JSON"** depending on your IDE version).
+5. Paste the JSON configuration provided above.
+6. Click **OK** or **Apply**.
+7. ⚠️ **Crucial:** Start a **New Chat** (or restart the agent) for the new 27 MCP tools to load and become visible.
+
 ### Overview of MCP Tools (27 Tools):
 - **Token Discovery & Analysis:** `list_tokens`, `find_token_by_color`, `get_token_impact`, `get_token_siblings`, `get_all_token_groups`, `list_orphans`, `get_naming_convention`.
 - **Surgical Code Editing:** `set_token`, `set_text`, `add_token`, `rollback_last`.
