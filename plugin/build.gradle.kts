@@ -31,6 +31,13 @@ tasks {
         sinceBuild.set("241")
         untilBuild.set(provider { null })
                 changeNotes.set("""
+<h3>v1.1.5 - Critical Rollback Fix (Hotfix)</h3>
+<ul>
+  <li><b>CRLF False Positives Fixed:</b> The server now normalizes line endings (CRLF/LF) before checksum comparisons, preventing false <code>EXTERNAL_MODIFICATION_DETECTED</code> warnings on Windows.</li>
+  <li><b>Stable Backup:</b> <code>.bridge.bak</code> is now created only once on the first edit and never overwritten by subsequent edits, guaranteeing safe rollback to the true original state.</li>
+  <li><b>Journal Merge:</b> Consecutive edits to the same token merge seamlessly without losing the original value.</li>
+  <li><b>Regression Tests:</b> Added <code>test_multi_edit_rollback.py</code> with 100% passing tests (29/29).</li>
+</ul>
 <h3>v1.1.3 - AI Agent Integration (MCP) & Extreme Performance</h3>
 <ul>
   <li><b>AI Agent Ready (MCP):</b> Model Context Protocol server exposing 27 deep-inspection and surgical AST refactoring tools for Antigravity, Cursor, and Claude Desktop.</li>
