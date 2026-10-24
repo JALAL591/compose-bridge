@@ -25,6 +25,7 @@ object BridgeOverlayManager {
      * If already attached to the same Activity, does nothing.
      */
     fun attach(activity: Activity) {
+        if (!BuildConfig.DEBUG) return
         if (overlay != null && attachedActivity === activity) return
 
         detach()

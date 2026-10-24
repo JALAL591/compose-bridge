@@ -25,6 +25,11 @@ object ComposeBridgeAgent {
 
     @Composable
     fun Root(content: @Composable () -> Unit) {
+        if (!BuildConfig.DEBUG) {
+            // In release builds, render the user content directly with zero overhead, zero buttons, and zero overlays
+            content()
+            return
+        }
         currentComposer.collectParameterInformation()
         registry.register(currentComposer.compositionData)
         val context = androidx.compose.ui.platform.LocalContext.current
@@ -78,6 +83,7 @@ object ComposeBridgeAgent {
      * Attaches Overlay to Activity (called from onResume)
      */
     fun attachOverlay(activity: Activity) {
+        if (!BuildConfig.DEBUG) return
         BridgeOverlayManager.attach(activity)
     }
 

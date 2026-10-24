@@ -35,17 +35,23 @@ async def notify_bridge_server(token: str, value: str) -> bool:
             await asyncio.wait_for(ws.recv(), timeout=2)
 
             # Send mcp_state_update
+            prop_name = token if token.startswith("AppColors.") else f"AppColors.{token}"
             await ws.send(json.dumps({
                 "type": "mcp_state_update",
-                "property": f"AppColors.{token}",
+                "property": prop_name,
                 "value": value,
                 "source": "mcp",
             }))
-            ack = await asyncio.wait_for(ws.recv(), timeout=2)
-            return True
+            raw_ack = await asyncio.wait_for(ws.recv(), timeout=2)
+            try:
+                ack_data = json.loads(raw_ack)
+                forwarded = ack_data.get("forwarded_to", 0)
+                return {"bridge_connected": True, "device_connected": forwarded > 0, "forwarded_to": forwarded}
+            except Exception:
+                return {"bridge_connected": True, "device_connected": False, "forwarded_to": 0}
     except Exception as e:
         print(f"[MCP] Bridge notify failed: {e}", file=sys.stderr)
-        return False
+        return {"bridge_connected": False, "device_connected": False, "forwarded_to": 0}
 
 
 async def notify_refresh_to_bridge() -> bool:

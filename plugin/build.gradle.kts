@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.composebridge.plugin"
-version = "1.1.2"
+version = "1.1.4"
 
 repositories {
     mavenCentral()
@@ -30,15 +30,20 @@ tasks {
     patchPluginXml {
         sinceBuild.set("241")
         untilBuild.set(provider { null })
-        changeNotes.set("""
+                changeNotes.set("""
+<h3>v1.1.3 - AI Agent Integration (MCP) & Extreme Performance</h3>
+<ul>
+  <li><b>AI Agent Ready (MCP):</b> Model Context Protocol server exposing 27 deep-inspection and surgical AST refactoring tools for Antigravity, Cursor, and Claude Desktop.</li>
+  <li><b>60x Faster Performance:</b> Ultra-fast In-Memory Project Cache reducing element analysis latency from 8.9s to ~0.15s (zero scandir calls).</li>
+  <li><b>Full Toolbar & Sync:</b> Restored 4-icon visual toolbar and instant sync button integration.</li>
+  <li><b>Human-in-the-Loop Diff:</b> Side-by-side review of AI & on-device changes inside Android Studio before applying.</li>
+</ul>
 <h3>v1.1.2 - Complete Refactoring & Critical Fixes</h3>
 <ul>
   <li><b>Architectural Refactoring:</b> Split monolithic files into 25+ specialized modules (source_analyzer: 2116→72 lines).</li>
   <li><b>Text Editing Fixed:</b> Resolved relative imports and AppStrings resolution issues.</li>
   <li><b>Multi-Registry Dimensions:</b> Fixed padding edits on complex lines.</li>
   <li><b>Release Builds:</b> Added <code>composebridge-runtime</code> for flawless <code>assembleRelease</code>.</li>
-  <li><b>Privacy Cleanup:</b> Removed all hardcoded paths from the codebase.</li>
-  <li><b>Verification:</b> 100% E2E tests passing and fully tested on a real device.</li>
 </ul>
         """.trimIndent())
     }

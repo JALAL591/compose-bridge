@@ -30,11 +30,11 @@
 
 | الحزمة | ملف التثبيت (.zip / .aar) | طريقة التثبيت السريع |
 |---|---|---|
-| **إضافة بيئة التطوير (Android Studio / IntelliJ)** | [📥 **تحميل ComposeBridgeIntelliJ-1.1.2.zip**](dist/ComposeBridgeIntelliJ-1.1.2.zip) | في Android Studio: انتقل إلى `Settings` ➔ `Plugins` ➔ `⚙️` ➔ `Install Plugin from Disk...` |
+| **إضافة بيئة التطوير (Android Studio / IntelliJ)** | [📥 **تحميل ComposeBridgeIntelliJ-1.1.4.zip**](dist/ComposeBridgeIntelliJ-1.1.4.zip) | في Android Studio: انتقل إلى `Settings` ➔ `Plugins` ➔ `⚙️` ➔ `Install Plugin from Disk...` |
 | **مكتبة أندرويد لـ Jetpack Compose (Agent)** | [📦 **تحميل composebridge-agent-release.aar**](dist/composebridge-agent-release.aar) | انسخ الملف إلى مجلد `app/libs/` أو ضعه في `debugImplementation` |
 | **مكتبة أندرويد الأساسية (Runtime)** | [📦 **تحميل composebridge-runtime-release.aar**](dist/composebridge-runtime-release.aar) | ضعه في `implementation` لضمان أمان البناء |
-| **سيرفر بايثون و MCP** | [📦 **تحميل composebridge-server-1.1.3.zip**](dist/composebridge-server-1.1.3.zip) | خادم المزامنة ووكلاء الذكاء الاصطناعي |
-| **الحزمة الشاملة المتكاملة (All-in-One)** | [📦 **تحميل ComposeBridge-v1.1.3-AllInOne.zip**](dist/ComposeBridge-v1.1.3-AllInOne.zip) | تجمع الإضافة، العميل، مكتبة الـ Runtime، والسيرفر |
+| **سيرفر بايثون و MCP** | [📦 **تحميل composebridge-server-1.1.4.zip**](dist/composebridge-server-1.1.4.zip) | خادم المزامنة ووكلاء الذكاء الاصطناعي |
+| **الحزمة الشاملة المتكاملة (All-in-One)** | [📦 **تحميل ComposeBridge-v1.1.4-AllInOne.zip**](dist/ComposeBridge-v1.1.4-AllInOne.zip) | تجمع الإضافة، العميل، مكتبة الـ Runtime، والسيرفر |
 
 **ComposeBridge** هي حزمة أدوات للمطورين تربط تطبيق Compose (KMP/Android) بمحرر الأكواد أو وكيل الذكاء الاصطناعي الخاص بك.
 
@@ -130,10 +130,17 @@ composebridge/
 
 ### 📲 خطوات دمج الـ Agent في تطبيقك
 
-#### 1. أضف الـ Agent إلى مشروعك
+#### 1. أضف المكتبات إلى مشروعك (عزل بيئة الإنتاج)
+انسخ مكتبي `composebridge-runtime-release.aar` و `composebridge-agent-release.aar` إلى مجلد `libs/` في تطبيقك:
 ```kotlin
-// build.gradle.kts
-debugImplementation("com.composebridge:agent:1.1.1")
+// app/build.gradle.kts
+dependencies {
+    // 1. مكتبة Runtime الأساسية: تُترجم بأمان في نسختي Debug و Release
+    implementation(files("libs/composebridge-runtime-release.aar"))
+
+    // 2. مكتبة الـ Agent وأدوات التعديل التفاعلية: تُضاف في وضع Debug فقط
+    debugImplementation(files("libs/composebridge-agent-release.aar"))
+}
 ```
 
 #### 2. قم بتهيئته في MainActivity

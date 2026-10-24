@@ -114,13 +114,21 @@ def _journal_save(file_path, original_content, new_content):
             if not isinstance(existing, list):
                 existing = []
 
+            # Preserve earliest original old value across multiple edits
+            orig_old = old_line_text
+            for item in existing:
+                if item.get("file") == rel_path or Path(item.get("file", "")).name == Path(file_path).name:
+                    if item.get("old"):
+                        orig_old = item["old"]
+                    break
+
             filtered = [item for item in existing if item.get("file") != rel_path and Path(item.get("file", "")).name != Path(file_path).name]
             filtered.append({
                 "file": rel_path,
                 "backup": str(file_path) + ".bridge.bak",
                 "timestamp": time.time(),
                 "line": changed_line,
-                "old": old_line_text,
+                "old": orig_old,
                 "new": new_line_text,
             })
             with open(ppath, "w", encoding="utf-8") as pf:

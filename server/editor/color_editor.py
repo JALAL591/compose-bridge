@@ -213,12 +213,47 @@ def update_theme_color(key: str, new_hex: str, expected_checksum: Optional[str] 
             "new_hex": normalized_hex,
         })
 
-    # 4. استبدل
-    new_content = content[:match.start(2)] + normalized_hex + content[match.end(2):]
+    # 4. تحقق من قابلية التحديث الحي (Live Preview Capability) وتطبيق Auto-Wrap
+    # إذا كان التوكن معرفاً كـ val X = Color(...) بدون BridgeThemeRegistry، نقوم بلفه تلقائياً
+    matched_prefix = match.group(1)
+    is_live_capable = "BridgeThemeRegistry" in matched_prefix
+    auto_wrapped = False
+
+    if not is_live_capable:
+        # البحث عن السطر الكامل للتوكن واستبداله بصيغة Dynamic Getter
+        # مثال: val Primary: Color = Color(0x...) -> val Primary: Color get() = BridgeThemeRegistry.getColor("Primary", Color(0x...))
+        line_start = content.rfind("\n", 0, match.start(0)) + 1
+        line_end = content.find("\n", match.end(0))
+        if line_end == -1:
+            line_end = len(content)
+        full_line = content[line_start:line_end]
+
+        indent_match = re.match(r"^([ \t]*)", full_line)
+        indent = indent_match.group(1) if indent_match else "    "
+        wrapped_line = f'{indent}val {clean_key}: Color get() = BridgeThemeRegistry.getColor("{clean_key}", Color({normalized_hex}))'
+        
+        # التأكد من وجود import لـ BridgeThemeRegistry
+        import_stmt = "import com.composebridge.agent.BridgeThemeRegistry\n"
+        if "BridgeThemeRegistry" not in content and import_stmt not in content:
+            pkg_m = re.search(r"package\s+[^\n]+\n", content)
+            if pkg_m:
+                insert_pos = pkg_m.end()
+                content_with_import = content[:insert_pos] + "\n" + import_stmt + content[insert_pos:]
+                # إعادة حساب المواقع بعد إضافة الـ import
+                line_start += len(import_stmt) + 1
+                line_end += len(import_stmt) + 1
+                content = content_with_import
+
+        new_content = content[:line_start] + wrapped_line + content[line_end:]
+        auto_wrapped = True
+        is_live_capable = True
+    else:
+        new_content = content[:match.start(2)] + normalized_hex + content[match.end(2):]
 
     # 5. نسخة احتياطية
     backup_path = str(file_path) + ".bridge.bak"
-    shutil.copy2(file_path, backup_path)
+    if not os.path.exists(backup_path):
+        shutil.copy2(file_path, backup_path)
 
     # 6. كتابة ذرية
     try:
@@ -241,12 +276,14 @@ def update_theme_color(key: str, new_hex: str, expected_checksum: Optional[str] 
 
     return (
         True,
-        f"Updated {key}: {old_hex} → {normalized_hex}",
+        f"Updated {key}: {old_hex} → {normalized_hex}" + (" (Auto-wrapped in BridgeThemeRegistry for Live Preview)" if auto_wrapped else ""),
         {
             "key": key,
             "old_hex": old_hex,
             "new_hex": normalized_hex,
             "backup": backup_path,
+            "auto_wrapped": auto_wrapped,
+            "is_live_capable": is_live_capable,
         }
     )
 

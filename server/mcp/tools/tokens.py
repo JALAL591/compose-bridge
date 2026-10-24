@@ -367,13 +367,20 @@ def set_token(token_name: str, value: str) -> str:
             state_manager.save_all()
             
             # ═══ 4. Notify Bridge: mcp_state_update ═══
-            notified = False
+            bridge_status = {"bridge_connected": False, "device_connected": False, "forwarded_to": 0}
             try:
-                notified = asyncio.run(
+                notify_res = asyncio.run(
                     notify_bridge_server(token_name, value)
                 )
+                if isinstance(notify_res, dict):
+                    bridge_status = notify_res
+                elif notify_res is True:
+                    bridge_status = {"bridge_connected": True, "device_connected": True, "forwarded_to": 1}
             except Exception as e:
                 print(f"[MCP] notify error: {e}", file=sys.stderr)
+
+            device_connected = bridge_status.get("device_connected", False)
+            live_applied = device_connected and ok
             
             # ═══ 5. Notify Bridge: agent_end & refresh ═══
             try:
@@ -387,15 +394,24 @@ def set_token(token_name: str, value: str) -> str:
                 print(f"[MCP] agent_end notified: {ended}", file=sys.stderr)
             except Exception as e:
                 print(f"[MCP] agent_end failed: {e}", file=sys.stderr)
-            
+
+            warning_msg = None
+            if not device_connected:
+                warning_msg = "Code modified on disk, but live preview failed because no connected device was found."
+
             return json.dumps({
                 "success": True,
                 "token": token_name,
                 "value": value,
-                "notified_live": notified,
+                "disk_updated": True,
+                "device_connected": device_connected,
+                "live_applied": live_applied,
+                "notified_live": device_connected,
+                "warning": warning_msg,
                 "agent_started": started,
                 "agent_ended": ended,
-            })
+                "auto_wrapped": info.get("auto_wrapped", False) if isinstance(info, dict) else False,
+            }, indent=2, ensure_ascii=False)
         
         except Exception as e:
             state_manager.failures.record(

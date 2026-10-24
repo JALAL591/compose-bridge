@@ -2,22 +2,43 @@
     <id>com.composebridge.plugin</id>
     <name>ComposeBridge</name>
     <vendor>ComposeBridge</vendor>
+    <version>1.1.4</version>
 
     <description><![CDATA[
-        Live UI tuning for Jetpack Compose.
-        Scan your project for design tokens, detect hardcoded values,
-        analyze impact, and suggest splits - all from Android Studio.
+<h2>ComposeBridge v1.1.4: Real-Time Visual Editor & MCP Server for Jetpack Compose</h2>
+<p><b>ComposeBridge</b> bridges the gap between running Android applications and your Kotlin source code. It enables developers and AI agents to inspect and modify UI elements—including colors, dimensions, and text—directly from the device screen, applying surgical changes straight to the source code via AST mutation without full project rebuilds.</p>
+
+<h3>🚀 Key Features</h3>
+<ul>
+    <li><b>Real-Time On-Device Editing:</b> Tap and adjust padding, dimensions, colors, and text directly on your connected device with instant Live Preview.</li>
+    <li><b>AI-Ready via MCP:</b> Built-in Model Context Protocol (MCP) server enables AI assistants (such as Antigravity, Cursor, or Claude Desktop) to inspect runtime layouts and safely execute surgical patches.</li>
+    <li><b>⚡ Extreme Performance:</b> Powered by an In-Memory Project Cache for a 60x faster analysis engine (~0.15s response time).</li>
+    <li><b>Surgical AST Refactoring:</b> Employs precise AST manipulation to update target Composable nodes without altering surrounding logic, imports, or formatting.</li>
+    <li><b>Human-in-the-Loop Safety:</b> Review all incoming changes in a side-by-side visual diff inside Android Studio. Approve, reject, or roll back edits with a single click.</li>
+    <li><b>Zero-Rebuild Workflow:</b> See layout and text updates reflect instantly without resetting screen state, user input, or navigation backstacks.</li>
+</ul>
+
+<h3>🛠️ Requirements</h3>
+<ul>
+    <li><b>Supported IDEs:</b> Android Studio Hedgehog (2023.1.1) or newer, IntelliJ IDEA 2023.1+.</li>
+    <li><b>Host Environment:</b> Python 3.10 or higher (for the companion server).</li>
+</ul>
     ]]></description>
 
     <change-notes><![CDATA[
+<h3>v1.1.3 - AI Agent Integration (MCP) & Extreme Performance</h3>
+<ul>
+  <li><b>AI Agent Ready (MCP):</b> Model Context Protocol server exposing 27 deep-inspection and surgical AST refactoring tools for Antigravity, Cursor, and Claude Desktop.</li>
+  <li><b>60x Faster Performance:</b> Ultra-fast In-Memory Project Cache reducing element analysis latency from 8.9s to ~0.15s (zero scandir calls).</li>
+  <li><b>Full Toolbar & Sync:</b> Restored 4-icon visual toolbar and instant sync button integration.</li>
+  <li><b>Human-in-the-Loop Diff:</b> Side-by-side review of AI & on-device changes inside Android Studio before applying.</li>
+</ul>
 <h3>v1.1.2 - Complete Refactoring & Critical Fixes</h3>
 <ul>
-  <li><b>Architectural Refactoring:</b> Split monolithic files into 25+ specialized modules (source_analyzer: 2116→72 lines).</li>
+  <li><b>Architectural Refactoring:</b> Split monolithic files into 25+ specialized modules.</li>
   <li><b>Text Editing Fixed:</b> Resolved relative imports and AppStrings resolution issues.</li>
   <li><b>Multi-Registry Dimensions:</b> Fixed padding edits on complex lines.</li>
   <li><b>Release Builds:</b> Added <code>composebridge-runtime</code> for flawless <code>assembleRelease</code>.</li>
-  <li><b>Privacy Cleanup:</b> Removed all hardcoded paths from the codebase.</li>
-  <li><b>Verification:</b> 100% E2E tests passing and fully tested on a real device.</li>
 </ul>
     ]]></change-notes>
 

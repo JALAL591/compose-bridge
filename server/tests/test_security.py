@@ -92,7 +92,7 @@ class TestSecurity(unittest.TestCase):
         self.assertTrue(result["success"])
         self.assertEqual(
             set(result["tasks"]),
-            {"assembleDebug", "assembleRelease", "test", "lint", "clean"},
+            {"assembleDebug", "assembleRelease", "test", "lint", "clean", "compileDebugKotlin", "compileReleaseKotlin"},
         )
 
     def test_replace_pattern_dry_run_not_found(self):

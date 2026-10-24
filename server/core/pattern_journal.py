@@ -15,6 +15,80 @@ class PatternJournal:
         self.project_root = project_root
         self.journal_file = project_root / ".composebridge-state" / "pattern_journal.jsonl"
         self.journal_file.parent.mkdir(exist_ok=True)
+        self.clean_temp_entries()
+
+    @staticmethod
+    def is_temp_path(path_str, project_root: Optional[Path] = None) -> bool:
+        if not path_str or not str(path_str).strip():
+            return True
+        norm = str(path_str).replace("\\", "/").lower()
+        temp_markers = [
+            "/appdata/local/temp/",
+            "appdata/local/temp",
+            "/tmp/",
+            "\\tmp\\",
+            "/temp/",
+            "\\temp\\",
+            ".tmp_",
+            ".tmp",
+        ]
+        if any(marker in norm for marker in temp_markers):
+            if project_root:
+                norm_root = str(project_root).replace("\\", "/").lower()
+                if norm.startswith(norm_root):
+                    return ".tmp_" in norm or norm.endswith(".tmp")
+            return True
+        if norm.startswith("temp/") or norm.startswith("tmp/"):
+            return True
+        return False
+
+    def clean_temp_entries(self) -> int:
+        """Purge any temporary/test paths from journal and pending_edits."""
+        removed_count = 0
+        if self.journal_file.exists():
+            clean_lines = []
+            try:
+                with open(self.journal_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line_str = line.strip()
+                        if not line_str:
+                            continue
+                        try:
+                            entry = json.loads(line_str)
+                            f_path = entry.get("file")
+                            if self.is_temp_path(f_path, self.project_root):
+                                removed_count += 1
+                                continue
+                        except Exception:
+                            continue
+                        clean_lines.append(line_str + "\n")
+                with open(self.journal_file, "w", encoding="utf-8") as f:
+                    f.writelines(clean_lines)
+            except Exception:
+                pass
+
+        pending_candidates = [
+            self.project_root / ".composebridge-state" / "pending_edits.json",
+            self.project_root / "pending_edits.json"
+        ]
+        for pfile in pending_candidates:
+            if pfile.exists():
+                try:
+                    with open(pfile, "r", encoding="utf-8") as pf:
+                        p_entries = json.load(pf)
+                    if isinstance(p_entries, list):
+                        remaining = [
+                            pe for pe in p_entries
+                            if not self.is_temp_path(pe.get("file"), self.project_root)
+                            and not self.is_temp_path(pe.get("backup"), self.project_root)
+                        ]
+                        if len(remaining) != len(p_entries):
+                            removed_count += (len(p_entries) - len(remaining))
+                            with open(pfile, "w", encoding="utf-8") as pf:
+                                json.dump(remaining, pf, indent=2, ensure_ascii=False)
+                except Exception:
+                    pass
+        return removed_count
 
     def record_pattern_summary(
         self,
@@ -149,7 +223,9 @@ class PatternJournal:
                     if not line:
                         continue
                     try:
-                        entries.append(json.loads(line))
+                        item = json.loads(line)
+                        if not self.is_temp_path(item.get("file"), self.project_root):
+                            entries.append(item)
                     except json.JSONDecodeError:
                         continue
         except Exception:
@@ -451,22 +527,25 @@ class PatternJournal:
             return {"success": False, "error": f"No changes or backup found for {file_path}"}
 
         curr_content = full_path.read_text(encoding="utf-8")
+        curr_bytes = full_path.read_bytes()
         import hashlib
-        curr_checksum = hashlib.sha256(curr_content.encode("utf-8")).hexdigest()
+        curr_checksum_bytes = hashlib.sha256(curr_bytes).hexdigest()
+        curr_checksum_text = hashlib.sha256(curr_content.encode("utf-8")).hexdigest()
 
-        # Check for external modifications (checksum mismatch or missing content)
+        # Check for external modifications (verify against the latest change state)
         external_modified = False
         mismatch_reason = ""
 
-        for ch in changes:
-            if ch.get("checksum_after") and ch["checksum_after"] != curr_checksum:
+        latest_change = changes[-1] if changes else None
+        if latest_change and latest_change.get("checksum_after"):
+            if latest_change["checksum_after"] not in (curr_checksum_bytes, curr_checksum_text):
                 external_modified = True
                 mismatch_reason = "checksum_mismatch"
-                break
-            if ch.get("new") and ch["new"] not in curr_content and ch["new"].strip() not in curr_content:
+
+        if not external_modified and latest_change and latest_change.get("new"):
+            if latest_change["new"] not in curr_content and latest_change["new"].strip() not in curr_content:
                 external_modified = True
-                mismatch_reason = "content_missing"
-                break
+                mismatch_reason = "content_missing" 
 
         if not external_modified and backup_path.exists() and not changes:
             external_modified = True

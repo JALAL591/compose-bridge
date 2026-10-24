@@ -104,7 +104,8 @@ def edit_dimension_in_source(
 
     # نسخة احتياطية
     backup_path = str(full_path) + ".bridge.bak"
-    shutil.copy2(full_path, backup_path)
+    if not os.path.exists(backup_path):
+        shutil.copy2(full_path, backup_path)
 
     # كتابة ذرية
     try:
@@ -187,28 +188,59 @@ def update_token_default(token_name: str, value: str) -> tuple:
     except Exception:
         return (False, f"Invalid number: {value}", None)
 
-    # ابحث عن: get("cardHeight", 100.dp) أو get("cardHeight", 100f)
-    # ⭐ pattern صحيح: يقبض على الرقم فقط (بدون النقطة)
-    pattern = re.compile(
+    # 1. ابحث عن صيغة الـ Registry: get("cardHeight", 100.dp) أو get("cardHeight", 100f)
+    pattern_registry = re.compile(
         rf'(BridgeDimensionRegistry\.get\(\s*"{re.escape(token_name)}"\s*,\s*)(\d+)(\.dp|\.f)'
     )
+    match = pattern_registry.search(content)
+    auto_wrapped = False
+    is_live_capable = True
 
-    match = pattern.search(content)
-    if not match:
-        return (False, f"Token not found: {token_name}", None)
+    if match:
+        old_value = match.group(2)
+        new_text = (
+            content[:match.start(2)]
+            + clean_display
+            + content[match.end(2):]
+        )
+    else:
+        # 2. فحص ما إذا كان التوكن ثابتاً (Hardcoded val cardHeight: Dp = 100.dp)
+        pattern_hardcoded = re.compile(
+            rf'([ \t]*val\s+{re.escape(token_name)}\s*(?::\s*Dp)?\s*=\s*)(\d+(?:\.\d+)?)(?:\.dp|f)?'
+        )
+        match_hardcoded = pattern_hardcoded.search(content)
+        if match_hardcoded:
+            # تطبيق Auto-Wrap تلقائياً لتحويله إلى صيغة ديناميكية حية
+            old_value = match_hardcoded.group(2)
+            line_start = content.rfind("\n", 0, match_hardcoded.start(0)) + 1
+            line_end = content.find("\n", match_hardcoded.end(0))
+            if line_end == -1:
+                line_end = len(content)
+            full_line = content[line_start:line_end]
 
-    old_value = match.group(2)
+            indent_match = re.match(r"^([ \t]*)", full_line)
+            indent = indent_match.group(1) if indent_match else "    "
+            wrapped_line = f'{indent}val {token_name}: Dp get() = BridgeDimensionRegistry.get("{token_name}", {clean_display}.dp)'
 
-    # استبدل
-    new_text = (
-        content[:match.start(2)]
-        + clean_display
-        + content[match.end(2):]
-    )
+            import_stmt = "import com.composebridge.agent.BridgeDimensionRegistry\n"
+            if "BridgeDimensionRegistry" not in content and import_stmt not in content:
+                pkg_m = re.search(r"package\s+[^\n]+\n", content)
+                if pkg_m:
+                    insert_pos = pkg_m.end()
+                    content = content[:insert_pos] + "\n" + import_stmt + content[insert_pos:]
+                    line_start += len(import_stmt) + 1
+                    line_end += len(import_stmt) + 1
+
+            new_text = content[:line_start] + wrapped_line + content[line_end:]
+            auto_wrapped = True
+            is_live_capable = True
+        else:
+            return (False, f"Token '{token_name}' is not live-capable or not found in {file_path.name}. Wrap it in BridgeDimensionRegistry first.", None)
 
     # نسخة احتياطية
     backup_path = str(file_path) + ".bridge.bak"
-    shutil.copy2(file_path, backup_path)
+    if not os.path.exists(backup_path):
+        shutil.copy2(file_path, backup_path)
 
     # كتابة
     try:
@@ -231,7 +263,11 @@ def update_token_default(token_name: str, value: str) -> tuple:
 
     return (
         True,
-        f"Updated {token_name}: {old_value} → {clean_display}",
-        {"backup": backup_path}
+        f"Updated {token_name}: {old_value} → {clean_display}" + (" (Auto-wrapped in BridgeDimensionRegistry for Live Preview)" if auto_wrapped else ""),
+        {
+            "backup": backup_path,
+            "auto_wrapped": auto_wrapped,
+            "is_live_capable": is_live_capable,
+        }
     )
 
