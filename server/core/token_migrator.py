@@ -508,10 +508,10 @@ class TokenMigrator:
         return False
     
     def _backup_file(self, file_path: Path) -> Path:
-        """Create a backup of the file."""
-        ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S_%f")
-        backup = self.backup_dir / f"{file_path.stem}_{ts}{file_path.suffix}.bak"
-        shutil.copy2(file_path, backup)
+        """Create a backup of the file using a single fixed .bridge.bak."""
+        backup = file_path.with_name(file_path.name + ".bridge.bak")
+        if not backup.exists():
+            shutil.copy2(file_path, backup)
         return backup
     
     def _generate_registry_entry(

@@ -1,3 +1,14 @@
+import hashlib
+
+def compute_normalized_hash(content_or_bytes) -> str:
+    """Compute SHA-256 hash with normalized line endings to prevent platform CRLF/LF mismatches."""
+    if isinstance(content_or_bytes, bytes):
+        text = content_or_bytes.decode("utf-8", errors="replace")
+    else:
+        text = str(content_or_bytes)
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
 import shutil
 # -*- coding: utf-8 -*-
 """
@@ -22,6 +33,17 @@ class PatternJournal:
         if not path_str or not str(path_str).strip():
             return True
         norm = str(path_str).replace("\\", "/").lower()
+
+        # If project_root is provided:
+        if project_root:
+            norm_root = str(project_root).replace("\\", "/").lower().rstrip("/")
+            # Relative paths inside project root (e.g. "DesignSystem.kt")
+            if not norm.startswith("/") and not (len(norm) > 1 and norm[1] == ":"):
+                return ".tmp_" in norm or norm.endswith(".tmp")
+            # Absolute paths inside project root
+            if norm.startswith(norm_root):
+                return ".tmp_" in norm or norm.endswith(".tmp")
+
         temp_markers = [
             "/appdata/local/temp/",
             "appdata/local/temp",
@@ -33,10 +55,6 @@ class PatternJournal:
             ".tmp",
         ]
         if any(marker in norm for marker in temp_markers):
-            if project_root:
-                norm_root = str(project_root).replace("\\", "/").lower()
-                if norm.startswith(norm_root):
-                    return ".tmp_" in norm or norm.endswith(".tmp")
             return True
         if norm.startswith("temp/") or norm.startswith("tmp/"):
             return True
@@ -264,6 +282,18 @@ class PatternJournal:
         """
         existing_entries = self._read_entries()
 
+        curr_checksum = None
+        try:
+            full_chk = self.project_root / file
+            if not full_chk.exists():
+                matches = [m for m in self.project_root.rglob(Path(file).name) if "build" not in str(m) and ".composebridge-state" not in str(m)]
+                if matches:
+                    full_chk = matches[0]
+            if full_chk.exists():
+                curr_checksum = compute_normalized_hash(full_chk.read_bytes())
+        except Exception:
+            pass
+
         norm_file = str(file).replace("\\", "/").strip().lower()
         file_name = Path(norm_file).name
         merged = False
@@ -271,24 +301,26 @@ class PatternJournal:
             if entry.get("type") == "token_added":
                 continue
             e_file = str(entry.get("file", "")).replace("\\", "/").strip().lower()
-            if (e_file == norm_file or Path(e_file).name == file_name) and entry.get("line") == line:
-                # دمج: احتفظ بالـ old_line الأصلي، حدّث new_line
-                entry["new_line"] = new_line
-                entry["new"] = new_line
-                entry["t"] = datetime.utcnow().isoformat()
-                if pattern_id:
-                    entry["pattern_id"] = pattern_id
-                merged = True
-                break
-
-        curr_checksum = None
-        try:
-            full_chk = self.project_root / file
-            if full_chk.exists():
-                import hashlib
-                curr_checksum = hashlib.sha256(full_chk.read_bytes()).hexdigest()
-        except Exception:
-            pass
+            same_file = (e_file == norm_file or Path(e_file).name == file_name)
+            if same_file:
+                entry_line = entry.get("line", 0)
+                same_or_near_line = (entry_line == line or abs(entry_line - line) <= 3)
+                consecutive_match = (
+                    entry.get("new_line", "").strip() == old_line.strip()
+                    or entry.get("new", "").strip() == old_line.strip()
+                )
+                if same_or_near_line or consecutive_match:
+                    # Merge: keep earliest original value (old_line and old), update to latest
+                    entry["new_line"] = new_line
+                    entry["new"] = new_line
+                    entry["line"] = line
+                    entry["t"] = datetime.utcnow().isoformat()
+                    if curr_checksum:
+                        entry["checksum_after"] = curr_checksum
+                    if pattern_id:
+                        entry["pattern_id"] = pattern_id
+                    merged = True
+                    break
 
         if not merged:
             existing_entries.append({
@@ -303,10 +335,6 @@ class PatternJournal:
                 "pattern_id": pattern_id,
                 "checksum_after": curr_checksum,
             })
-        elif merged and curr_checksum:
-            for e in existing_entries:
-                if e.get("file") == file and e.get("line") == line:
-                    e["checksum_after"] = curr_checksum
 
         self.journal_file.parent.mkdir(parents=True, exist_ok=True)
         with open(self.journal_file, "w", encoding="utf-8") as f:
@@ -531,6 +559,7 @@ class PatternJournal:
         import hashlib
         curr_checksum_bytes = hashlib.sha256(curr_bytes).hexdigest()
         curr_checksum_text = hashlib.sha256(curr_content.encode("utf-8")).hexdigest()
+        curr_checksum_norm = compute_normalized_hash(curr_bytes)
 
         # Check for external modifications (verify against the latest change state)
         external_modified = False
@@ -538,12 +567,15 @@ class PatternJournal:
 
         latest_change = changes[-1] if changes else None
         if latest_change and latest_change.get("checksum_after"):
-            if latest_change["checksum_after"] not in (curr_checksum_bytes, curr_checksum_text):
+            expected_chk = latest_change["checksum_after"]
+            if expected_chk not in (curr_checksum_bytes, curr_checksum_text, curr_checksum_norm):
                 external_modified = True
                 mismatch_reason = "checksum_mismatch"
 
         if not external_modified and latest_change and latest_change.get("new"):
-            if latest_change["new"] not in curr_content and latest_change["new"].strip() not in curr_content:
+            curr_norm = curr_content.replace("\r\n", "\n").replace("\r", "\n")
+            target_norm = str(latest_change["new"]).replace("\r\n", "\n").replace("\r", "\n")
+            if target_norm not in curr_norm and target_norm.strip() not in curr_norm:
                 external_modified = True
                 mismatch_reason = "content_missing" 
 

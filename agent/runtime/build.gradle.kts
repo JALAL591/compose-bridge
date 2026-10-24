@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "com.composebridge"
-version = "1.1.4"
+version = "1.1.5"
 
 kotlin {
     androidTarget {

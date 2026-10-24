@@ -56,12 +56,7 @@ def _journal_save(file_path, original_content, new_content):
     if len(SPLICE_JOURNAL) > MAX_JOURNAL:
         SPLICE_JOURNAL.pop(0)
 
-    # Disk (.composebridge-journal.json)
-    try:
-        with open(JOURNAL_FILE, "a", encoding="utf-8") as f:
-            f.write(json.dumps(entry) + "\n")
-    except Exception as e:
-        sys.stderr.write(f"[journal] failed to persist: {e}\n")
+    # Disk (.composebridge-journal.json is deprecated; state is kept in PatternJournal)
 
     # Line number & difference
     old_lines = original_content.splitlines()
@@ -84,8 +79,20 @@ def _journal_save(file_path, original_content, new_content):
 
     # 1. Record in PatternJournal for IDE
     try:
+        from core.project_root import get_project_root
+        proj_root = get_project_root()
+    except Exception:
+        proj_root = PROJECT_ROOT
+
+    rel_path = str(file_path)
+    try:
+        rel_path = str(Path(file_path).relative_to(proj_root)).replace("\\", "/")
+    except Exception:
+        rel_path = str(file_path).replace("\\", "/")
+
+    try:
         from core.pattern_journal import PatternJournal
-        pj = PatternJournal(PROJECT_ROOT)
+        pj = PatternJournal(proj_root)
         pj.record_change(
             file=rel_path,
             line=changed_line,
@@ -99,8 +106,8 @@ def _journal_save(file_path, original_content, new_content):
     # 2. Record in pending_edits.json
     try:
         pending_paths = [
-            PROJECT_ROOT / ".composebridge-state" / "pending_edits.json",
-            PROJECT_ROOT / "pending_edits.json",
+            proj_root / ".composebridge-state" / "pending_edits.json",
+            proj_root / "pending_edits.json",
         ]
         for ppath in pending_paths:
             ppath.parent.mkdir(parents=True, exist_ok=True)

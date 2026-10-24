@@ -30,11 +30,11 @@
 
 | الحزمة | ملف التثبيت (.zip / .aar) | طريقة التثبيت السريع |
 |---|---|---|
-| **إضافة بيئة التطوير (Android Studio / IntelliJ)** | [📥 **تحميل ComposeBridgeIntelliJ-1.1.4.zip**](dist/ComposeBridgeIntelliJ-1.1.4.zip) | في Android Studio: انتقل إلى `Settings` ➔ `Plugins` ➔ `⚙️` ➔ `Install Plugin from Disk...` |
+| **إضافة بيئة التطوير (Android Studio / IntelliJ)** | [📥 **تحميل ComposeBridgeIntelliJ-1.1.5.zip**](dist/ComposeBridgeIntelliJ-1.1.5.zip) | في Android Studio: انتقل إلى `Settings` ➔ `Plugins` ➔ `⚙️` ➔ `Install Plugin from Disk...` |
 | **مكتبة أندرويد لـ Jetpack Compose (Agent)** | [📦 **تحميل composebridge-agent-release.aar**](dist/composebridge-agent-release.aar) | انسخ الملف إلى مجلد `app/libs/` أو ضعه في `debugImplementation` |
 | **مكتبة أندرويد الأساسية (Runtime)** | [📦 **تحميل composebridge-runtime-release.aar**](dist/composebridge-runtime-release.aar) | ضعه في `implementation` لضمان أمان البناء |
-| **سيرفر بايثون و MCP** | [📦 **تحميل composebridge-server-1.1.4.zip**](dist/composebridge-server-1.1.4.zip) | خادم المزامنة ووكلاء الذكاء الاصطناعي |
-| **الحزمة الشاملة المتكاملة (All-in-One)** | [📦 **تحميل ComposeBridge-v1.1.4-AllInOne.zip**](dist/ComposeBridge-v1.1.4-AllInOne.zip) | تجمع الإضافة، العميل، مكتبة الـ Runtime، والسيرفر |
+| **سيرفر بايثون و MCP** | [📦 **تحميل composebridge-server-1.1.5.zip**](dist/composebridge-server-1.1.5.zip) | خادم المزامنة ووكلاء الذكاء الاصطناعي |
+| **الحزمة الشاملة المتكاملة (All-in-One)** | [📦 **تحميل ComposeBridge-v1.1.5-AllInOne.zip**](dist/ComposeBridge-v1.1.5-AllInOne.zip) | تجمع الإضافة، العميل، مكتبة الـ Runtime، والسيرفر |
 
 **ComposeBridge** هي حزمة أدوات للمطورين تربط تطبيق Compose (KMP/Android) بمحرر الأكواد أو وكيل الذكاء الاصطناعي الخاص بك.
 

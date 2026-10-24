@@ -221,9 +221,10 @@ def apply_state_update(property_name: str, value: str) -> tuple:
     if current != old_value:
         return (False, f"Value mismatch: expected '{old_value}', found '{current}'", None)
 
-    # 4. أنشئ نسخة احتياطية
+    # 4. أنشئ نسخة احتياطية (فقط إذا لم تكن موجودة للحفاظ على النسخة الأصلية النقية)
     backup_path = str(file_path) + ".bridge.bak"
-    shutil.copy2(file_path, backup_path)
+    if not os.path.exists(backup_path):
+        shutil.copy2(file_path, backup_path)
 
     # 5. ابنِ المحتوى الجديد
     new_source = (
@@ -350,9 +351,10 @@ def update_typography_property(
 
     new_content = content[:textstyle_start] + new_block + content[textstyle_end:]
 
-    # 5. نسخة احتياطية
+    # 5. نسخة احتياطية (فقط إذا لم تكن موجودة للحفاظ على النسخة الأصلية النقية)
     backup_path = str(file_path) + ".bridge.bak"
-    shutil.copy2(file_path, backup_path)
+    if not os.path.exists(backup_path):
+        shutil.copy2(file_path, backup_path)
 
     # 6. كتابة ذرية
     try:

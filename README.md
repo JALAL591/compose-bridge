@@ -8,7 +8,7 @@
 [![Status](https://img.shields.io/badge/Status-Early%20Access%20%7C%20Tested%20on%20Device-orange.svg)]()
 [![DevEx](https://img.shields.io/badge/DevEx-Zero--Rebuild%20Tuning-brightgreen.svg)]()
 [![Latency](https://img.shields.io/badge/Latency-%3C50ms-success.svg)]()
-[![Version](https://img.shields.io/badge/Version-1.1.4-blue.svg)]()
+[![Version](https://img.shields.io/badge/Version-1.1.5-blue.svg)]()
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/JALAL591/compose-bridge/blob/main/LICENSE)
 [![Glama MCP](https://glama.ai/mcp/servers/JALAL591/compose-bridge/badges/score.svg)](https://glama.ai/mcp/servers/JALAL591/compose-bridge)
 [![M8ven Score](https://m8ven.ai/badge/mcp/jalal591-compose-bridge-rapm1x)](https://m8ven.ai/mcp/jalal591-compose-bridge-rapm1x?s=readme)
@@ -28,11 +28,11 @@
 
 | Package | Asset | Purpose |
 |---|---|---|
-| **IDE Plugin (Android Studio / IntelliJ)** | [📥 **ComposeBridgeIntelliJ-1.1.4.zip**](dist/ComposeBridgeIntelliJ-1.1.4.zip) | Install in IDE: `Settings` ➔ `Plugins` ➔ `⚙️` ➔ `Install Plugin from Disk...` |
+| **IDE Plugin (Android Studio / IntelliJ)** | [📥 **ComposeBridgeIntelliJ-1.1.5.zip**](dist/ComposeBridgeIntelliJ-1.1.5.zip) | Install in IDE: `Settings` ➔ `Plugins` ➔ `⚙️` ➔ `Install Plugin from Disk...` |
 | **Compose Runtime Library (Release & Debug)** | [📦 **composebridge-runtime-release.aar**](dist/composebridge-runtime-release.aar) | Core registries (~9KB). Required in `implementation` for production-safe APK builds |
 | **Compose Agent Library (Debug Only)** | [📦 **composebridge-agent-release.aar**](dist/composebridge-agent-release.aar) | Visual overlays, touch inspector, and WebSocket bridge. Put in `debugImplementation` |
-| **Python Server & MCP Package** | [📦 **composebridge-server-1.1.4.zip**](dist/composebridge-server-1.1.4.zip) | Modular WebSocket hub & MCP server for AI agents |
-| **All-in-One Distribution** | [📦 **ComposeBridge-v1.1.4-AllInOne.zip**](dist/ComposeBridge-v1.1.4-AllInOne.zip) | Bundles Plugin, Runtime, Agent, and Server together |
+| **Python Server & MCP Package** | [📦 **composebridge-server-1.1.5.zip**](dist/composebridge-server-1.1.5.zip) | Modular WebSocket hub & MCP server for AI agents |
+| **All-in-One Distribution** | [📦 **ComposeBridge-v1.1.5-AllInOne.zip**](dist/ComposeBridge-v1.1.5-AllInOne.zip) | Bundles Plugin, Runtime, Agent, and Server together |
 
 ---
 
@@ -57,7 +57,7 @@ Watch ComposeBridge visually edit a running Jetpack Compose UI live:
 ## ⚡ Quick Start in 60 Seconds
 
 ### Step 1: Install IDE Plugin
-1. Download [ComposeBridgeIntelliJ-1.1.4.zip](dist/ComposeBridgeIntelliJ-1.1.4.zip).
+1. Download [ComposeBridgeIntelliJ-1.1.5.zip](dist/ComposeBridgeIntelliJ-1.1.5.zip).
 2. In Android Studio, go to **Settings (Preferences)** ➔ **Plugins** ➔ Click the **⚙️ gear icon** ➔ **Install Plugin from Disk...**.
 3. Select the zip file and restart Android Studio.
 

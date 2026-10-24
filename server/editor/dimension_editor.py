@@ -154,9 +154,11 @@ def update_token_default(token_name: str, value: str) -> tuple:
     import tempfile
     import os
 
+    from core.project_root import get_project_root
+    p_root = get_project_root()
     file_path = None
     for candidate in ["AppDimens.kt", "DesignSystem.kt", "Dimens.kt", "Dimensions.kt", "Spacing.kt"]:
-        candidate_path = _find_registry_file(candidate)
+        candidate_path = _find_registry_file(candidate, p_root)
         if candidate_path and candidate_path.exists():
             try:
                 txt = candidate_path.read_text(encoding="utf-8")
@@ -167,10 +169,10 @@ def update_token_default(token_name: str, value: str) -> tuple:
                 pass
 
     if not file_path or not file_path.exists():
-        file_path = _find_registry_file("AppDimens.kt")
+        file_path = _find_registry_file("AppDimens.kt", p_root)
 
     if not file_path or not file_path.exists():
-        return (False, f"Registry file for token '{token_name}' not found in project: {PROJECT_ROOT}", None)
+        return (False, f"Registry file for token '{token_name}' not found in project: {p_root}", None)
 
     with open(file_path, "r", encoding="utf-8", newline="") as f:
         content = f.read()
@@ -190,7 +192,7 @@ def update_token_default(token_name: str, value: str) -> tuple:
 
     # 1. ابحث عن صيغة الـ Registry: get("cardHeight", 100.dp) أو get("cardHeight", 100f)
     pattern_registry = re.compile(
-        rf'(BridgeDimensionRegistry\.get\(\s*"{re.escape(token_name)}"\s*,\s*)(\d+)(\.dp|\.f)'
+        rf'(BridgeDimensionRegistry\.(?:get|getDimension)\(\s*"{re.escape(token_name)}"\s*,\s*)(\d+)(\.dp|\.f)'
     )
     match = pattern_registry.search(content)
     auto_wrapped = False

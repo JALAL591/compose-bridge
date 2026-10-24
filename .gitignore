@@ -39,6 +39,9 @@ dist/*.zip
 !dist/ComposeBridge-v1.1.4-AllInOne.zip
 !dist/ComposeBridgeIntelliJ-1.1.4.zip
 !dist/composebridge-server-1.1.4.zip
+!dist/ComposeBridge-v1.1.5-AllInOne.zip
+!dist/ComposeBridgeIntelliJ-1.1.5.zip
+!dist/composebridge-server-1.1.5.zip
 
 # Python
 __pycache__/
