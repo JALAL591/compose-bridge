@@ -1,3 +1,4 @@
+from common.file_ops import is_ignored_path
 # -*- coding: utf-8 -*-
 """
 Text reference and AppStrings analysis module.
@@ -44,8 +45,7 @@ def _resolve_app_strings_value(project_root: Optional[Path], ref_key: str, runti
             except Exception:
                 pass
             if not candidates:
-                candidates = list(effective_root.rglob("AppStrings.kt"))
-                candidates = [c for c in candidates if "build" not in str(c) and ".composebridge" not in str(c) and ".bak" not in str(c)]
+                candidates = [c for c in effective_root.rglob("AppStrings.kt") if not is_ignored_path(c, effective_root)]
 
         if not candidates:
             # Check common directories
@@ -129,8 +129,7 @@ def _find_ref_in_app_strings(project_root: Path, text_value: str) -> Optional[st
         return None
     val_clean = text_value.strip()
     try:
-        candidates = list(project_root.rglob("AppStrings.kt"))
-        candidates = [c for c in candidates if "build" not in str(c) and ".composebridge" not in str(c)]
+        candidates = [c for c in project_root.rglob("AppStrings.kt") if not is_ignored_path(c, project_root)]
         if not candidates:
             return None
         content = candidates[0].read_text(encoding="utf-8", errors="ignore")

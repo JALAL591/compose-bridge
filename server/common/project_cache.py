@@ -60,9 +60,9 @@ class ProjectCache:
             }
 
             try:
+                from common.file_ops import is_ignored_path
                 for p in root.rglob("*.kt"):
-                    p_str_lower = str(p).lower()
-                    if any(ign in p_str_lower for ign in ignore_parts) or "backup" in p_str_lower:
+                    if is_ignored_path(p, root):
                         continue
                     try:
                         content = p.read_text(encoding="utf-8", errors="ignore")

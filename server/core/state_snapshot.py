@@ -3,15 +3,15 @@
 State Snapshot — Captures a full picture of all tokens.
 """
 
-import json
 from pathlib import Path
 from typing import Dict, Optional
 from datetime import datetime
 from .project_scanner import ProjectScanner
 from .token_migrator import TokenMigrator
+from .base_state import JsonPersistentState
 
 
-class TokenSnapshot:
+class TokenSnapshot(JsonPersistentState):
     """Snapshot of all design tokens in the project."""
     
     def __init__(self, project_root: Path):
@@ -43,7 +43,7 @@ class TokenSnapshot:
         self.version += 1
         self.tokens = {}
         
-        # ⭐ استخدام ProjectScanner لقراءة tokens بأي نمط
+        # استخدام ProjectScanner لقراءة tokens بأي نمط
         scanner = ProjectScanner(self.project_root)
         report = scanner.scan(include_hardcoded=False)
         
@@ -66,15 +66,10 @@ class TokenSnapshot:
         }
     
     def save(self, path: Path):
-        path.write_text(
-            json.dumps(self.to_dict(), indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
+        self.save_json(path, self.to_dict())
     
     def load(self, path: Path):
-        if not path.exists():
-            return
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = self.load_json(path, default={}) or {}
         self.captured_at = data.get("captured_at")
         self.version = data.get("version", 0)
         self.tokens = data.get("tokens", {})

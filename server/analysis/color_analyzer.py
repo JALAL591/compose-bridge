@@ -1,3 +1,4 @@
+from common.file_ops import is_ignored_path
 from common.color_constants import NAMED_COLORS_HEX, NAMED_COLOR_VARIANTS
 # -*- coding: utf-8 -*-
 """
@@ -263,7 +264,7 @@ def _detect_app_colors_pkg(file_path: Path) -> str:
         if project_root:
             # 1. Search for AppColors.kt in project
             for candidate in project_root.rglob("AppColors.kt"):
-                if candidate.is_file() and "build" not in candidate.parts:
+                if candidate.is_file() and not is_ignored_path(candidate, project_root):
                     c = candidate.read_text(encoding="utf-8", errors="ignore")
                     m = re.search(r'^\s*package\s+([\w.]+)', c, re.MULTILINE)
                     if m:
@@ -271,7 +272,7 @@ def _detect_app_colors_pkg(file_path: Path) -> str:
 
             # 2. Check build.gradle.kts for namespace
             for candidate in project_root.rglob("build.gradle.kts"):
-                if candidate.is_file() and "build" not in candidate.parts:
+                if candidate.is_file() and not is_ignored_path(candidate, project_root):
                     c = candidate.read_text(encoding="utf-8", errors="ignore")
                     m = re.search(r'namespace\s*=\s*["\']([\w.]+)["\']', c)
                     if m:
@@ -403,6 +404,17 @@ def global_color_edit(
 
         old_val_str = (old_value or "").strip()
         clean_token = (token_name or "").replace("AppColors.", "").strip()
+        clean_old = old_val_str.replace("AppColors.", "").strip()
+
+        # ⭐ STEP 1: Check FIRST if token_name or old_value matches an existing token in DesignSystem.kt
+        is_token = False
+        target_token_name = ""
+        if clean_token and _is_valid_kotlin_identifier(clean_token) and re.search(rf'\bval\s+{re.escape(clean_token)}\b', ds_content):
+            is_token = True
+            target_token_name = clean_token
+        elif clean_old and _is_valid_kotlin_identifier(clean_old) and re.search(rf'\bval\s+{re.escape(clean_old)}\b', ds_content):
+            is_token = True
+            target_token_name = clean_old
 
         # Check if old_value is a literal color
         is_literal = (
@@ -412,18 +424,6 @@ def global_color_edit(
             or old_val_str.startswith("0X")
             or (len(old_val_str) in (6, 8) and all(c in "0123456789abcdefABCDEF" for c in old_val_str))
         )
-
-        # Check if old_value or token_name matches an existing token in DesignSystem.kt
-        is_token = False
-        target_token_name = ""
-        if not is_literal:
-            clean_old = old_val_str.replace("AppColors.", "").strip()
-            if _is_valid_kotlin_identifier(clean_old) and re.search(rf'\bval\s+{re.escape(clean_old)}\b', ds_content):
-                is_token = True
-                target_token_name = clean_old
-            elif clean_token and _is_valid_kotlin_identifier(clean_token) and re.search(rf'\bval\s+{re.escape(clean_token)}\b', ds_content):
-                is_token = True
-                target_token_name = clean_token
 
         # ─── CASE 1: TOKEN EDIT (عدّل token واحد فقط — لا تبحث عن literals) ───
         if is_token:
@@ -507,10 +507,17 @@ def global_color_edit(
         for f, occs in by_file.items():
             file_path = project_root / f
             if not file_path.exists():
-                matches = list(project_root.rglob(Path(f).name))
+                matches = [m for m in project_root.rglob(Path(f).name) if not is_ignored_path(m, project_root)]
                 if not matches:
                     errors.append({"file": f, "error": "not found"})
                     continue
+                def _rank(p):
+                    norm = str(p).replace("\\", "/").lower()
+                    if "/commonmain/" in norm: return 0
+                    if "/main/" in norm: return 1
+                    if "/src/" in norm: return 2
+                    return 3
+                matches.sort(key=lambda p: (_rank(p), len(str(p))))
                 file_path = matches[0]
             
             try:
@@ -520,8 +527,21 @@ def global_color_edit(
                     skipped_files.append({"file": f, "reason": reason})
                     continue
 
+                # ═══ Safe Backup Before Any Changes or Journal Recording ═══
+                from core.ast_finder import safe_create_backup, validate_kotlin_syntax
+                is_valid, err_syntax = validate_kotlin_syntax(file_path)
+                if not is_valid:
+                    skipped_files.append({"file": f, "reason": f"Syntax error: {err_syntax}"})
+                    continue
+
+                ok_bak, err_bak, _ = safe_create_backup(file_path, project_root=project_root)
+                if not ok_bak:
+                    errors.append({"file": f, "error": f"Backup failed: {err_bak}"})
+                    continue
+
                 lines = content.splitlines()
                 file_replaced_in_this_file = False
+                gce_changes = []
                 
                 sorted_occs = sorted(occs, key=lambda x: x["line"], reverse=True)
                 for occ in sorted_occs:
@@ -552,13 +572,7 @@ def global_color_edit(
                     
                     if new_line != cur_line:
                         lines[occ_line - 1] = new_line
-                        journal.record_change(
-                            file=f,
-                            line=occ_line,
-                            old_line=cur_line,
-                            new_line=new_line,
-                            pattern_id=f"global_color_{final_token_name}",
-                        )
+                        gce_changes.append((occ_line, cur_line, new_line))
                         replaced += 1
                         file_replaced_in_this_file = True
                 
@@ -573,7 +587,18 @@ def global_color_edit(
                             new_line=target_import,
                             pattern_id=f"global_color_{final_token_name}",
                         )
-                    file_path.write_text(updated_content + "\n", encoding="utf-8")
+                    try:
+                        _atomic_write_text(file_path, updated_content + "\n")
+                    except Exception:
+                        file_path.write_text(updated_content + "\n", encoding="utf-8")
+                    for occ_l, old_l, new_l in gce_changes:
+                        journal.record_change(
+                            file=f,
+                            line=occ_l,
+                            old_line=old_l,
+                            new_line=new_l,
+                            pattern_id=f"global_color_{final_token_name}",
+                        )
             
             except Exception as e:
                 errors.append({"file": f, "error": str(e)})
@@ -714,10 +739,21 @@ def split_token_for_element(
             src_matches = [m for m in clean_matches if "src" in str(m).replace("\\", "/").split("/")]
             file_path = src_matches[0] if src_matches else clean_matches[0]
         
+        # ═══ Safe Backup Before Any Changes or Journal Recording ═══
+        from core.ast_finder import safe_create_backup, validate_kotlin_syntax
+        is_valid, err_syntax = validate_kotlin_syntax(file_path)
+        if not is_valid:
+            return {"success": False, "error": f"الملف الحالي يحتوي على أخطاء برمجية ({err_syntax})، يرجى إصلاحه أولاً."}
+
+        ok_bak, err_bak, _ = safe_create_backup(file_path, project_root=project_root)
+        if not ok_bak:
+            return {"success": False, "error": f"Backup failed for {file_path.name}: {err_bak}"}
+
         # Replace occurrences in element scope only
         content = file_path.read_text(encoding="utf-8")
         lines = content.splitlines()
         replaced = 0
+        ste_changes = []
         
         if not occurrences and element_line > 0:
             occurrences = []
@@ -780,13 +816,7 @@ def split_token_for_element(
             
             if new_line != old_line:
                 lines[target_idx] = new_line
-                journal.record_change(
-                    file=str(file_path.relative_to(project_root)),
-                    line=occ_line,
-                    old_line=old_line,
-                    new_line=new_line,
-                    pattern_id=f"split_token_{final_token_name}",
-                )
+                ste_changes.append((occ_line, old_line, new_line))
                 replaced += 1
         
         updated_content = "\n".join(lines)
@@ -799,7 +829,18 @@ def split_token_for_element(
                 new_line=target_import,
                 pattern_id=f"split_import_{final_token_name}",
             )
-        file_path.write_text(updated_content + "\n", encoding="utf-8")
+        try:
+            _atomic_write_text(file_path, updated_content + "\n")
+        except Exception:
+            file_path.write_text(updated_content + "\n", encoding="utf-8")
+        for occ_l, old_l, new_l in ste_changes:
+            journal.record_change(
+                file=str(file_path.relative_to(project_root)),
+                line=occ_l,
+                old_line=old_l,
+                new_line=new_l,
+                pattern_id=f"split_token_{final_token_name}",
+            )
         
         modified = journal.list_modified_files()
         print(f"[SPLIT-JOURNAL] Modified files after split: {len(modified)}")

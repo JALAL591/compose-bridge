@@ -1,3 +1,4 @@
+from common.file_ops import is_ignored_path
 # -*- coding: utf-8 -*-
 """
 Dimension analysis and refactoring module.
@@ -71,7 +72,7 @@ def _find_dimension_usage(project_root: Path, value: float, kind: str, kt_cache:
         except Exception:
             kt_cache = []
             for kt_file in project_root.rglob("*.kt"):
-                if any(x in str(kt_file).lower() for x in ["build", "backup", ".composebridge", ".bak"]):
+                if is_ignored_path(kt_file, project_root):
                     continue
                 try:
                     kt_cache.append((str(kt_file.relative_to(project_root)).replace("\\", "/"), kt_file.read_text(encoding="utf-8")))
@@ -258,58 +259,7 @@ def _extract_dimensions_with_property(scope_text: str) -> List[Dict]:
     return unique
 
 
-def _ensure_bridge_dimension_registry_import(
-    file_path: Path,
-    project_root: Optional[Path] = None,
-) -> Tuple[bool, int]:
-    """
-    تأكد من وجود import BridgeDimensionRegistry.
-    Returns (was_added, line_number).
-    """
-    content = file_path.read_text(encoding="utf-8")
-    
-    import_stmt = "import com.composebridge.agent.BridgeDimensionRegistry"
-    
-    # ⭐ افحص إذا موجود
-    if import_stmt in content:
-        return False, -1
-    
-    # ⭐ لا يوجد — أضف
-    lines = content.splitlines()
-    
-    # ابحث عن آخر import أو package
-    last_import_idx = -1
-    package_idx = -1
-    
-    for i, line in enumerate(lines):
-        stripped = line.strip()
-        if stripped.startswith('package '):
-            package_idx = i
-        elif stripped.startswith('import '):
-            last_import_idx = i
-    
-    # ⭐ الموقع الصحيح للإدراج
-    if last_import_idx >= 0:
-        insert_idx = last_import_idx + 1
-        lines.insert(insert_idx, import_stmt)
-        inserted_line = insert_idx + 1
-    elif package_idx >= 0:
-        insert_idx = package_idx + 1
-        lines.insert(insert_idx, "")
-        lines.insert(insert_idx + 1, import_stmt)
-        inserted_line = insert_idx + 2
-    else:
-        insert_idx = 0
-        lines.insert(insert_idx, import_stmt)
-        inserted_line = insert_idx + 1
-    
-    new_content = "\n".join(lines)
-    if not new_content.endswith("\n"):
-        new_content += "\n"
-    
-    file_path.write_text(new_content, encoding="utf-8")
-    
-    return True, inserted_line
+from common.kotlin_utils import _ensure_bridge_dimension_registry_import
 
 
 def global_dimension_edit(
@@ -340,7 +290,7 @@ def global_dimension_edit(
         new_val_str = str(new_value)
     
     for kt_file in project_root.rglob("*.kt"):
-        if any(x in str(kt_file).lower() for x in ["build", "backup", ".composebridge", ".bak"]):
+        if is_ignored_path(kt_file, project_root):
             continue
         
         try:
@@ -415,6 +365,15 @@ def global_dimension_edit(
                 new_lines.append(new_l)
             
             if file_changed:
+                from core.ast_finder import safe_create_backup, validate_kotlin_syntax
+                is_val_pre, err_pre = validate_kotlin_syntax(kt_file)
+                if not is_val_pre:
+                    errors.append({"file": str(kt_file), "error": err_pre})
+                    continue
+                ok_bak, err_bak, _ = safe_create_backup(kt_file, project_root=project_root)
+                if not ok_bak:
+                    errors.append({"file": str(kt_file), "error": err_bak})
+                    continue
                 kt_file.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
                 rel_file = str(kt_file.relative_to(project_root)).replace("\\", "/")
                 
@@ -477,7 +436,7 @@ def split_dimension_edit(
     file_path = project_root / element_file
     if not file_path.exists():
         matches = [m for m in project_root.rglob(Path(element_file).name)
-                   if "build" not in str(m) and ".bak" not in str(m)]
+                   if not is_ignored_path(m, project_root)]
         if not matches:
             return {"success": False, "error": f"File not found: {element_file}"}
         file_path = matches[0]
@@ -517,6 +476,13 @@ def split_dimension_edit(
             "error": f"Could not find {value}.{kind} in line {element_line}",
         }
     
+    from core.ast_finder import safe_create_backup, validate_kotlin_syntax
+    is_val_pre, err_pre = validate_kotlin_syntax(file_path)
+    if not is_val_pre:
+        return {"success": False, "error": f"الملف مكسور مسبقاً قبل التعديل: {err_pre}"}
+    ok_bak, err_bak, _ = safe_create_backup(file_path, project_root=project_root)
+    if not ok_bak:
+        return {"success": False, "error": f"فشل إنشاء النسخة الاحتياطية للملف: {err_bak}"}
     lines[target_idx] = new_line
     file_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
     

@@ -17,6 +17,11 @@ import android.view.ViewGroup
 object BridgeOverlayManager {
 
     private var overlay: BridgeSelectionOverlay? = null
+    var toolbarBounds: android.graphics.Rect? = null
+
+    fun updateToolbarBounds(rect: android.graphics.Rect?) {
+        toolbarBounds = rect
+    }
     var attachedActivity: Activity? = null
         internal set
 
@@ -25,7 +30,8 @@ object BridgeOverlayManager {
      * If already attached to the same Activity, does nothing.
      */
     fun attach(activity: Activity) {
-        if (!BuildConfig.DEBUG) return
+        val isDebuggable = (activity.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
+        if (!isDebuggable) return
         if (overlay != null && attachedActivity === activity) return
 
         detach()
@@ -79,6 +85,7 @@ object BridgeOverlayManager {
      * Removes Overlay from view hierarchy.
      */
     fun detach() {
+        toolbarBounds = null
         overlay?.let { view ->
             (view.parent as? ViewGroup)?.removeView(view)
         }

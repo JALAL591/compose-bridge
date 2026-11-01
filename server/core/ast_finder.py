@@ -1,4 +1,5 @@
 import os
+import shutil
 """
 AST Finder — Tree-sitter integration for Kotlin parsing.
 """
@@ -398,6 +399,11 @@ def surgical_edit(
     if not path.exists():
         return (False, f"File not found: {file_path}", None)
 
+    # Validate syntax before modification
+    is_valid, err_msg = validate_kotlin_syntax(path)
+    if not is_valid:
+        return (False, err_msg, None)
+
     # 1. اقرأ الملف
     with open(path, "rb") as f:
         source = f.read()
@@ -415,10 +421,11 @@ def surgical_edit(
             None
         )
 
-    # 3. أنشئ النسخة الاحتياطية (فقط إذا لم تكن موجودة للحفاظ على النسخة الأصلية النقية)
-    backup_path = str(path) + ".bridge.bak"
-    if not os.path.exists(backup_path):
-        shutil.copy2(path, backup_path)
+    # 3. أنشئ النسخة الاحتياطية (فقط إذا لم تكن موجودة وبعد التحقق من سلامة الكود)
+    ok_bak, bak_err, backup_path_obj = safe_create_backup(path)
+    if not ok_bak:
+        return (False, bak_err, None)
+    backup_path = str(backup_path_obj)
 
     # 4. ابنِ المحتوى الجديد
     new_source = (
@@ -472,3 +479,217 @@ def parse_bytes(source_bytes: bytes):
     """Thread-safe parse of raw Kotlin bytes."""
     with PARSER_LOCK:
         return PARSER.parse(source_bytes)
+
+
+def check_kotlin_syntax(source) -> dict:
+    """
+    Checks Kotlin syntax using tree-sitter AST and semantic safety guards:
+    1. Tree-sitter parse errors (tree.root_node.has_error).
+    2. Duplicate named arguments in calls (e.g. c1 = ..., c1 = ... or horizontal = ...).
+    3. Unresolved BridgeDimensionRegistry / BridgeThemeRegistry usages without import.
+    Returns:
+        {"is_valid": bool, "error": str, "line": int, "column": int}
+    """
+    if isinstance(source, (str, Path)) and os.path.exists(str(source)):
+        path = Path(source)
+        try:
+            source_bytes = path.read_bytes()
+        except Exception as e:
+            return {"is_valid": False, "error": f"Cannot read file {path}: {e}", "line": 1, "column": 1}
+    elif isinstance(source, str):
+        source_bytes = source.encode("utf-8")
+    elif isinstance(source, bytes):
+        source_bytes = source
+    else:
+        return {"is_valid": False, "error": "Invalid source input", "line": 1, "column": 1}
+
+    with PARSER_LOCK:
+        tree = PARSER.parse(source_bytes)
+
+    if tree.root_node.has_error:
+        def get_first_error(node):
+            if node.is_error or node.is_missing:
+                return (node.start_point[0] + 1, node.start_point[1] + 1, node.type)
+            for child in node.children:
+                res = get_first_error(child)
+                if res:
+                    return res
+            return None
+
+        err_info = get_first_error(tree.root_node)
+        if err_info:
+            line, col, ntype = err_info
+            msg = f"خطأ برمجي في السطر {line}، العمود {col} ({ntype})"
+        else:
+            line, col = 1, 1
+            msg = "الملف يحتوي على أخطاء برمجية"
+        return {"is_valid": False, "error": msg, "line": line, "column": col}
+
+    # Semantic Guard 1: Duplicate named arguments in function calls
+    def find_duplicate_named_arguments(node):
+        if node.type in ("value_arguments", "function_value_parameters"):
+            seen_names = {}
+            for child in node.children:
+                if child.type in ("value_argument", "parameter"):
+                    first_named = None
+                    has_eq_or_colon = False
+                    for sub in child.children:
+                        if sub.type == "identifier" and first_named is None and not has_eq_or_colon:
+                            first_named = sub
+                        elif sub.type in ("=", ":"):
+                            has_eq_or_colon = True
+                    if first_named is not None and has_eq_or_colon:
+                        name = source_bytes[first_named.start_byte:first_named.end_byte].decode("utf-8", "ignore")
+                        if name in seen_names:
+                            return (first_named.start_point[0] + 1, first_named.start_point[1] + 1, name)
+                        seen_names[name] = first_named
+        for child in node.children:
+            res = find_duplicate_named_arguments(child)
+            if res:
+                return res
+        return None
+
+    dup_arg = find_duplicate_named_arguments(tree.root_node)
+    if dup_arg:
+        line, col, name = dup_arg
+        return {
+            "is_valid": False,
+            "error": f"معامل مكرر '{name}' في نفس الاستدعاء (Argument already passed for this parameter)",
+            "line": line,
+            "column": col
+        }
+
+    # Semantic Guard 2: Missing Bridge imports
+    source_text = source_bytes.decode("utf-8", "ignore")
+    if "BridgeDimensionRegistry" in source_text:
+        if "import com.composebridge.agent.BridgeDimensionRegistry" not in source_text and "package com.composebridge.agent" not in source_text and "import com.composebridge.agent.*" not in source_text:
+            for idx, sline in enumerate(source_text.splitlines()):
+                if "BridgeDimensionRegistry" in sline:
+                    return {
+                        "is_valid": False,
+                        "error": "Unresolved reference 'BridgeDimensionRegistry' (استيراد com.composebridge.agent.BridgeDimensionRegistry مفقود)",
+                        "line": idx + 1,
+                        "column": sline.find("BridgeDimensionRegistry") + 1
+                    }
+
+    return {"is_valid": True, "error": "", "line": 0, "column": 0}
+
+
+def validate_kotlin_syntax(source) -> tuple:
+    """
+    Validates Kotlin source syntax using tree-sitter.
+    
+    Args:
+        source: str (code or file path), bytes, or Path
+        
+    Returns:
+        (is_valid: bool, error_message: str)
+    """
+    res = check_kotlin_syntax(source)
+    if not res["is_valid"]:
+        msg = f"الملف الحالي يحتوي على أخطاء برمجية (عند السطر {res['line']}، العمود {res['column']})، يرجى إصلاحه أولاً."
+        return (False, msg)
+    return (True, "")
+
+
+def safe_create_backup(file_path, project_root=None, force_new_baseline: bool = False) -> tuple:
+    """
+    Validates file syntax before taking backup.
+    
+    🌟 IMMUTABLE BASELINE (P0 Fix):
+    - When a file is modified for the first time in a session, .bridge.bak is created.
+    - If .bridge.bak ALREADY exists, IT IS NEVER OVERWRITTEN by intermediate tool edits.
+    - This eliminates Baseline Drift, ensuring that rollbacks ALWAYS revert to the true original.
+    - The baseline is only reset or cleared when explicitly approved via clear_session_baseline().
+    
+    Returns:
+        (success: bool, error_message: str, backup_path: Path | None)
+    """
+    path = Path(file_path)
+    if not path.exists():
+        return (False, f"File not found: {path}", None)
+
+    is_valid, err_msg = validate_kotlin_syntax(path)
+    if not is_valid:
+        return (False, err_msg, None)
+
+    backup_path = path.with_name(path.name + ".bridge.bak")
+    
+    # 1. First edit in session: Create baseline backup
+    if not backup_path.exists():
+        try:
+            shutil.copy2(path, backup_path)
+        except Exception as e:
+            return (False, f"Failed to create backup: {e}", None)
+        return (True, "", backup_path)
+
+    # 2. If force_new_baseline is explicitly requested (e.g. upon user Approve):
+    if force_new_baseline:
+        try:
+            shutil.copy2(path, backup_path)
+        except Exception:
+            pass
+        return (True, "", backup_path)
+
+    # 3. If backup exists:
+    try:
+        from core.pattern_journal import PatternJournal, compute_normalized_hash
+        from core.project_root import get_project_root
+        import hashlib
+
+        p_root = project_root or get_project_root()
+        journal = PatternJournal(p_root)
+
+        active_changes = journal.get_file_changes(path.name)
+        if not active_changes and p_root in path.parents:
+            active_changes = journal.get_file_changes(str(path.relative_to(p_root)))
+
+        curr_bytes = path.read_bytes()
+        curr_norm = compute_normalized_hash(curr_bytes)
+        curr_raw = hashlib.sha256(curr_bytes).hexdigest()
+
+        if active_changes:
+            known_tool_hashes = set()
+            for ch in active_changes:
+                if ch.get("checksum_after"):
+                    known_tool_hashes.add(ch["checksum_after"])
+            
+            curr_text = path.read_text(encoding="utf-8")
+            has_tool_new_text = any(
+                (ch.get("new") and ch.get("new").strip() in curr_text)
+                for ch in active_changes
+            )
+
+            # If current content on disk is a tool modification (stacked edits):
+            # PRESERVE THE IMMUTABLE BASELINE!
+            if (curr_norm in known_tool_hashes or curr_raw in known_tool_hashes) or has_tool_new_text:
+                return (True, "", backup_path)
+
+            # Developer made a clean manual edit on top:
+            shutil.copy2(path, backup_path)
+            journal.reset_file_baseline(str(path), curr_norm)
+            return (True, "", backup_path)
+
+        # No active tool changes:
+        # Immutable baseline: preserve existing .bridge.bak!
+        return (True, "", backup_path)
+    except Exception:
+        pass
+
+    return (True, "", backup_path)
+
+
+def clear_session_baseline(file_path, project_root=None) -> bool:
+    """
+    Clears the immutable session baseline backup (.bridge.bak) for a file.
+    Executed ONLY upon explicit user approval (Approve Changes).
+    """
+    try:
+        path = Path(file_path)
+        backup_path = path.with_name(path.name + ".bridge.bak")
+        if backup_path.exists():
+            backup_path.unlink()
+            return True
+    except Exception:
+        pass
+    return False

@@ -6,6 +6,11 @@ Re-exports network, routing, handlers, and launches the WebSocket server.
 
 import os
 import sys
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
+except Exception:
+    pass
 import argparse
 import asyncio
 from pathlib import Path
@@ -45,6 +50,8 @@ from network.ws_server import (
     log_forward,
     broadcast,
     broadcast_refresh,
+    broadcast_changes_updated,
+    trigger_broadcast_refresh,
     safe_send,
     handle_client,
 )
@@ -70,17 +77,23 @@ from handlers.dimension_handler import (
 
 
 async def main():
+    from core.auth_manager import get_auth_token_file_path, get_or_create_auth_token
+    token_file = get_auth_token_file_path(PROJECT_ROOT)
+    token_val = get_or_create_auth_token(PROJECT_ROOT)
+
     print()
-    print(f"{Color.BOLD}{Color.GREEN}{'=' * 55}{Color.END}")
-    print(f"{Color.BOLD}{Color.GREEN}  ComposeBridge - Message Hub{Color.END}")
-    print(f"{Color.BOLD}{Color.GREEN}{'=' * 55}{Color.END}")
+    print(f"{Color.BOLD}{Color.GREEN}{'=' * 65}{Color.END}")
+    print(f"{Color.BOLD}{Color.GREEN}  ComposeBridge - Secure WebSocket Hub (v1.2.0){Color.END}")
+    print(f"{Color.BOLD}{Color.GREEN}{'=' * 65}{Color.END}")
     print(f"  Host:         {HOST}")
     print(f"  Port:         {PORT}")
     print(f"  Project root: {PROJECT_ROOT}")
+    print(f"  Rate Limit:   60 requests/minute per IP")
+    print(f"{Color.BOLD}{Color.YELLOW}  🔑 Auth Token: {token_val}{Color.END}")
+    print(f"  📁 Saved to:   {token_file}")
     if args.dev_token:
-        print(f"  Dev Token:    {args.dev_token}")
-    print(f"  Mode:         Message Hub (broadcast)")
-    print(f"{Color.BOLD}{Color.GREEN}{'=' * 55}{Color.END}")
+        print(f"  Dev Token:    {args.dev_token} (override)")
+    print(f"{Color.BOLD}{Color.GREEN}{'=' * 65}{Color.END}")
     print()
 
     # Init Theme Tokens
@@ -92,7 +105,10 @@ async def main():
     log_info("Waiting for clients (phone + test tools)...")
     print()
 
-    async with websockets.serve(handle_client, HOST, PORT):
+    import network.ws_server as ws_module
+    ws_module.MAIN_EVENT_LOOP = asyncio.get_running_loop()
+
+    async with websockets.serve(handle_client, HOST, PORT, ping_interval=20, ping_timeout=20):
         await asyncio.Future()
 
 

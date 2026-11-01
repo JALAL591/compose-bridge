@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.composebridge.plugin"
-version = "1.1.5"
+version = "1.1.6"
 
 repositories {
     mavenCentral()
@@ -14,6 +14,8 @@ repositories {
 
 dependencies {
     implementation("com.google.code.gson:gson:2.10.1")
+    implementation("com.google.zxing:core:3.5.3")
+    implementation("com.google.zxing:javase:3.5.3")
 }
 
 // Resolved dynamically from ANDROID_STUDIO_HOME env var or androidStudioLocalPath in gradle.properties
@@ -31,6 +33,13 @@ tasks {
         sinceBuild.set("241")
         untilBuild.set(provider { null })
                 changeNotes.set("""
+<h3>v1.1.6 - Architecture Decomposition, Dynamic QR, & Debranding</h3>
+<ul>
+  <li><b>Modular Monolith Refactoring:</b> Decomposed Agent, IDE plugin, and Server monoliths into clean, single-responsibility packages.</li>
+  <li><b>Dynamic QR Scanner:</b> Host app reflection automatically finds local QrScannerActivity.</li>
+  <li><b>Full UI Localization:</b> Complete English copy across all dialogs, toasts, and overlays.</li>
+  <li><b>P0 Fix:</b> Color token re-edits in hex format reliably appear in the Changes tab.</li>
+</ul>
 <h3>v1.1.5 - Critical Rollback Fix (Hotfix)</h3>
 <ul>
   <li><b>CRLF False Positives Fixed:</b> The server now normalizes line endings (CRLF/LF) before checksum comparisons, preventing false <code>EXTERNAL_MODIFICATION_DETECTED</code> warnings on Windows.</li>

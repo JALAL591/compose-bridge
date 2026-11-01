@@ -28,11 +28,16 @@ def section(title):
 def main():
     project_root = Path(os.environ.get("COMPOSEBRIDGE_ROOT", "."))
     
-    # Clean start
+    # Clean start (preserves auth token)
     state_dir = project_root / ".composebridge-state"
     if state_dir.exists():
         import shutil
-        shutil.rmtree(state_dir)
+        for child in state_dir.iterdir():
+            if child.name not in ("auth_token.txt", "auth.json"):
+                if child.is_file() or child.is_symlink():
+                    child.unlink()
+                elif child.is_dir():
+                    shutil.rmtree(child, ignore_errors=True)
     
     sm = StateManager(project_root)
     sm.init()

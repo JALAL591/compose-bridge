@@ -26,22 +26,14 @@ captures/
 # Scratch & Local Experiments
 scratch/
 
-# Dist Release Artifacts (Keep only official release assets)
+# Dist Release Artifacts (Keep only official release assets for v1.1.6)
 dist/*.aar
 dist/*.zip
 !dist/composebridge-runtime-release.aar
 !dist/composebridge-agent-release.aar
-!dist/ComposeBridgeIntelliJ-1.1.2.zip
-!dist/composebridge-server-1.1.2.zip
-!dist/composebridge-server-1.1.3.zip
-!dist/ComposeBridge-v1.1.2-AllInOne.zip
-!dist/ComposeBridge-v1.1.3-AllInOne.zip
-!dist/ComposeBridge-v1.1.4-AllInOne.zip
-!dist/ComposeBridgeIntelliJ-1.1.4.zip
-!dist/composebridge-server-1.1.4.zip
-!dist/ComposeBridge-v1.1.5-AllInOne.zip
-!dist/ComposeBridgeIntelliJ-1.1.5.zip
-!dist/composebridge-server-1.1.5.zip
+!dist/ComposeBridgeIntelliJ-1.1.6.zip
+!dist/composebridge-server-1.1.6.zip
+!dist/ComposeBridge-v1.1.6-AllInOne.zip
 
 # Python
 __pycache__/
@@ -62,3 +54,6 @@ venv/
 .composebridge-failures.jsonl
 composebridge-mcp.log
 _backup_*/
+*.bridge.bak
+dist/archive/
+*.bak_docs

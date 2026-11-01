@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <cache-path name="composebridge_cache" path="." />
+    <external-cache-path name="composebridge_ext_cache" path="." />
+    <external-path name="composebridge_downloads" path="Download/" />
+    <external-path name="composebridge_downloads_legacy" path="Downloads/" />
+</paths>

@@ -109,9 +109,13 @@ class ScanReport:
     orphans: List[OrphanToken] = field(default_factory=list)
     token_impacts: List[TokenImpact] = field(default_factory=list)
     split_suggestions: List[SplitSuggestion] = field(default_factory=list)
+    broken_files: List[dict] = field(default_factory=list)
+    broken_count: int = 0
     
     def to_dict(self) -> dict:
-        return asdict(self)
+        d = asdict(self)
+        d["broken_count"] = len(self.broken_files)
+        return d
 
     def get(self, key, default=None):
         return getattr(self, key, default)
@@ -126,6 +130,7 @@ class ScanReport:
             "hardcoded_count": len(self.hardcoded_values),
             "duplicate_groups": len(self.duplicates),
             "orphan_count": len(self.orphans),
+            "broken_files_count": len(self.broken_files),
             "files_scanned": self.files_scanned,
             "scan_duration_ms": self.scan_duration_ms,
         }

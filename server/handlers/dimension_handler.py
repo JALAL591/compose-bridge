@@ -243,6 +243,16 @@ def _apply_dimension_edit(edit: dict, project_root: Path) -> dict:
                 target_idx -= 1
                 actual_line = target_idx + 1
 
+        # Create safe backup before writing modifications
+        from core.ast_finder import safe_create_backup, validate_kotlin_syntax
+        is_val_pre, err_pre = validate_kotlin_syntax(file_path)
+        if not is_val_pre:
+            return {"success": False, "error": f"الملف مكسور مسبقاً قبل التعديل: {err_pre}"}
+
+        ok_bak, err_bak, _ = safe_create_backup(file_path, project_root=project_root)
+        if not ok_bak:
+            return {"success": False, "error": f"فشل إنشاء النسخة الاحتياطية للملف: {err_bak}"}
+
         lines[target_idx] = new_line
         file_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 

@@ -15,7 +15,8 @@ if hasattr(sys.stdout, 'reconfigure'):
 
 async def test():
     async with websockets.connect('ws://127.0.0.1:8711') as ws:
-        await ws.send(json.dumps({'type': 'auth', 'token': 'test-token-local-dev'}))
+        from core.auth_manager import get_or_create_auth_token
+        await ws.send(json.dumps({'type': 'auth', 'token': get_or_create_auth_token()}))
         await ws.recv()
 
         await ws.send(json.dumps({'type': 'agent_start'}))

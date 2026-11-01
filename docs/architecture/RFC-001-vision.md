@@ -3,7 +3,7 @@
 > **Status:** Accepted  
 > **Author:** Jalal (@JALAL591)  
 > **Date:** 2026-10-21  
-> **Target Release:** v1.1.0 (current), v2.0.0 (vision)  
+> **Target Release:** v1.1.6 (current), v2.0.0 (vision)  
 > **License:** MIT
 
 ---
@@ -52,7 +52,7 @@ ComposeBridge is not just a visual editor. It is a **Mobile-Native Development S
 │  │  • Surgical AST Editing (byte-level precision)         │  │
 │  │  • Pending Edits Queue (batch atomic commits)          │  │
 │  │  • Gradle Build Pipeline                               │  │
-│  │  • MCP Server (17+ tools for AI agents)                │  │
+│  │  • MCP Server (27 tools for AI agents)                 │  │
 │  │  • File-based Agent Bridge (.composebridge/*.json)     │  │
 │  └────────────────────────────────────────────────────────┘  │
 │         │                                                    │
@@ -74,7 +74,7 @@ ComposeBridge is not just a visual editor. It is a **Mobile-Native Development S
 - Handles all logic and file system access.
 - Performs surgical byte-level AST edits to `.kt` files.
 - Manages the pending edits queue and rollback journal.
-- Exposes an MCP server (17+ tools) for AI agent integration.
+- Exposes an MCP server (27 tools) for AI agent integration.
 - Runs Gradle builds in the background and serves APKs.
 
 **Layer 3: The AI Agent (Developer's Choice)**
@@ -88,12 +88,12 @@ ComposeBridge is not just a visual editor. It is a **Mobile-Native Development S
 ## 4. Roadmap
 
 | Version | Features | Status |
-|:--------|:---------|:------:|
+|:---|:---|:---:|
 | **v1.0.0** | Colors, Dimensions, MCP Server, IDE Plugin | ✅ Released |
-| **v1.1.0** | Text Editing, Live Preview, Auto-Migration, RFC-001 | ✅ Current |
-| **v1.2.0** | Changes Screen (Approve/Reject on phone), Build APK from phone, Chat Bridge with AI Agent | 🚧 Planned |
-| **v1.3.0** | History & Reports, Remote Access via Tailscale Funnel | 📅 Planned |
-| **v2.0.0** | Full Mobile-Native Development Studio | 🎯 Vision |
+| **v1.1.0** | Text Editing, Live Preview, Auto-Migration, RFC-001 | ✅ Released |
+| **v1.1.6** | **Current Release:** Changes Screen on Phone, Build APK from Phone, Remote Access via Tailscale Funnel, Async Gradle, Full English UI, 27 MCP Tools, 60x Faster Analysis | ✅ Released |
+| **v1.2.0** | Chat Bridge with AI Agent (Conversational UI) | 🚧 Planned |
+| **v2.0.0** | Full Mobile-Native Development Studio (iOS Support, Cloud Sync) | 🎯 Vision |
 
 ---
 
@@ -122,4 +122,4 @@ We welcome contributions. Please read [CONTRIBUTING.md](../../CONTRIBUTING.md) b
 
 ---
 
-*This is a living document. Last updated: 2026-10-21.*
+*This is a living document. Last updated: 2026-11-01.*

@@ -102,8 +102,8 @@ class TestDirtyBufferGuard(unittest.TestCase):
         )
 
         self.assertFalse(ok)
-        self.assertIn("تحذير", msg)
-        self.assertIn("تم تعديله خارج الأداة", msg)
+        self.assertIn("Warning", msg)
+        self.assertIn("modified externally", msg)
         self.assertEqual(info.get("error_code"), "EXTERNAL_MODIFICATION_DETECTED")
         self.assertEqual(info.get("suggested_action"), "confirm_restore")
 
@@ -139,8 +139,8 @@ class TestDirtyBufferGuard(unittest.TestCase):
         self.assertFalse(res["success"])
         self.assertEqual(res["error_code"], "EXTERNAL_MODIFICATION_DETECTED")
         self.assertTrue(res["can_force"])
-        self.assertIn("تحذير", res["message"])
-        self.assertIn("تم تعديله خارج الأداة", res["message"])
+        self.assertIn("Warning", res["message"])
+        self.assertIn("modified externally", res["message"])
         self.assertEqual(res["suggested_action"], "confirm_restore")
 
         # Verify backup was NOT destroyed and file on disk was NOT overwritten
@@ -175,6 +175,35 @@ class TestDirtyBufferGuard(unittest.TestCase):
         self.assertEqual(test_file.read_text(encoding="utf-8"), current_code)
         self.assertFalse(backup_file.exists())
 
+
+
+    def test_android_studio_whitespace_formatting_does_not_trigger_false_positive(self):
+        test_file = self.root / "Dashboard.kt"
+        original_code = 'val primaryColor = Color(0xFF112233)\nval title = "Dashboard"\n'
+        test_file.write_text(original_code, encoding="utf-8")
+
+        # 1. Create backup
+        backup_file = self.root / "Dashboard.kt.bridge.bak"
+        backup_file.write_text(original_code, encoding="utf-8")
+
+        # 2. Record change in journal
+        pj = PatternJournal(self.root)
+        pj.record_change(
+            file="Dashboard.kt",
+            line=1,
+            old_line="val primaryColor = Color(0xFF112233)",
+            new_line="val primaryColor = Color(0xFF000000)",
+            pattern_id="test_pat_autoformat",
+        )
+
+        # 3. Simulate Android Studio saving with CRLF/trailing whitespace/extra newline
+        # The code is intact, but byte checksum differs from journal
+        ide_saved_code = "val primaryColor = Color(0xFF000000)   \r\nval title = \"Dashboard\"\r\n\r\n"
+        test_file.write_text(ide_saved_code, encoding="utf-8")
+
+        # 4. Reject without force -> should NOT trigger false positive EXTERNAL_MODIFICATION_DETECTED
+        res = pj.reject_file_changes("Dashboard.kt", force=False)
+        self.assertTrue(res["success"], f"Expected success, got: {res}")
 
 if __name__ == "__main__":
     unittest.main()

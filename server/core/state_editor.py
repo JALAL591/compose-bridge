@@ -10,6 +10,7 @@ from editor.color_editor import *
 from editor.dimension_editor import *
 from editor.text_editor import *
 from common.file_ops import (
+    apply_safe_edit,
     _atomic_write_text,
     _find_registry_file,
     is_file_dirty_in_ide,

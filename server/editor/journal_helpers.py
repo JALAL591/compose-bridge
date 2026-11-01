@@ -43,7 +43,7 @@ def with_write_lock(func):
 SPLICE_JOURNAL = []
 
 
-def _journal_save(file_path, original_content, new_content):
+def _journal_save(file_path, original_content, new_content, pattern_id="cli_edit"):
     entry = {
         "file": str(file_path),
         "original": original_content,
@@ -58,26 +58,50 @@ def _journal_save(file_path, original_content, new_content):
 
     # Disk (.composebridge-journal.json is deprecated; state is kept in PatternJournal)
 
-    # Line number & difference
+    # Ensure .bridge.bak is persisted alongside the target file (only from valid content)
+    try:
+        bak_file = Path(str(file_path) + ".bridge.bak")
+        if not bak_file.exists():
+            from core.ast_finder import validate_kotlin_syntax
+            is_valid, _ = validate_kotlin_syntax(original_content)
+            if is_valid:
+                bak_file.write_text(original_content, encoding="utf-8")
+            else:
+                sys.stderr.write(f"[journal] Refused to create .bridge.bak: original content contains syntax errors\n")
+    except Exception as e:
+        sys.stderr.write(f"[journal] failed to create .bridge.bak: {e}\n")
+
+    # Compute discrete diff hunks across all changed lines (no break on first line!)
+    import difflib
     old_lines = original_content.splitlines()
     new_lines = new_content.splitlines()
-    changed_line = 1
-    old_line_text = ""
-    new_line_text = ""
-    for idx, (l1, l2) in enumerate(zip(old_lines, new_lines)):
-        if l1 != l2:
-            changed_line = idx + 1
-            old_line_text = l1
-            new_line_text = l2
-            break
+    matcher = difflib.SequenceMatcher(None, old_lines, new_lines)
+    changed_hunks = []
+    for tag, alo, ahi, blo, bhi in matcher.get_opcodes():
+        if tag == "equal":
+            continue
+        old_slice = old_lines[alo:ahi]
+        new_slice = new_lines[blo:bhi]
+        line_num = blo + 1 if blo < len(new_lines) else max(1, len(new_lines))
+        changed_hunks.append({
+            "line": line_num,
+            "old_line": "\n".join(old_slice),
+            "new_line": "\n".join(new_slice),
+        })
 
-    rel_path = str(file_path)
-    try:
-        rel_path = str(Path(file_path).relative_to(PROJECT_ROOT)).replace("\\", "/")
-    except Exception:
-        rel_path = str(file_path).replace("\\", "/")
+    if not changed_hunks:
+        changed_hunks.append({
+            "line": 1,
+            "old_line": "",
+            "new_line": "",
+        })
 
-    # 1. Record in PatternJournal for IDE
+    first_hunk = changed_hunks[0]
+    changed_line = first_hunk["line"]
+    old_line_text = first_hunk["old_line"]
+    new_line_text = first_hunk["new_line"]
+
+    # 1. Record all hunks in PatternJournal for IDE
     try:
         from core.project_root import get_project_root
         proj_root = get_project_root()
@@ -93,13 +117,14 @@ def _journal_save(file_path, original_content, new_content):
     try:
         from core.pattern_journal import PatternJournal
         pj = PatternJournal(proj_root)
-        pj.record_change(
-            file=rel_path,
-            line=changed_line,
-            old_line=old_line_text,
-            new_line=new_line_text,
-            pattern_id="cli_edit",
-        )
+        for h in changed_hunks:
+            pj.record_change(
+                file=rel_path,
+                line=h["line"],
+                old_line=h["old_line"],
+                new_line=h["new_line"],
+                pattern_id=pattern_id,
+            )
     except Exception as e:
         sys.stderr.write(f"[journal] failed to record in PatternJournal: {e}\n")
 
@@ -142,6 +167,13 @@ def _journal_save(file_path, original_content, new_content):
                 json.dump(filtered, pf, indent=2, ensure_ascii=False)
     except Exception as e:
         sys.stderr.write(f"[journal] failed to save pending_edits: {e}\n")
+
+    # 3. Live notification: broadcast changes to connected IDE & devices
+    try:
+        from network.ws_server import trigger_broadcast_refresh
+        trigger_broadcast_refresh()
+    except Exception:
+        pass
 
 
 def _validate_after_splice(file_path):

@@ -22,6 +22,7 @@ from .scanner_models import (
     Token, HardcodedValue, DuplicateGroup, OrphanToken, ScanReport, TokenUsage, TokenImpact
 )
 from . import scanner_kotlin_parser as parser
+from .ast_finder import validate_kotlin_syntax, check_kotlin_syntax
 
 logger = logging.getLogger(__name__)
 
@@ -163,11 +164,17 @@ class ProjectScanner:
         file_contents: Dict[Path, str] = {}
 
         def worker(file_path: Path):
+            content = ""
             try:
-                with open(file_path, "r", encoding="utf-8", newline="") as _fh: content = _fh.read()
+                with open(file_path, "r", encoding="utf-8", newline="") as _fh:
+                    content = _fh.read()
+            except Exception as e:
+                return file_path, "", {"dimensions": [], "colors": [], "hardcoded": [], "read_error": str(e)}
+            
+            try:
+                res = self._extract_from_file(file_path, content, include_hardcoded=include_hardcoded)
             except Exception:
-                return None
-            res = self._extract_from_file(file_path, content, include_hardcoded=include_hardcoded)
+                res = {"dimensions": [], "colors": [], "hardcoded": []}
             return file_path, content, res
 
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -235,6 +242,24 @@ class ProjectScanner:
         
         elapsed_ms = int((time.time() - start) * 1000)
         
+        # ═══ Health Check (validate Kotlin syntax on all files) ═══
+        broken_files = []
+        for file_path, content in file_contents.items():
+            valid, err_msg = validate_kotlin_syntax(content)
+            if not valid:
+                res = check_kotlin_syntax(content)
+                line = res.get("line", 1)
+                try:
+                    rel_file = str(file_path.relative_to(self.project_root)).replace("\\", "/")
+                except Exception:
+                    rel_file = file_path.name
+                broken_files.append({
+                    "file": rel_file,
+                    "line": line,
+                    "error": err_msg,
+                    "full_path": str(file_path),
+                })
+
         report = ScanReport(
             project_root=str(self.project_root),
             files_scanned=len(kt_files),
@@ -244,6 +269,7 @@ class ProjectScanner:
             orphans=orphans,
             token_impacts=token_impacts,
             split_suggestions=split_suggestions,
+            broken_files=broken_files,
             scan_duration_ms=elapsed_ms,
         )
         self.report = report
@@ -257,6 +283,8 @@ class ProjectScanner:
             "orphans": [asdict(o) if hasattr(o, "__dataclass_fields__") else o for o in orphans],
             "token_impacts": [asdict(i) if hasattr(i, "__dataclass_fields__") else i for i in token_impacts],
             "split_suggestions": [asdict(s) if hasattr(s, "__dataclass_fields__") else s for s in split_suggestions],
+            "broken_files": broken_files,
+            "broken_count": len(broken_files),
             "scan_duration_ms": elapsed_ms,
             "from_cache": False,
         })
@@ -324,6 +352,25 @@ class ProjectScanner:
             except Exception as e:
                 logger.error(f"Scan timed out or failed: {e}")
                 raise
+
+    def check_health(self) -> List[dict]:
+        """Runs validate_kotlin_syntax across all Kotlin files in project."""
+        broken = []
+        for f in self.find_kt_files():
+            valid, msg = validate_kotlin_syntax(f)
+            if not valid:
+                res = check_kotlin_syntax(f)
+                try:
+                    rel = str(f.relative_to(self.project_root))
+                except Exception:
+                    rel = f.name
+                broken.append({
+                    "file": rel,
+                    "line": res.get("line", 1),
+                    "error": msg,
+                    "full_path": str(f),
+                })
+        return broken
 
     def scan(
         self,

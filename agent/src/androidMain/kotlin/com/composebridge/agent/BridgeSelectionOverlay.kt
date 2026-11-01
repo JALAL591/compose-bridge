@@ -26,6 +26,11 @@ class BridgeSelectionOverlay(
     var isActive: Boolean = false
         set(value) {
             field = value
+            if (!value) {
+                highlightRect = null
+                selectedLabel = null
+                currentNode = null
+            }
             invalidate()
         }
 
@@ -96,30 +101,11 @@ class BridgeSelectionOverlay(
     // Floating toolbar target aligned with DesignModeButton (statusBarsPadding + 80dp top, 16dp end)
         // Floating toolbar target aligned with DesignModeButton (statusBarsPadding + 80dp top, 16dp end)
     private fun isTouchOnToolbar(x: Float, y: Float): Boolean {
-        val density = resources.displayMetrics.density
-        val statusBarHeight = run {
-            val resId = resources.getIdentifier("status_bar_height", "dimen", "android")
-            if (resId > 0) resources.getDimensionPixelSize(resId) else (24 * density).toInt()
+        val bounds = BridgeOverlayManager.toolbarBounds
+        if (bounds != null && bounds.contains(x.toInt(), y.toInt())) {
+            return true
         }
-        val topOffset = statusBarHeight + (65 * density).toInt()
-        val heightPx = (80 * density).toInt()
-        val bottomOffset = topOffset + heightPx
-
-        // Outside vertical toolbar strip?
-        if (y < topOffset || y > bottomOffset) return false
-
-        // DesignModeButton is a horizontal Row (~210dp width) aligned to TopEnd with 16dp end padding.
-        // In RTL: TopEnd is at screen LEFT (x around 0..250dp).
-        // In LTR: TopEnd is at screen RIGHT (x around width - 250dp..width).
-        val toolbarWidth = (320 * density).toInt()
-        val isRtl = resources.configuration.layoutDirection == View.LAYOUT_DIRECTION_RTL ||
-                BridgeOverlayManager.attachedActivity?.window?.decorView?.layoutDirection == View.LAYOUT_DIRECTION_RTL
-
-        return if (isRtl) {
-            x <= toolbarWidth
-        } else {
-            x >= (width - toolbarWidth)
-        }
+        return false
     }
 
     private var overlayLocation = IntArray(2)

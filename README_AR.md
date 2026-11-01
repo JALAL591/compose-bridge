@@ -8,17 +8,22 @@
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-1.7.3+-4285F4.svg)](https://developer.android.com/jetpack/compose)
 [![Zero Rebuild](https://img.shields.io/badge/DevEx-Zero--Rebuild%20Preview-brightgreen.svg)]()
 [![Latency](https://img.shields.io/badge/Latency-%3C50ms-success.svg)]()
-[![Status](https://img.shields.io/badge/Status-Production%20Ready%20(v1.1.1)-success.svg)]()
+[![Status](https://img.shields.io/badge/Status-Production%20Ready%20(v1.1.6)-success.svg)]()
 [![Scanner Speed](https://img.shields.io/badge/Scanner%20Speed-137ms%20%2F%20146%20files-brightgreen.svg)]()
-[![Version](https://img.shields.io/badge/Version-1.1.1-blue.svg)]()
+[![Version](https://img.shields.io/badge/Version-1.1.6-blue.svg)]()
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/JALAL591/compose-bridge/blob/main/LICENSE)
+[![JetBrains Marketplace](https://img.shields.io/badge/JetBrains%20Marketplace-ComposeBridge-blue.svg?logo=jetbrains&logoColor=white)](https://plugins.jetbrains.com/plugin/35226-composebridge)
 [![M8ven Score](https://m8ven.ai/badge/mcp/jalal591-compose-bridge-rapm1x)](https://m8ven.ai/mcp/jalal591-compose-bridge-rapm1x?s=readme)
 
 ## 📰 Featured In
 
 <p align="left">
   <a href="https://androidweekly.net/issues/issue-746" title="Android Weekly Issue #746">
-    <img alt="Android Weekly" src="https://androidweekly.net/issues/issue-746/badge" height="24">
+    <img alt="Android Weekly Issue #746" src="https://androidweekly.net/issues/issue-746/badge" height="24">
+  </a>
+  &nbsp;
+  <a href="https://jetc.dev/issues/336.html" title="jetc.dev Newsletter Issue #336">
+    <img src="https://img.shields.io/badge/As_Seen_In-jetc.dev_%23336-blue?logo=Jetpack+Compose&logoColor=white" alt="As Seen In - jetc.dev Newsletter Issue #336" height="24">
   </a>
 </p>
 
@@ -26,20 +31,20 @@
 
 ---
 
-### 📥 التحميل المباشر والتثبيت السريع (v1.1.3)
+### 📥 التحميل المباشر والتثبيت السريع (v1.1.6)
 
 | الحزمة | ملف التثبيت (.zip / .aar) | طريقة التثبيت السريع |
 |---|---|---|
-| **إضافة بيئة التطوير (Android Studio / IntelliJ)** | [📥 **تحميل ComposeBridgeIntelliJ-1.1.5.zip**](dist/ComposeBridgeIntelliJ-1.1.5.zip) | في Android Studio: انتقل إلى `Settings` ➔ `Plugins` ➔ `⚙️` ➔ `Install Plugin from Disk...` |
-| **مكتبة أندرويد لـ Jetpack Compose (Agent)** | [📦 **تحميل composebridge-agent-release.aar**](dist/composebridge-agent-release.aar) | انسخ الملف إلى مجلد `app/libs/` أو ضعه في `debugImplementation` |
-| **مكتبة أندرويد الأساسية (Runtime)** | [📦 **تحميل composebridge-runtime-release.aar**](dist/composebridge-runtime-release.aar) | ضعه في `implementation` لضمان أمان البناء |
-| **سيرفر بايثون و MCP** | [📦 **تحميل composebridge-server-1.1.5.zip**](dist/composebridge-server-1.1.5.zip) | خادم المزامنة ووكلاء الذكاء الاصطناعي |
-| **الحزمة الشاملة المتكاملة (All-in-One)** | [📦 **تحميل ComposeBridge-v1.1.5-AllInOne.zip**](dist/ComposeBridge-v1.1.5-AllInOne.zip) | تجمع الإضافة، العميل، مكتبة الـ Runtime، والسيرفر |
+| **إضافة بيئة التطوير (Android Studio / IntelliJ)** | [🚀 **تثبيت من متجر JetBrains Marketplace الرسمي**](https://plugins.jetbrains.com/plugin/35226-composebridge)<br>أو [📥 **تحميل ComposeBridgeIntelliJ-1.1.6.zip**](https://github.com/JALAL591/compose-bridge/raw/main/dist/ComposeBridgeIntelliJ-1.1.6.zip) | التثبيت بضغطة زر من المتجر مباشرة، أو في Android Studio: `Settings` ➔ `Plugins` ➔ `⚙️` ➔ `Install Plugin from Disk...` |
+| **مكتبة أندرويد لـ Jetpack Compose (Agent)** | [📦 **تحميل composebridge-agent-release.aar**](https://github.com/JALAL591/compose-bridge/raw/main/dist/composebridge-agent-release.aar) | انسخ الملف إلى مجلد `app/libs/` أو ضعه في `debugImplementation` |
+| **مكتبة أندرويد الأساسية (Runtime)** | [📦 **تحميل composebridge-runtime-release.aar**](https://github.com/JALAL591/compose-bridge/raw/main/dist/composebridge-runtime-release.aar) | ضعه في `implementation` لضمان أمان البناء في وضعي Debug و Release |
+| **سيرفر بايثون وخادم MCP** | [📦 **تحميل composebridge-server-1.1.6.zip**](https://github.com/JALAL591/compose-bridge/raw/main/dist/composebridge-server-1.1.6.zip) | حزمة السيرفر المنفصلة لوكلاء الذكاء الاصطناعي والمزامنة |
+| **الحزمة الشاملة المتكاملة (All-in-One)** | [📦 **تحميل ComposeBridge-v1.1.6-AllInOne.zip**](https://github.com/JALAL591/compose-bridge/raw/main/dist/ComposeBridge-v1.1.6-AllInOne.zip) | تجمع الإضافة، العميل، مكتبة الـ Runtime، التوثيق، والسيرفر معاً |
 
 **ComposeBridge** هي حزمة أدوات للمطورين تربط تطبيق Compose (KMP/Android) بمحرر الأكواد أو وكيل الذكاء الاصطناعي الخاص بك.
 
 > [!NOTE]
-> **حالة دعم KMP / Desktop**: دعم KMP/Desktop حالياً في مرحلة **Beta تجريبية**. التركيز الأساسي لإصدار v1.1.1 ينصب على **استقرار منصة أندرويد (Android stability)**.
+> **حالة دعم KMP / Desktop**: دعم KMP/Desktop حالياً في مرحلة **Beta تجريبية**. التركيز الأساسي لإصدار v1.1.6 ينصب على **استقرار منصة أندرويد (Android stability)**.
 
 
 ### 🎯 ما الجديد في الإصدار v1.0.0؟
@@ -48,7 +53,7 @@
 - **طابور التعديلات المعلقة (Queue):** اجمع عدة تعديلات للواجهة محلياً ثم اضغط **Sync** مرة واحدة.
 - **دعم الأبعاد (Dimensions):** عدّل الارتفاع، العرض، الحشوات، وأحجام الخطوط لحظياً — وليس الألوان فقط.
 - **المراجعة والتراجع (Review & Reject):** مراجعة كاملة تشبه `git status` داخل بيئة التطوير. اعتمد التغييرات (Approve) أو تراجع عنها بالبايت (Reject All).
-- **أكثر من 17 أداة MCP:** يمكن لوكلاء الذكاء الاصطناعي الآن تشغيل بناء Gradle، واكتشاف الأنماط، والتراجع عن التغييرات بشكل مستقل.
+- **27 أداة MCP متكاملة:** يمكن لوكلاء الذكاء الاصطناعي الآن تشغيل بناء Gradle، واكتشاف الأنماط، والتراجع عن التغييرات بشكل مستقل.
 
 ### 🎬 شاهد المشروع أثناء العمل ولقطات الشاشة
 
@@ -81,6 +86,23 @@
 
 ---
 
+## ⚙️ كيف تعمل الأداة خلف الكواليس (Under the Hood)
+
+تعمل ComposeBridge كمنظومة ثلاثية الأطراف تنسق بين إضافة الـ IDE، ومحرك التعديل الجراحي، والمراقب الحي على الهاتف:
+
+- **إضافة بيئة التطوير (Android Studio / IntelliJ Plugin):**
+  تدير عمليات خادم البايثون في الخلفية، وتعرض حالة الاتصال والنبضات اللحظية، وتنشئ رموز QR لشبكة Tailscale WireGuard الآمنة للاتصال عن بُعد، وتوفر تبويبات الفحص (`Changes`, `Tokens`, `Orphans`, `Patterns`, `Status`) مع واجهة لمراجعة الفروقات واعتمادها أو رفضها.
+- **سيرفر بايثون ومحرك الـ AST الجراحي (Tree-sitter):**
+  خادم WebSocket سريع يعمل على المنفذ `8711`. عند استقبال أي تعديل، يقوم Tree-sitter بتحليل شجرة قواعد كود Kotlin وتعديل السطر المطلوب جراحياً دون إعادة تنسيق الكود أو المساس بالتعليقات، مع نظام قفل ذري للملفات (`_atomic_write_text`) وحفظ دقيق لنهايات الأسطر (CRLF/LF).
+- **عميل أندرويد (:composebridge-agent):**
+  يعمل كطبقة خفيفة فوق واجهة التطبيق عبر `ComposeBridgeAgent.Root`. يلتقط لمسات المستخدم في وضع التصميم، ويحسب أبعاد وإحداثيات العناصر عبر `CompositionRegistry`، ويطبق التعديلات محلياً وفورياً (<50ms) عبر سجلات `BridgeThemeRegistry` و `BridgeDimensionRegistry` و `BridgeTextRegistry`.
+- **محرك اليومية والتراجع الآمن (PatternJournal):**
+  قبل تعديل أي ملف، يتم فحص صحة قواعده بـ Tree-sitter وأخذ نسخة احتياطية سالمة `.bridge.bak`. عند التراجع (Reject)، تعتمد الأداة على Git أولاً (`git checkout -- <file>`) لضمان استرجاع سليم 100%، وتعود للنسخة الاحتياطية في الملفات غير المتتبعة.
+- **بروتوكول سياق النموذج (MCP Server):**
+  يوفر 27 أداة قياسية عبر stdio/JSON-RPC تمكّن وكلاء الذكاء الاصطناعي (مثل Antigravity, Cursor, Claude) من فحص المشروع والتوكنات والقيام بإعادة الهيكلة آلياً دون الحاجة لاتصال هاتف حقيقي.
+
+---
+
 ## 📦 هيكل المستودع
 
 ```text
@@ -90,6 +112,17 @@ composebridge/
 ├── plugin/      # إضافة Android Studio (5 تبويبات)
 └── docs/        # التوثيق المعماري وأدلة الإعداد
 ```
+
+---
+
+## 🔄 دليل الترقية من v1.1.x إلى v1.1.6
+
+الترقية إلى الإصدار v1.1.6 سهلة ومباشرة ولا تتضمن **أي تغييرات كاسرة (Zero Breaking Changes)** في كود مشروعك أو إعدادات Gradle:
+
+1. **تحديث إضافة بيئة التطوير (IDE Plugin):** قم بتثبيت حزمة الإضافة المحدثة `dist/ComposeBridgeIntelliJ-1.1.6.zip` في Android Studio عبر (**Settings** ➔ **Plugins** ➔ **Install Plugin from Disk...**) وأعد تشغيل البرنامج.
+2. **تحديث مكتبة الـ Android AAR:** استبدل ملف `composebridge-agent-release.aar` في مجلد `libs/` داخل تطبيقك بالنسخة المحدثة من `dist/composebridge-agent-release.aar`، ثم أعد مزامنة Gradle (`Sync Project`).
+3. **تحديث سيرفر البايثون:** إذا كنت تشغله يدوياً، حدّث الحزم عبر `pip install -r requirements.txt --upgrade` في مجلد `server/`.
+4. **التغييرات الكاسرة:** **لا توجد أي تغييرات كاسرة.** جميع بروتوكولات الاتصال وسجلات الـ Runtime وأدوات الـ MCP متوافقة 100% مع الإصدارات السابقة.
 
 ---
 
@@ -126,6 +159,57 @@ composebridge/
    ```
 *(ملاحظة: إذا كنت تستخدم وكلاء الذكاء الاصطناعي عبر بروتوكول MCP فقط، فلا تحتاج لهاتف أو لأمر adb reverse؛ راجع قسم [خادم MCP](#-خادم-mcp-لوكلاء-الذكاء-الاصطناعي) أدناه).*
 
+### 🌍 الاتصال عن بُعد (ميزة تجريبية - Experimental)
+
+يمكنك ضبط وتعديل واجهات Jetpack Compose عبر الإنترنت (بيانات الهاتف، شبكات Wi-Fi مختلفة، أو أثناء العمل عن بُعد) دون الحاجة لكابل USB باستخدام **Tailscale Funnel**:
+
+#### المتطلبات الأساسية:
+- تثبيت تطبيق [Tailscale](https://tailscale.com/download) على جهاز الكمبيوتر والهاتف الذكي.
+- إنشاء حساب Tailscale (مجاني تماماً للاستخدام الشخصي).
+
+#### خطوات التشغيل بالتفصيل:
+
+##### الخطوة 1: إعداد سياسات Tailscale (ACL) - خطوة حاسمة!
+بشكل افتراضي، لا تسمح خدمة Tailscale بتشغيل خاصية Funnel ما لم يتم تفعيلها صراحة في سياسات التحكم بالوصول (Access Controls). قبل تشغيل أمر الـ Funnel:
+1. اذهب إلى لوحة تحكم [Tailscale Admin Console - Access Controls](https://login.tailscale.com/admin/acls).
+2. في محرر سياسات الـ JSON، أضف الكود التالي داخل القوسين الرئيسيين `{ ... }`:
+   ```json
+   "nodeAttrs": [
+     {
+       "target": ["*"],
+       "attr": ["funnel"]
+     }
+   ]
+   ```
+3. اضغط على **Save** لحفظ التغييرات.
+> [!IMPORTANT]
+> **تحذير هام:** بدون هذه الخطوة، لن يعمل أمر `tailscale funnel 8711` وستظهر رسالة خطأ تفيد بعدم السماح: `funnel not allowed by ACLs`.
+
+##### الخطوة 2: تشغيل Tailscale Funnel على جهاز الكمبيوتر
+1. افتح تطبيق Tailscale وسجّل الدخول.
+2. في موجه الأوامر (Terminal / PowerShell)، شغّل الأمر التالي:
+   ```bash
+   tailscale funnel 8711
+   ```
+   *(أو: `tailscale serve https / http://127.0.0.1:8711`)*
+3. **اترك هذه النافذة مفتوحة** (يجب أن يظل نفق Tailscale Funnel قيد التشغيل).
+
+##### الخطوة 3: الحصول على الرابط في إضافة Android Studio / IntelliJ
+1. افتح نافذة أداة **ComposeBridge** في الشريط الجانبي.
+2. اضغط على زر **"Share Remote"**.
+3. ستظهر لك نافذة منبثقة تحتوي على **QR Code** ورابط الاتصال المشفر المباشر (`wss://...`).
+
+##### الخطوة 4: الاتصال عبر الهاتف الذكي
+1. افتح تطبيقك (المدمج به ComposeBridge Agent).
+2. اضغط على أيقونة وضع التصميم العائمة 🎨 ثم افتح **إعدادات الاتصال (Connection Settings)**.
+3. اختر تبويب **"Remote"**:
+   - اضغط على **"Scan QR"** وامسح الرمز مباشرة من شاشة الكمبيوتر، **أو**
+   - الصق الرابط يدوياً عبر زر **"Paste from Clipboard"**.
+4. اضغط على **"Connect Remote"** لبدء المزامنة الحية فوراً.
+
+> [!WARNING]
+> **تنبيه صادق وشفاف:** ميزة الاتصال عن بُعد هي **ميزة تجريبية (Experimental)**. قد ينقطع الاتصال نتيجة لتغييرات الشبكة (مثل التبديل بين Wi-Fi وبيانات الهاتف)، أو جدران الحماية الصارمة، أو دخول الهاتف في وضع توفير الطاقة والنوم (Phone Sleep). للحصول على أعلى استقرار وزمن استجابة فائق (<50ms)، يُوصى دائماً باستخدام **اتصال USB المباشر**. لمزيد من التفاصيل راجع [LIMITATIONS.md](LIMITATIONS.md).
+
 ---
 
 ### 📲 خطوات دمج الـ Agent في تطبيقك
@@ -143,11 +227,41 @@ dependencies {
 }
 ```
 
+##### ⚠️ مشاريع Kotlin Multiplatform (KMP)
+إذا كان مشروعك يستهدف كلاً من Android و Desktop (KMP) وكنت تستخدم سجلات ComposeBridge داخل `commonMain`، **لا تستخدم ملفات الـ `.aar`** (حيث إن مترجم الكمبيوتر Desktop لا يستطيع قراءة حزم `.aar` الخاصة بنظام Android). بدلاً من ذلك، استخدم الموديولات المصدرية كالتالي:
+
+1. انسخ مجلد `agent/runtime` إلى مشروعك (مثال: `composebridge-agent/runtime`).
+2. في ملف `settings.gradle.kts` (أو `settings.gradle`)، أضف موديول الـ runtime:
+   ```kotlin
+   include(":composebridge-runtime")
+   project(":composebridge-runtime").projectDir = file("composebridge-agent/runtime")
+   ```
+3. في ملف `composebridge-agent/build.gradle.kts`، صدّر الـ runtime كتابعية `api`:
+   ```kotlin
+   kotlin {
+       sourceSets {
+           commonMain.dependencies {
+               api(project(":composebridge-runtime"))
+           }
+       }
+   }
+   ```
+4. في ملف `composeApp/build.gradle.kts`، اربط الـ agent في `commonMain`:
+   ```kotlin
+   kotlin {
+       sourceSets {
+           commonMain.dependencies {
+               implementation(project(":composebridge-agent"))
+           }
+       }
+   }
+   ```
+
 #### 2. قم بتهيئته في MainActivity
 ```kotlin
 override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
-    ComposeBridgeAgent.start(serverUrl = "ws://127.0.0.1:8711")
+    ComposeBridgeAgent.start(context = this, serverUrl = "ws://127.0.0.1:8711")
     setContent {
         ComposeBridgeAgent.Root {
             App()
@@ -197,7 +311,7 @@ pip install -r requirements.txt
       "command": "python",
       "args": ["-u", "C:\Users\thinkpad\StudioProjects\compose-bridge\server\mcp_server.py"],
       "env": {
-        "COMPOSEBRIDGE_ROOT": "C:\Users\thinkpad\StudioProjects\MyTeacher-App",
+        "COMPOSEBRIDGE_ROOT": "/مسار/مشروع/الاندرويد/الخاص/بك",
         "PYTHONIOENCODING": "utf-8"
       }
     }
@@ -228,7 +342,7 @@ pip install -r requirements.txt
 
 ---
 
-## ⚠️ دعم المنصات (الإصدار v1.1.1)
+## ⚠️ دعم المنصات (الإصدار v1.1.6)
 
 | الميزة | Android | Desktop | iOS |
 |--------|:-------:|:-------:|:---:|
@@ -236,7 +350,7 @@ pip install -r requirements.txt
 | **إضافة بيئة التطوير** | ✅ | ✅ | ✅ |
 | **التعديل الحي على الهاتف** | ✅ | ❌ | ❌ |
 
-*التعديل الحي على سطح المكتب (Desktop) و iOS مخطط لهما في الإصدار v1.1.1.*
+*التعديل الحي على سطح المكتب (Desktop) و iOS في مرحلة التطوير النشط.*
 
 ---
 
@@ -250,5 +364,42 @@ pip install -r requirements.txt
 
 ---
 
+## ⚠️ القيود الصادقة والحدود التشغيلية (Honest Limitations)
+
+> 📖 **الإفصاح الفني الشامل:** للاطلاع على كامل الحدود التشغيلية والمعمارية بدقة وشفافية، راجع **[LIMITATIONS.md](LIMITATIONS.md)**.
+> 
+> ⚠️ **تنبيه صادق:** **الاتصال عن بُعد ميزة تجريبية (Remote Connection is experimental).** كما أن الأداة **تتوقف بأمان تام** (`NEEDS_MANUAL_MAPPING`) وترفض التعديل العشوائي إذا لم تجد ملفات التصميم (الألوان، الأبعاد، النصوص) حتى تقوم بتحديدها في تبويب **Discovery** لحماية مشروعك من التلوث البرمجي.
+
+- **استقرار الاتصال عن بُعد:** ميزة الاتصال عبر الإنترنت تجريبية. اتصالات USB المباشرة هي الخيار الموصى به للاستقرار التام.
+- **إلزامية مسار التصميم عند الغياب:** لن تكتب الأداة في أي ملف عشوائي إذا غابت ملفات الأنماط المركزية.
+
+---
+
 ## 📜 الترخيص
 موزّع تحت رخصة [Apache License 2.0](https://github.com/JALAL591/compose-bridge/blob/main/LICENSE).
+
+---
+
+## 🌍 الاتصال والتحكم عن بُعد عبر Tailscale (Remote Access)
+
+يقدم ComposeBridge v1.1.6 ميزة الاتصال عن بُعد الآمن باستخدام تقنية **Tailscale Funnel** المبنية على بروتوكول WireGuard والتشفير الكامل. يمكنك الآن معاينة وتعديل واجهات Compose مباشرة على الهواتف الحقيقية عبر شبكات الإنترنت الخارجية وبيانات الهاتف دون الحاجة لكابل USB.
+
+### 1. المتطلبات الأساسية
+- قم بتثبيت **Tailscale** على حاسوب التطوير: [https://tailscale.com/download](https://tailscale.com/download)
+- سجل الدخول وشغل الخدمة: `tailscale up`
+- تأكد من تفعيل خاصية [Tailscale Funnel](https://tailscale.com/kb/1223/funnel) لحسابك.
+
+### 2. تفعيل المشاركة من بيئة التطوير (Android Studio Plugin)
+1. افتح نافذة **ComposeBridge** في أندرويد ستوديو.
+2. انقر على **▶ Start Bridge** لتشغيل السيرفر المحلي مع التوكن الديناميكي العشوائي.
+3. انقر على زر **🌍 Share Remote** في شريط الأدوات:
+   - ستقوم الإضافة بتشغيل نفق `tailscale funnel 8711 --bg` تلقائياً.
+   - ستظهر نافذة منبثقة تحتوي على رمز **QR Code** يضم رابط الاتصال الآمن `wss://<node>.<tailnet>.ts.net` وتوكن المصادقة الديناميكي.
+4. يمكنك نسخ الرابط أو التوكن بنقرة زر، أو إيقاف المشاركة بالنقر على **Stop Sharing**.
+
+### 3. الاتصال من تطبيق الهاتف (ComposeBridge Agent)
+1. افتح تطبيقك (في وضع Debug) المزود بـ `ComposeBridgeAgent`.
+2. انقر على الزر العائم **🎨** لإظهار شريط الأدوات، ثم انقر على أيقونة **🌍**.
+3. انقر على **📷 مسح QR أو لصق من الحافظة** (أو الصق JSON مباشرة).
+4. سيتصل الوكيل فوراً بالسيرفر عبر بروتوكول مشفر `wss://` ويبدأ المزامنة الحية للتصميم.
+5. للعودة للاتصال المحلي السلكي، اضغط على **محلي (127.0.0.1)** في أي وقت.

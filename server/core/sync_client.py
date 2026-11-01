@@ -14,7 +14,8 @@ except ImportError:
 
 
 BRIDGE_URL = "ws://127.0.0.1:8711"
-AUTH_TOKEN = "test-token-local-dev"
+from core.auth_manager import get_or_create_auth_token
+AUTH_TOKEN = get_or_create_auth_token()
 
 
 async def _send_message_async(msg_type: str, extra: Optional[Dict] = None) -> Dict:

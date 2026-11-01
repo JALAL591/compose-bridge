@@ -323,8 +323,4 @@ private fun BridgeTextEditorPopup(
     }
 }
 
-private fun parseHexColor(hex: String): Color {
-    val cleaned = hex.removePrefix("#").removePrefix("0x")
-    val argb = if (cleaned.length == 6) "FF$cleaned" else cleaned
-    return Color(argb.toLong(16))
-}
+private fun parseHexColor(hex: String): Color = com.composebridge.agent.util.ColorUtils.parseHexColor(hex)

@@ -1,3 +1,4 @@
+from common.file_ops import is_ignored_path
 # -*- coding: utf-8 -*-
 """
 Dimension source editor module.
@@ -58,8 +59,14 @@ def edit_dimension_in_source(
         return (False, f"Refused: {reason}", None)
 
     if not full_path.exists():
-        candidates = list(PROJECT_ROOT.rglob(Path(source_file).name))
-        candidates = [c for c in candidates if 'build/' not in str(c)]
+        candidates = [c for c in PROJECT_ROOT.rglob(Path(source_file).name) if not is_ignored_path(c, PROJECT_ROOT)]
+        def _rank(p):
+            norm = str(p).replace("\\", "/").lower()
+            if "/commonmain/" in norm: return 0
+            if "/main/" in norm: return 1
+            if "/src/" in norm: return 2
+            return 3
+        candidates.sort(key=lambda p: (_rank(p), len(str(p))))
         if not candidates:
             return (False, f"File not found: {source_file}", None)
         full_path = candidates[0]
@@ -162,17 +169,36 @@ def update_token_default(token_name: str, value: str) -> tuple:
         if candidate_path and candidate_path.exists():
             try:
                 txt = candidate_path.read_text(encoding="utf-8")
-                if f'"{token_name}"' in txt:
+                if f'"{token_name}"' in txt or f'val {token_name}' in txt:
                     file_path = candidate_path
                     break
             except Exception:
                 pass
 
     if not file_path or not file_path.exists():
-        file_path = _find_registry_file("AppDimens.kt", p_root)
+        try:
+            from analysis.universal_scanner import resolve_target_design_file
+            target_dim, _ = resolve_target_design_file("dimension", p_root)
+            if target_dim and target_dim.exists():
+                file_path = target_dim
+        except Exception:
+            pass
 
     if not file_path or not file_path.exists():
-        return (False, f"Registry file for token '{token_name}' not found in project: {p_root}", None)
+        return (
+            False,
+            f"NEEDS_MANUAL_MAPPING: Registry file for dimension token '{token_name}' not found in project: {p_root}. Please configure mapping.",
+            {
+                "error_code": "NEEDS_MANUAL_MAPPING",
+                "token_type": "dimension",
+                "token_name": token_name,
+            }
+        )
+
+    from core.ast_finder import validate_kotlin_syntax
+    is_valid_initial, init_err = validate_kotlin_syntax(file_path)
+    if not is_valid_initial:
+        return (False, f"❌ الملف الحالي يحتوي على أخطاء برمجية ({init_err}). يرجى إصلاحه أولاً.", None)
 
     with open(file_path, "r", encoding="utf-8", newline="") as f:
         content = f.read()
@@ -273,3 +299,6 @@ def update_token_default(token_name: str, value: str) -> tuple:
         }
     )
 
+
+
+update_token_default_value = update_token_default

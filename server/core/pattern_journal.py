@@ -1,27 +1,26 @@
-import hashlib
-
-def compute_normalized_hash(content_or_bytes) -> str:
-    """Compute SHA-256 hash with normalized line endings to prevent platform CRLF/LF mismatches."""
-    if isinstance(content_or_bytes, bytes):
-        text = content_or_bytes.decode("utf-8", errors="replace")
-    else:
-        text = str(content_or_bytes)
-    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
-    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
-
-import shutil
 # -*- coding: utf-8 -*-
 """
-Pattern Journal — حفظ كل تعديلات replace_pattern للسماح بالتراجع الكامل وإدارة التغييرات (Changes Tab).
+سجل الأنماط والتعديلات (Pattern Journal) لخادم ComposeBridge.
+Manages persistent recording of pattern replacements, modified files, diffs, and approvals.
 """
 
 import json
+import shutil
+import subprocess
 from pathlib import Path
 from typing import List, Dict, Optional
 from datetime import datetime
 
+from core.journal.backup_verifier import BackupVerifierMixin, compute_normalized_hash
+from core.journal.rollback_manager import RollbackMixin
+from core.journal.approval_manager import ApprovalMixin
 
-class PatternJournal:
+class PatternJournal(RollbackMixin, BackupVerifierMixin, ApprovalMixin):
+    """
+    سجل تتبع التعديلات والأنماط المعلقة.
+    Coordinates pattern journal logging, modified files discovery, diff generation, and approvals.
+    """
+
     def __init__(self, project_root: Path):
         self.project_root = project_root
         self.journal_file = project_root / ".composebridge-state" / "pattern_journal.jsonl"
@@ -143,72 +142,6 @@ class PatternJournal:
                 pass
         return remaining
 
-    def verify_before_reject(self) -> dict:
-        """
-        Verify occurrences and token definitions before executing reject.
-        Checks if occurrences match what is on disk.
-        """
-        if not self.journal_file.exists():
-            return {"can_reject": True, "mismatches": [], "warnings": []}
-
-        mismatches = []
-        warnings = []
-        files = self.list_modified_files()
-
-        for f_data in files:
-            f_name = f_data["file"]
-            full_path = self.project_root / f_name
-            if not full_path.exists():
-                matches = [m for m in self.project_root.rglob(Path(f_name).name) if "build" not in str(m) and ".composebridge-state" not in str(m)]
-                if matches:
-                    full_path = matches[0]
-                else:
-                    mismatches.append({"file": f_name, "error": "File does not exist"})
-                    continue
-
-            content = full_path.read_text(encoding="utf-8")
-            changes = self.get_file_changes(f_name)
-            for ch in changes:
-                if ch["new"] not in content and ch["new"].strip() not in content:
-                    mismatches.append({
-                        "file": f_name,
-                        "line": ch.get("line"),
-                        "error": "New content modified or missing",
-                    })
-
-        # Check token definitions
-        added_tokens = []
-        try:
-            with open(self.journal_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    try:
-                        entry = json.loads(line.strip())
-                        if entry.get("type") in ("token_added", "pattern_summary"):
-                            tname = entry.get("token_name")
-                            if tname and tname not in added_tokens:
-                                added_tokens.append(tname)
-                    except Exception:
-                        pass
-            if added_tokens:
-                from .token_migrator import TokenMigrator
-                migrator = TokenMigrator(self.project_root)
-                registry_file = migrator._find_registry_file()
-                if registry_file and registry_file.exists():
-                    reg_content = registry_file.read_text(encoding="utf-8")
-                    for tname in added_tokens:
-                        if tname not in reg_content:
-                            warnings.append({
-                                "token": tname,
-                                "warning": f"Token '{tname}' definition missing from registry",
-                            })
-        except Exception:
-            pass
-
-        return {
-            "can_reject": len(mismatches) == 0,
-            "mismatches": mismatches,
-            "warnings": warnings,
-        }
 
     def record_token_added(
         self,
@@ -294,6 +227,22 @@ class PatternJournal:
         except Exception:
             pass
 
+        # 🌟 IMMUTABLE BASELINE: Extract true original line from .bridge.bak if available
+        baseline_old = old_line
+        try:
+            full_target = self.project_root / file
+            if not full_target.exists():
+                matches = [m for m in self.project_root.rglob(Path(file).name) if "build" not in str(m) and ".composebridge-state" not in str(m)]
+                if matches:
+                    full_target = matches[0]
+            bak_path = Path(str(full_target) + ".bridge.bak")
+            if bak_path.exists() and line > 0:
+                bak_lines = bak_path.read_text(encoding="utf-8").splitlines()
+                if 1 <= line <= len(bak_lines):
+                    baseline_old = bak_lines[line - 1]
+        except Exception:
+            pass
+
         norm_file = str(file).replace("\\", "/").strip().lower()
         file_name = Path(norm_file).name
         merged = False
@@ -304,17 +253,23 @@ class PatternJournal:
             same_file = (e_file == norm_file or Path(e_file).name == file_name)
             if same_file:
                 entry_line = entry.get("line", 0)
-                same_or_near_line = (entry_line == line or abs(entry_line - line) <= 3)
+                # STRICT line matching: only merge if on the exact same line
+                # AND it represents a consecutive modification of that same line
+                same_exact_line = (entry_line == line)
                 consecutive_match = (
                     entry.get("new_line", "").strip() == old_line.strip()
                     or entry.get("new", "").strip() == old_line.strip()
                 )
-                if same_or_near_line or consecutive_match:
+                if same_exact_line and (consecutive_match or entry_line == line):
                     # Merge: keep earliest original value (old_line and old), update to latest
                     entry["new_line"] = new_line
                     entry["new"] = new_line
                     entry["line"] = line
                     entry["t"] = datetime.utcnow().isoformat()
+                    # Ensure old_line is never replaced by intermediate new_line
+                    if not entry.get("old_line") or not entry.get("old"):
+                        entry["old_line"] = baseline_old
+                        entry["old"] = baseline_old
                     if curr_checksum:
                         entry["checksum_after"] = curr_checksum
                     if pattern_id:
@@ -328,9 +283,9 @@ class PatternJournal:
                 "type": "replacement",
                 "file": file,
                 "line": line,
-                "old": old_line,
+                "old": baseline_old,
                 "new": new_line,
-                "old_line": old_line,
+                "old_line": baseline_old,
                 "new_line": new_line,
                 "pattern_id": pattern_id,
                 "checksum_after": curr_checksum,
@@ -415,29 +370,57 @@ class PatternJournal:
         Returns list of {file, change_count, pattern_ids, first_line}.
         """
         files: Dict[str, Dict] = {}
-        if self.journal_file.exists():
-            with open(self.journal_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    try:
-                        entry = json.loads(line.strip())
-                        if entry.get("type") == "token_added":
+        candidate_journals = [
+            self.journal_file,
+            self.project_root / ".composebridge-state" / "pattern_journal.jsonl",
+            self.project_root / "pattern_journal.jsonl",
+            self.project_root / ".composebridge-journal.json",
+        ]
+        seen_journals = set()
+        for jfile in candidate_journals:
+            if not jfile or not jfile.exists() or jfile in seen_journals:
+                continue
+            seen_journals.add(jfile)
+            try:
+                with open(jfile, "r", encoding="utf-8") as f:
+                    for line in f:
+                        try:
+                            line_str = line.strip()
+                            if not line_str:
+                                continue
+                            entry = json.loads(line_str)
+                            if entry.get("type") == "token_added":
+                                continue
+                            file_path = entry.get("file")
+                            if not file_path:
+                                continue
+                            try:
+                                p_abs = Path(file_path)
+                                if p_abs.is_absolute():
+                                    norm_path = str(p_abs.relative_to(self.project_root)).replace("\\", "/")
+                                else:
+                                    norm_path = str(file_path).replace("\\", "/")
+                            except Exception:
+                                norm_path = str(file_path).replace("\\", "/")
+
+                            if self.is_temp_path(norm_path, self.project_root):
+                                continue
+
+                            if norm_path not in files:
+                                files[norm_path] = {
+                                    "file": norm_path,
+                                    "change_count": 0,
+                                    "pattern_ids": set(),
+                                    "first_line": entry.get("line", 0),
+                                }
+                            files[norm_path]["change_count"] += 1
+                            pid = entry.get("pattern_id")
+                            if pid:
+                                files[norm_path]["pattern_ids"].add(pid)
+                        except Exception:
                             continue
-                        file_path = entry.get("file")
-                        if not file_path:
-                            continue
-                        if file_path not in files:
-                            files[file_path] = {
-                                "file": file_path,
-                                "change_count": 0,
-                                "pattern_ids": set(),
-                                "first_line": entry.get("line", 0),
-                            }
-                        files[file_path]["change_count"] += 1
-                        pid = entry.get("pattern_id")
-                        if pid:
-                            files[file_path]["pattern_ids"].add(pid)
-                    except Exception:
-                        continue
+            except Exception:
+                continue
 
         # Also check pending_edits.json
         pending_candidates = [
@@ -486,24 +469,48 @@ class PatternJournal:
                             matched_key = k
                             break
                     
-                    if not matched_key:
-                        first_line = 1
-                        try:
-                            orig_lines = bak.read_text(encoding="utf-8", errors="replace").splitlines()
-                            curr_lines = orig_path.read_text(encoding="utf-8", errors="replace").splitlines()
+                    orig_lines = []
+                    curr_lines = []
+                    is_modified_on_disk = False
+                    first_line = 1
+                    orig_line_text = ""
+                    curr_line_text = ""
+                    try:
+                        orig_lines = bak.read_text(encoding="utf-8", errors="replace").splitlines()
+                        curr_lines = orig_path.read_text(encoding="utf-8", errors="replace").splitlines()
+                        if orig_lines != curr_lines:
+                            is_modified_on_disk = True
                             for idx, (l1, l2) in enumerate(zip(orig_lines, curr_lines)):
                                 if l1 != l2:
                                     first_line = idx + 1
+                                    orig_line_text = l1
+                                    curr_line_text = l2
                                     break
-                        except Exception:
-                            first_line = 1
-                        
-                        files[rel] = {
-                            "file": rel,
-                            "change_count": 1,
-                            "pattern_ids": {"external_edit"},
-                            "first_line": first_line,
-                        }
+                            if first_line == 1 and not orig_line_text and not curr_line_text and len(orig_lines) != len(curr_lines):
+                                first_line = min(len(orig_lines), len(curr_lines)) + 1
+                    except Exception:
+                        is_modified_on_disk = True
+                        first_line = 1
+
+                    if not matched_key:
+                        if is_modified_on_disk:
+                            files[rel] = {
+                                "file": rel,
+                                "change_count": 1,
+                                "pattern_ids": {"external_edit"},
+                                "first_line": first_line,
+                            }
+                            # Auto-reconcile with journal so it persists across sessions and IDE views
+                            try:
+                                self.record_change(
+                                    file=rel,
+                                    line=first_line,
+                                    old_line=orig_line_text,
+                                    new_line=curr_line_text,
+                                    pattern_id="reconciled_disk_edit",
+                                )
+                            except Exception:
+                                pass
                     else:
                         files[matched_key]["pattern_ids"].add("external_edit")
         except Exception:
@@ -511,9 +518,26 @@ class PatternJournal:
 
         result = []
         for f in files.values():
+            full_f = self.project_root / f["file"]
+            if not full_f.exists():
+                continue
             f["pattern_ids"] = list(f["pattern_ids"])
-            result.append(f)
+            try:
+                from core.diff_engine import get_file_diff_report
+                report = get_file_diff_report(full_f, self.project_root)
+                f["changes"] = report.get("changes", [])
+                f["change_count"] = report.get("change_count", len(f["changes"]))
+                f["has_backup"] = report.get("has_backup", False)
+            except Exception:
+                f["changes"] = []
+                f["change_count"] = 0
+                f["has_backup"] = False
+
+            # Only include files that genuinely have pending modifications or backup
+            if f.get("change_count", 0) > 0 or f.get("has_backup", False):
+                result.append(f)
         return result
+
 
     def get_file_changes(self, file_path: str) -> List[Dict]:
         """Get all changes for a specific file."""
@@ -534,739 +558,23 @@ class PatternJournal:
                     continue
         return changes
 
-    def reject_file_changes(self, file_path: str, force: bool = False) -> Dict:
-        """Revert all changes for a specific file with external modification guard."""
-        changes = self.get_file_changes(file_path)
-        full_path = self.project_root / file_path
-        if not full_path.exists():
-            matches = [m for m in self.project_root.rglob(Path(file_path).name) if "build" not in str(m) and ".composebridge-state" not in str(m)]
-            if matches:
-                full_path = matches[0]
-            else:
-                return {"success": False, "error": f"File '{file_path}' not found"}
 
-        backup_path = Path(str(full_path) + ".bridge.bak")
-        if not backup_path.exists():
-            alt_matches = [m for m in self.project_root.rglob(full_path.name + ".bridge.bak") if "build" not in str(m) and ".composebridge-state" not in str(m)]
-            if alt_matches:
-                backup_path = alt_matches[0]
-
-        if not backup_path.exists() and not changes:
-            return {"success": False, "error": f"No changes or backup found for {file_path}"}
-
-        curr_content = full_path.read_text(encoding="utf-8")
-        curr_bytes = full_path.read_bytes()
-        import hashlib
-        curr_checksum_bytes = hashlib.sha256(curr_bytes).hexdigest()
-        curr_checksum_text = hashlib.sha256(curr_content.encode("utf-8")).hexdigest()
-        curr_checksum_norm = compute_normalized_hash(curr_bytes)
-
-        # Check for external modifications (verify against the latest change state)
-        external_modified = False
-        mismatch_reason = ""
-
-        latest_change = changes[-1] if changes else None
-        if latest_change and latest_change.get("checksum_after"):
-            expected_chk = latest_change["checksum_after"]
-            if expected_chk not in (curr_checksum_bytes, curr_checksum_text, curr_checksum_norm):
-                external_modified = True
-                mismatch_reason = "checksum_mismatch"
-
-        if not external_modified and latest_change and latest_change.get("new"):
-            curr_norm = curr_content.replace("\r\n", "\n").replace("\r", "\n")
-            target_norm = str(latest_change["new"]).replace("\r\n", "\n").replace("\r", "\n")
-            if target_norm not in curr_norm and target_norm.strip() not in curr_norm:
-                external_modified = True
-                mismatch_reason = "content_missing" 
-
-        if not external_modified and backup_path.exists() and not changes:
-            external_modified = True
-            mismatch_reason = "orphan_backup_modified"
-
-        from common.file_ops import is_file_dirty_in_ide
-        if is_file_dirty_in_ide(full_path, self.project_root):
-            external_modified = True
-            mismatch_reason = "dirty_buffer"
-
-        msg_ar = (
-            f"⚠️ تحذير: الملف '{file_path}' تم تعديله خارج الأداة (يدوياً أو بواسطة وكيل آخر).\n"
-            f"استعادة النسخة الاحتياطية ستحذف هذه التعديلات.\n"
-            f"هل أنت متأكد؟"
-        )
-
-        if external_modified and not force:
-            try:
-                from core.sync_client import send_warning_to_bridge
-                send_warning_to_bridge(
-                    warning_type="external_modification_detected",
-                    file_path=str(file_path),
-                    message=msg_ar,
-                    error_code="EXTERNAL_MODIFICATION_DETECTED",
-                    suggested_action="confirm_restore",
-                )
-            except Exception:
-                pass
-
-            return {
-                "success": False,
-                "error_code": "EXTERNAL_MODIFICATION_DETECTED",
-                "file": file_path,
-                "message": msg_ar,
-                "error": msg_ar,
-                "mismatch_reason": mismatch_reason,
-                "suggested_action": "confirm_restore",
-                "can_force": True,
-            }
-
-        reverted = 0
-        errors = []
-
-        if backup_path.exists():
-            try:
-                shutil.copy2(str(backup_path), str(full_path))
-                backup_path.unlink()
-                reverted += 1
-                # If backup restored cleanly, do not attempt line replacements
-                self._clean_pending_edits(file_path)
-                target_name = Path(file_path).name
-                remaining = []
-                if self.journal_file.exists():
-                    with open(self.journal_file, "r", encoding="utf-8") as f:
-                        for line in f:
-                            try:
-                                entry = json.loads(line.strip())
-                                efile = entry.get("file", "")
-                                if efile != file_path and Path(efile).name != target_name:
-                                    remaining.append(line)
-                            except Exception:
-                                continue
-                    with open(self.journal_file, "w", encoding="utf-8") as f:
-                        f.writelines(remaining)
-                return {
-                    "success": True,
-                    "file": file_path,
-                    "reverted_count": reverted,
-                    "message": f"تمت استعادة الملف '{file_path}' بنجاح.",
-                }
-            except Exception as e:
-                errors.append({"file": file_path, "error": f"Failed to restore backup: {e}"})
-        for change in reversed(changes):
-            try:
-                content = full_path.read_text(encoding="utf-8")
-                target_new = change["new"]
-                target_old = change["old"]
-                lines = content.splitlines()
-                target_line = change.get("line", 0)
-                reverted_this = False
-
-                if target_old == "":
-                    # Line was inserted (e.g. import). Delete it completely.
-                    if 1 <= target_line <= len(lines) + 5:
-                        for offset in [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5]:
-                            idx = target_line - 1 + offset
-                            if 0 <= idx < len(lines):
-                                if lines[idx].strip() == target_new.strip():
-                                    del lines[idx]
-                                    full_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-                                    reverted += 1
-                                    reverted_this = True
-                                    break
-                    if not reverted_this:
-                        for line_cand in [target_new.strip() + "\r\n", target_new.strip() + "\n"]:
-                            if line_cand in content:
-                                content = content.replace(line_cand, "", 1)
-                                full_path.write_text(content, encoding="utf-8")
-                                reverted += 1
-                                reverted_this = True
-                                break
-                    if not reverted_this:
-                        errors.append({"file": file_path, "error": "New content not found"})
-                    continue
-
-                if 1 <= target_line <= len(lines) + 5:
-                    for offset in [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5]:
-                        idx = target_line - 1 + offset
-                        if 0 <= idx < len(lines):
-                            if target_new in lines[idx]:
-                                lines[idx] = lines[idx].replace(target_new, target_old, 1)
-                                full_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-                                reverted += 1
-                                reverted_this = True
-                                break
-                            elif target_new.strip() in lines[idx]:
-                                lines[idx] = lines[idx].replace(target_new.strip(), target_old.strip(), 1)
-                                full_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-                                reverted += 1
-                                reverted_this = True
-                                break
-
-                if not reverted_this:
-                    if target_new in content:
-                        content = content.replace(target_new, target_old, 1)
-                        full_path.write_text(content, encoding="utf-8")
-                        reverted += 1
-                    elif target_new.strip() in content:
-                        for line_cand in [target_new.strip() + "\r\n", target_new.strip() + "\n", target_new.strip()]:
-                            if line_cand in content:
-                                content = content.replace(line_cand, target_old, 1)
-                                full_path.write_text(content, encoding="utf-8")
-                                reverted += 1
-                                reverted_this = True
-                                break
-                        if not reverted_this:
-                            errors.append({"file": file_path, "error": "New content not found"})
-                    else:
-                        errors.append({"file": file_path, "error": "New content not found"})
-            except Exception as e:
-                errors.append({"file": file_path, "error": str(e)})
-
-        # Remove reverted entries from journal
+    def _clean_journal_for_file(self, file_path: str):
         target_name = Path(file_path).name
         remaining = []
         if self.journal_file.exists():
-            with open(self.journal_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    try:
-                        entry = json.loads(line.strip())
-                        efile = entry.get("file", "")
-                        if efile != file_path and Path(efile).name != target_name:
-                            remaining.append(line)
-                    except Exception:
-                        continue
-
-            with open(self.journal_file, "w", encoding="utf-8") as f:
-                f.writelines(remaining)
-
-        self._clean_pending_edits(file_path)
-        return {
-            "success": len(errors) == 0,
-            "file": file_path,
-            "reverted_count": reverted,
-            "error_count": len(errors),
-            "errors": errors,
-        }
-
-    def keep_current_file_changes(self, file_path: str) -> Dict:
-        """Keep current on-disk modifications, discard backup, and remove from journal."""
-        res = self.approve_file_changes(file_path)
-        if res.get("success"):
-            res["message"] = f"تم الاحتفاظ بالتعديلات الحالية للملف '{file_path}' بنجاح."
-        return res
-
-    def approve_file_changes(self, file_path: str) -> Dict:
-        """Mark file changes as approved (just remove from journal)."""
-        changes = self.get_file_changes(file_path)
-        count = len(changes)
-        
-        full_path = self.project_root / file_path
-        if not full_path.exists():
-            matches = [m for m in self.project_root.rglob(Path(file_path).name) if "build" not in str(m) and ".composebridge-state" not in str(m)]
-            if matches:
-                full_path = matches[0]
-
-        backup_path = Path(str(full_path) + ".bridge.bak")
-        if not backup_path.exists() and full_path.exists():
-            alt_matches = [m for m in self.project_root.rglob(full_path.name + ".bridge.bak") if "build" not in str(m) and ".composebridge-state" not in str(m)]
-            if alt_matches:
-                backup_path = alt_matches[0]
-
-        if backup_path.exists():
             try:
-                backup_path.unlink()
-                if count == 0:
-                    count = 1
+                with open(self.journal_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        try:
+                            entry = json.loads(line.strip())
+                            efile = entry.get("file", "")
+                            if efile != file_path and Path(efile).name != target_name:
+                                remaining.append(line)
+                        except Exception:
+                            continue
+                with open(self.journal_file, "w", encoding="utf-8") as f:
+                    f.writelines(remaining)
             except Exception:
                 pass
 
-        target_name = Path(file_path).name
-        remaining = []
-        if self.journal_file.exists():
-            with open(self.journal_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    try:
-                        entry = json.loads(line.strip())
-                        efile = entry.get("file", "")
-                        if efile != file_path and Path(efile).name != target_name:
-                            remaining.append(line)
-                    except Exception:
-                        continue
-            with open(self.journal_file, "w", encoding="utf-8") as f:
-                f.writelines(remaining)
-        
-        self._clean_pending_edits(file_path)
-        return {"success": True, "file": file_path, "approved_count": count}
-
-    def approve_all_files(self) -> Dict:
-        """Approve all pending changes only if files were not modified externally."""
-        # Delete any *.bridge.bak files on disk
-        try:
-            for bak in list(self.project_root.rglob("*.bridge.bak")):
-                if any(ign in bak.parts for ign in ["build", ".gradle", ".git", ".composebridge-state"]):
-                    continue
-                try:
-                    bak.unlink()
-                except Exception:
-                    pass
-        except Exception:
-            pass
-
-        # Clean pending_edits.json
-        for pfile in [self.project_root / ".composebridge-state" / "pending_edits.json", self.project_root / "pending_edits.json"]:
-            if pfile.exists():
-                try:
-                    pfile.unlink()
-                except Exception:
-                    pass
-        files = self.list_modified_files()
-        errors = []
-        
-        for f_data in files:
-            file_path = self.project_root / f_data["file"]
-            if not file_path.exists():
-                matches = [m for m in self.project_root.rglob(Path(f_data["file"]).name) if "build" not in str(m) and ".composebridge-state" not in str(m)]
-                if matches:
-                    file_path = matches[0]
-                else:
-                    errors.append({"file": f_data["file"], "error": "File not found"})
-                    continue
-            
-            # ⭐ تحقق أن التعديلات لا تزال موجودة
-            content = file_path.read_text(encoding="utf-8")
-            changes = self.get_file_changes(f_data["file"])
-            
-            for change in changes:
-                if change["new"] not in content and change["new"].strip() not in content:
-                    errors.append({
-                        "file": f_data["file"],
-                        "line": change["line"],
-                        "error": "Content changed externally",
-                    })
-        
-        if errors:
-            return {
-                "success": False,
-                "error": "Cannot approve — files modified externally",
-                "errors": errors,
-            }
-        
-        # احذف journal
-        count = 0
-        if self.journal_file.exists():
-            with open(self.journal_file, "r", encoding="utf-8") as f:
-                count = sum(1 for _ in f)
-            try:
-                self.journal_file.unlink()
-            except Exception:
-                pass
-        
-        return {"success": True, "approved_count": count}
-
-    def _save_backups_to_disk(self, files: List[str]) -> str:
-        """Save backup snapshot to disk before revert."""
-        import time
-        backups_dir = self.project_root / ".composebridge-state" / "reject_backups"
-        backups_dir.mkdir(parents=True, exist_ok=True)
-        
-        snapshot = {
-            "timestamp": datetime.utcnow().isoformat(),
-            "files": {},
-        }
-        
-        for file in files:
-            file_path = self.project_root / file
-            if not file_path.exists():
-                matches = [m for m in self.project_root.rglob(Path(file).name) if "build" not in str(m) and ".composebridge-state" not in str(m)]
-                if matches:
-                    file_path = matches[0]
-            if file_path.exists():
-                snapshot["files"][str(file)] = file_path.read_text(encoding="utf-8")
-        
-        snapshot_file = backups_dir / f"snapshot_{int(time.time())}.json"
-        snapshot_file.write_text(json.dumps(snapshot, ensure_ascii=False), encoding="utf-8")
-        return str(snapshot_file)
-
-    def reject_all_files(self, force: bool = False) -> Dict:
-        """
-        Revert all pending changes in REVERSE order (latest edit first).
-        """
-        try:
-            # 1. Restore any *.bridge.bak files on disk
-            disk_reverted = 0
-            try:
-                for bak in list(self.project_root.rglob("*.bridge.bak")):
-                    if any(ign in bak.parts for ign in ["build", ".gradle", ".git", ".composebridge-state"]):
-                        continue
-                    orig_str = str(bak)[:-len(".bridge.bak")]
-                    orig_path = Path(orig_str)
-                    try:
-                        shutil.copy2(str(bak), str(orig_path))
-                        bak.unlink()
-                        disk_reverted += 1
-                    except Exception:
-                        pass
-            except Exception:
-                pass
-
-            # Clean pending_edits.json
-            for pfile in [self.project_root / ".composebridge-state" / "pending_edits.json", self.project_root / "pending_edits.json"]:
-                if pfile.exists():
-                    try:
-                        pfile.unlink()
-                    except Exception:
-                        pass
-
-            if not self.journal_file.exists():
-                return {
-                    "success": True,
-                    "reverted_count": disk_reverted,
-                    "message": f"Reverted {disk_reverted} file(s) from disk backup",
-                }
-
-            entries = self._read_entries()
-            if not entries:
-                if self.journal_file.exists():
-                    try:
-                        self.journal_file.unlink()
-                    except Exception:
-                        pass
-                return {
-                    "success": True,
-                    "reverted_count": 0,
-                    "message": "Journal was empty",
-                }
-
-            # ⭐ اقرأ في ترتيب عكسي (الأحدث أولاً)
-            reversed_entries = list(reversed(entries))
-
-            reverted = 0
-            errors = []
-            changed_files = set()
-
-            for entry in reversed_entries:
-                file_rel = entry.get("file")
-                line_no = entry.get("line", 0)
-                old_line = entry.get("old_line") or entry.get("old") or entry.get("old_content") or ""
-                new_line = entry.get("new_line") or entry.get("new") or entry.get("new_content") or ""
-
-                if not file_rel:
-                    continue
-
-                file_path = self.project_root / file_rel
-                if not file_path.exists():
-                    matches = [m for m in self.project_root.rglob(Path(file_rel).name)
-                               if "build" not in str(m) and ".composebridge-state" not in str(m) and ".bak" not in str(m)]
-                    if not matches:
-                        errors.append({"file": file_rel, "error": f"File not found: {file_rel}"})
-                        continue
-                    file_path = matches[0]
-
-                try:
-                    content = file_path.read_text(encoding="utf-8")
-                    lines = content.splitlines()
-
-                    # إذا كان old_line فارغاً و new_line موجوداً -> سطر تمت إضافته (import/token)
-                    if old_line == "" and new_line != "":
-                        target_idx = -1
-                        if 1 <= line_no <= len(lines):
-                            for offset in [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5]:
-                                idx = line_no - 1 + offset
-                                if 0 <= idx < len(lines) and (new_line.strip() == lines[idx].strip() or new_line in lines[idx]):
-                                    target_idx = idx
-                                    break
-                        if target_idx < 0:
-                            for idx, l in enumerate(lines):
-                                if new_line.strip() == l.strip() or new_line in l:
-                                    target_idx = idx
-                                    break
-                        if target_idx >= 0:
-                            del lines[target_idx]
-                            file_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-                            reverted += 1
-                            changed_files.add(str(file_path.relative_to(self.project_root)))
-                        continue
-
-                    # استبدال new_line -> old_line
-                    found = False
-                    start_search = max(0, line_no - 6)
-                    end_search = min(len(lines), line_no + 5)
-                    for i in range(start_search, end_search):
-                        if new_line in lines[i]:
-                            lines[i] = lines[i].replace(new_line, old_line, 1)
-                            found = True
-                            break
-                        elif new_line.strip() and new_line.strip() == lines[i].strip():
-                            lines[i] = old_line
-                            found = True
-                            break
-                        elif new_line.strip() and new_line.strip() in lines[i]:
-                            lines[i] = lines[i].replace(new_line.strip(), old_line.strip(), 1)
-                            found = True
-                            break
-
-                    # Fallback: في كامل الملف
-                    if not found and new_line.strip():
-                        for i, l in enumerate(lines):
-                            if new_line in l:
-                                lines[i] = lines[i].replace(new_line, old_line, 1)
-                                found = True
-                                break
-                            elif new_line.strip() == l.strip():
-                                lines[i] = old_line
-                                found = True
-                                break
-                            elif new_line.strip() in l:
-                                lines[i] = lines[i].replace(new_line.strip(), old_line.strip(), 1)
-                                found = True
-                                break
-
-                    if found:
-                        file_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-                        reverted += 1
-                        changed_files.add(str(file_path.relative_to(self.project_root)))
-                    else:
-                        # قد يكون السطر بالفعل قد استرجع قيمته القديمة
-                        if old_line and any(old_line.strip() == l.strip() or old_line in l for l in lines):
-                            pass
-                        else:
-                            errors.append({"file": file_rel, "line": line_no, "error": f"Target content not found: {new_line[:40]}"})
-
-                except Exception as e:
-                    errors.append({"file": file_rel, "error": str(e)})
-
-            # ⭐ 4. احذف الـ journal
-            if self.journal_file.exists():
-                try:
-                    self.journal_file.unlink()
-                except Exception:
-                    pass
-
-            # ⭐ 5. نظّف backups
-            backups_dir = self.project_root / ".composebridge-state" / "reject_backups"
-            if backups_dir.exists():
-                for f in backups_dir.glob("snapshot_*.json"):
-                    try:
-                        f.unlink()
-                    except Exception:
-                        pass
-
-            return {
-                "success": len(errors) == 0,
-                "reverted_count": reverted,
-                "files_affected": len(changed_files),
-                "errors": errors[:10],
-                "forced": force,
-            }
-        
-        except Exception as e:
-            import traceback
-            return {
-                "success": False,
-                "error": str(e),
-                "traceback": traceback.format_exc()[:500],
-            }
-
-    def get_file_diff(self, file_path: str) -> Dict:
-        """Get before/after content and diff for a modified file."""
-        changes = self.get_file_changes(file_path)
-        full_path = self.project_root / file_path
-        if not full_path.exists():
-            matches = [m for m in self.project_root.rglob(Path(file_path).name) if "build" not in str(m) and ".composebridge-state" not in str(m)]
-            if matches:
-                full_path = matches[0]
-            else:
-                return {"success": False, "error": f"File '{file_path}' not found"}
-
-        current_content = full_path.read_text(encoding="utf-8")
-
-        backup_path = Path(str(full_path) + ".bridge.bak")
-        if not backup_path.exists():
-            alt_matches = [m for m in self.project_root.rglob(full_path.name + ".bridge.bak") if "build" not in str(m) and ".composebridge-state" not in str(m)]
-            if alt_matches:
-                backup_path = alt_matches[0]
-
-        if backup_path.exists():
-            original_content = backup_path.read_text(encoding="utf-8", errors="replace")
-        else:
-            # Reconstruct original content
-            original_content = current_content
-            for change in reversed(changes):
-                target_new = change.get("new", "")
-                target_old = change.get("old", "")
-                if target_old == "":
-                    for line_cand in [target_new.strip() + "\r\n", target_new.strip() + "\n"]:
-                        if line_cand in original_content:
-                            original_content = original_content.replace(line_cand, "", 1)
-                            break
-                elif target_new and target_new in original_content:
-                    original_content = original_content.replace(target_new, target_old, 1)
-                elif target_new and target_new.strip() in original_content:
-                    original_content = original_content.replace(target_new.strip(), target_old.strip(), 1)
-
-        import difflib
-        diff_lines = list(difflib.unified_diff(
-            original_content.splitlines(keepends=True),
-            current_content.splitlines(keepends=True),
-            fromfile=f"a/{Path(file_path).name} (original)",
-            tofile=f"b/{Path(file_path).name} (modified)",
-        ))
-
-        return {
-            "success": True,
-            "file": file_path,
-            "original_content": original_content,
-            "current_content": current_content,
-            "unified_diff": "".join(diff_lines),
-            "change_count": len(changes),
-        }
-
-    def rollback_pattern(self, pattern_id: str) -> Dict:
-        """
-        Rollback all changes for a specific pattern:
-        1. Remove any added tokens from registry files.
-        2. Revert every file modification in reverse order.
-        3. Clean up journal entries.
-        """
-        if not self.journal_file.exists():
-            return {"success": False, "error": f"Pattern '{pattern_id}' not found in journal"}
-
-        # 1. ابحث عن tokens مُضافة
-        tokens_added = []
-        with open(self.journal_file, "r", encoding="utf-8") as f:
-            for line in f:
-                try:
-                    entry = json.loads(line.strip())
-                    if (entry.get("pattern_id") == pattern_id and 
-                        entry.get("type") == "token_added"):
-                        tokens_added.append(entry)
-                except Exception:
-                    continue
-
-        changes = self.get_pattern_changes(pattern_id)
-        if not tokens_added and not changes:
-            return {"success": False, "error": f"Pattern '{pattern_id}' not found in journal"}
-
-        errors = []
-        tokens_removed = []
-
-        # 2. احذف كل token مُضاف
-        from .token_migrator import TokenMigrator
-        migrator = TokenMigrator(self.project_root)
-        for t in tokens_added:
-            token_name = t.get("token_name")
-            if not token_name:
-                continue
-            try:
-                success = migrator.remove_token(token_name, "color")
-                if success:
-                    tokens_removed.append(token_name)
-                else:
-                    success_dim = migrator.remove_token(token_name, "dimension")
-                    if success_dim:
-                        tokens_removed.append(token_name)
-                    else:
-                        errors.append({
-                            "token": token_name,
-                            "error": f"Token '{token_name}' definition not found in registry file",
-                        })
-            except Exception as e:
-                errors.append({
-                    "token": token_name,
-                    "error": str(e),
-                })
-
-        # 3. اعكس كل الاستبدالات من الأحدث للأقدم
-        reverted = []
-        for change in reversed(changes):
-            file_name = change.get("file", "")
-            if not file_name or not str(file_name).strip():
-                continue
-            file_path = self.project_root / file_name
-            if not file_path.exists():
-                matches = list(self.project_root.rglob(Path(file_name).name))
-                matches = [m for m in matches if "build" not in str(m) and ".composebridge-state" not in str(m)]
-                if matches:
-                    file_path = matches[0]
-                else:
-                    errors.append({"file": file_name, "line": change.get("line"), "error": "File not found"})
-                    continue
-
-            try:
-                content = file_path.read_text(encoding="utf-8")
-                target_new = change["new"]
-                target_old = change["old"]
-                lines = content.splitlines()
-                target_line = change.get("line", 0)
-                reverted_this = False
-
-                # First try line-targeted replacement with local search (+/- 5 lines)
-                if 1 <= target_line <= len(lines) + 5:
-                    for offset in [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5]:
-                        idx = target_line - 1 + offset
-                        if 0 <= idx < len(lines):
-                            if target_new in lines[idx]:
-                                lines[idx] = lines[idx].replace(target_new, target_old, 1)
-                                file_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-                                reverted.append({"file": file_name, "line": target_line})
-                                reverted_this = True
-                                break
-                            elif target_new.strip() in lines[idx]:
-                                lines[idx] = lines[idx].replace(target_new.strip(), target_old.strip(), 1)
-                                file_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-                                reverted.append({"file": file_name, "line": target_line})
-                                reverted_this = True
-                                break
-
-                # Fallback to whole file replacement
-                if not reverted_this:
-                    if target_new in content:
-                        content = content.replace(target_new, target_old, 1)
-                        file_path.write_text(content, encoding="utf-8")
-                        reverted.append({"file": file_name, "line": target_line})
-                        reverted_this = True
-                    elif target_new.strip() in content:
-                        for line_cand in [target_new.strip() + "\r\n", target_new.strip() + "\n", target_new.strip()]:
-                            if line_cand in content:
-                                content = content.replace(line_cand, target_old, 1)
-                                file_path.write_text(content, encoding="utf-8")
-                                reverted.append({"file": file_name, "line": target_line})
-                                reverted_this = True
-                                break
-                        if not reverted_this:
-                            errors.append({
-                                "file": file_name,
-                                "line": target_line,
-                                "error": "New content not found in file",
-                            })
-                    else:
-                        errors.append({
-                            "file": file_name,
-                            "line": target_line,
-                            "error": "New content not found in file",
-                        })
-            except Exception as e:
-                errors.append({"file": file_name, "line": change.get("line"), "error": str(e)})
-
-        # 4. احذف التعديلات من الـ journal
-        remaining = []
-        with open(self.journal_file, "r", encoding="utf-8") as f:
-            for line in f:
-                try:
-                    entry = json.loads(line.strip())
-                    if entry.get("pattern_id") != pattern_id:
-                        remaining.append(line)
-                except Exception:
-                    continue
-
-        with open(self.journal_file, "w", encoding="utf-8") as f:
-            f.writelines(remaining)
-
-        is_success = (len(errors) == 0) and (len(reverted) > 0 or len(tokens_removed) > 0)
-        return {
-            "success": is_success,
-            "pattern_id": pattern_id,
-            "reverted_count": len(reverted),
-            "tokens_removed": tokens_removed,
-            "error_count": len(errors),
-            "reverted": reverted,
-            "errors": errors,
-        }

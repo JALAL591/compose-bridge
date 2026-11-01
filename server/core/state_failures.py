@@ -3,13 +3,13 @@
 State Failures — Track failed operations.
 """
 
-import json
 from pathlib import Path
 from typing import List, Optional
 from datetime import datetime
+from .base_state import JsonPersistentState
 
 
-class FailureTracker:
+class FailureTracker(JsonPersistentState):
     """Tracks failed operations for notification."""
     
     def __init__(self, file_path: Path):
@@ -49,17 +49,7 @@ class FailureTracker:
         return [f for f in self.failures if not f["resolved"]]
     
     def save(self):
-        self.file_path.write_text(
-            json.dumps(self.failures, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
+        self.save_json(self.file_path, self.failures)
     
     def load(self):
-        if not self.file_path.exists():
-            return
-        try:
-            self.failures = json.loads(
-                self.file_path.read_text(encoding="utf-8")
-            )
-        except Exception:
-            self.failures = []
+        self.failures = self.load_json(self.file_path, default=[]) or []

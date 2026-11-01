@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 from mcp.app import app, log, PROJECT_ROOT, state_manager
+from core.project_root import get_project_root
 from core.pattern_journal import PatternJournal
 from core.state_editor import rollback_last as _rollback_last
 from common.file_ops import acquire_write_lock
@@ -61,7 +62,7 @@ def list_modified_files() -> str:
     """
     from core.pattern_journal import PatternJournal
     try:
-        journal = PatternJournal(PROJECT_ROOT)
+        journal = PatternJournal(get_project_root())
         files = journal.list_modified_files()
         return json.dumps({
             "success": True,
@@ -90,7 +91,7 @@ def reject_file_changes(file_path: str, force: bool = False) -> str:
     from core.write_lock import acquire_write_lock
     try:
         with acquire_write_lock():
-            journal = PatternJournal(PROJECT_ROOT)
+            journal = PatternJournal(get_project_root())
             result = journal.reject_file_changes(file_path, force=force)
             if result.get("success"):
                 try:
@@ -121,7 +122,7 @@ def approve_file_changes(file_path: str) -> str:
     from core.write_lock import acquire_write_lock
     try:
         with acquire_write_lock():
-            journal = PatternJournal(PROJECT_ROOT)
+            journal = PatternJournal(get_project_root())
             result = journal.approve_file_changes(file_path)
             if result.get("success"):
                 try:
@@ -151,7 +152,7 @@ def approve_all_files() -> str:
     from core.write_lock import acquire_write_lock
     try:
         with acquire_write_lock():
-            journal = PatternJournal(PROJECT_ROOT)
+            journal = PatternJournal(get_project_root())
             result = journal.approve_all_files()
             if result.get("success"):
                 try:
@@ -181,7 +182,7 @@ def reject_all_files() -> str:
     from core.write_lock import acquire_write_lock
     try:
         with acquire_write_lock():
-            journal = PatternJournal(PROJECT_ROOT)
+            journal = PatternJournal(get_project_root())
             result = journal.reject_all_files()
             if result.get("success"):
                 try:
@@ -211,7 +212,7 @@ def reject_all_files_force() -> str:
     from core.write_lock import acquire_write_lock
     try:
         with acquire_write_lock():
-            journal = PatternJournal(PROJECT_ROOT)
+            journal = PatternJournal(get_project_root())
             result = journal.reject_all_files(force=True)
             if result.get("success"):
                 try:
@@ -240,9 +241,86 @@ def get_file_diff(file_path: str) -> str:
     """
     from core.pattern_journal import PatternJournal
     try:
-        journal = PatternJournal(PROJECT_ROOT)
+        journal = PatternJournal(get_project_root())
         result = journal.get_file_diff(file_path)
         return json.dumps(result, indent=2, ensure_ascii=False)
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
 
+
+
+@app.tool()
+def approve_change(file_path: str, change_id: str) -> str:
+    """
+    Approves a single granular change (hunk) in a file.
+    
+    What it does: Incorporates the specific change into the file's baseline backup, leaving other changes pending.
+    When to use: When one specific change in a file is approved, but other changes need further inspection or rejection.
+    Parameters:
+      - file_path: relative path to project root
+      - change_id: hunk ID (e.g. "h1", "h2") or line number
+    Returns:
+      JSON string with operation result and remaining changes.
+    """
+    from core.diff_engine import approve_change as _approve_change
+    from core.write_lock import acquire_write_lock
+    try:
+        with acquire_write_lock():
+            result = _approve_change(file_path, change_id, get_project_root())
+            if result.get("success"):
+                try:
+                    from mcp.tools.misc import send_refresh_signal
+                    send_refresh_signal()
+                except Exception:
+                    pass
+            return json.dumps(result, indent=2, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+
+@app.tool()
+def reject_change(file_path: str, change_id: str) -> str:
+    """
+    Reverts a single granular change (hunk) in a file while keeping other changes intact.
+    
+    What it does: Reverts only the specified hunk back to its original baseline on disk.
+    When to use: When one specific change in a file is unwanted, but other changes in the file should be kept.
+    Parameters:
+      - file_path: relative path to project root
+      - change_id: hunk ID (e.g. "h1", "h2") or line number
+    Returns:
+      JSON string with operation result and remaining changes.
+    """
+    from core.diff_engine import reject_change as _reject_change
+    from core.write_lock import acquire_write_lock
+    try:
+        with acquire_write_lock():
+            result = _reject_change(file_path, change_id, get_project_root())
+            if result.get("success"):
+                try:
+                    from mcp.tools.misc import send_refresh_signal
+                    send_refresh_signal()
+                except Exception:
+                    pass
+            return json.dumps(result, indent=2, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+@app.tool()
+def clean_cache() -> str:
+    """
+    Safely cleans temporary cache, state files, and logs (.composebridge-state, .composebridge-journal.json, *.tmp)
+    without touching source code or .bridge.bak backups.
+    """
+    from core.project_root import clean_temp_files, get_project_root
+    try:
+        result = clean_temp_files(get_project_root())
+        return json.dumps(result, indent=2, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+
+
+# Aliases
+approve_hunk = approve_change
+reject_hunk = reject_change

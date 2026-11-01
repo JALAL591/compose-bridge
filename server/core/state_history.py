@@ -3,13 +3,13 @@
 State History — Value and Location histories (independent).
 """
 
-import json
 from pathlib import Path
 from typing import Dict, List, Optional
 from datetime import datetime
+from .base_state import JsonPersistentState
 
 
-class StateHistory:
+class StateHistory(JsonPersistentState):
     """
     Tracks value and location changes separately.
     
@@ -80,17 +80,9 @@ class StateHistory:
             "value_history": self.value_history,
             "location_history": self.location_history,
         }
-        self.file_path.write_text(
-            json.dumps(data, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
+        self.save_json(self.file_path, data)
     
     def load(self):
-        if not self.file_path.exists():
-            return
-        try:
-            data = json.loads(self.file_path.read_text(encoding="utf-8"))
-            self.value_history = data.get("value_history", {})
-            self.location_history = data.get("location_history", {})
-        except Exception:
-            pass
+        data = self.load_json(self.file_path, default={}) or {}
+        self.value_history = data.get("value_history", {})
+        self.location_history = data.get("location_history", {})

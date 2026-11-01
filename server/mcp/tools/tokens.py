@@ -350,7 +350,10 @@ def set_token(token_name: str, value: str) -> str:
                 except Exception:
                     pass
                 
-                return json.dumps({"success": False, "error": msg})
+                err_dict = {"success": False, "error": msg}
+                if isinstance(info, dict) and "error_code" in info:
+                    err_dict["error_code"] = info["error_code"]
+                return json.dumps(err_dict, indent=2, ensure_ascii=False)
             
             # ═══ 3. Record in State Manager ═══
             state_manager.history.record_value(

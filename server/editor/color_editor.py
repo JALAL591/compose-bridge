@@ -1,3 +1,4 @@
+from common.file_ops import is_ignored_path
 # -*- coding: utf-8 -*-
 """
 Theme color editor module.
@@ -41,10 +42,16 @@ def get_app_colors_file() -> Path:
         p = PROJECT_ROOT / cfg_paths["app_colors"]
         if p.exists():
             return p
-    for f in PROJECT_ROOT.rglob("AppColors.kt"):
-        s = str(f)
-        if ".bak" not in s and "build" not in s:
-            return f
+    matches = [f for f in PROJECT_ROOT.rglob("AppColors.kt") if not is_ignored_path(f, PROJECT_ROOT)]
+    if matches:
+        def _rank(p):
+            norm = str(p).replace("\\", "/").lower()
+            if "/commonmain/" in norm: return 0
+            if "/main/" in norm: return 1
+            if "/src/" in norm: return 2
+            return 3
+        matches.sort(key=lambda p: (_rank(p), len(str(p))))
+        return matches[0]
     return _find_registry_file("AppColors.kt") or (PROJECT_ROOT / "AppColors.kt")
 
 
@@ -75,8 +82,7 @@ def _find_color_file_for_key(key: str, project_root: Optional[Path] = None) -> O
     candidates = ["DesignSystem.kt", "AppColors.kt", "Theme.kt", "Color.kt", "Colors.kt"]
     for name in candidates:
         for f in root.rglob(name):
-            s = str(f)
-            if "build" in s or ".composebridge-state" in s or "composebridge-agent" in s:
+            if is_ignored_path(f, root):
                 continue
             try:
                 content = f.read_text(encoding="utf-8")
@@ -86,8 +92,7 @@ def _find_color_file_for_key(key: str, project_root: Optional[Path] = None) -> O
                 pass
 
     for f in root.rglob("*.kt"):
-        s = str(f)
-        if "build" in s or ".composebridge-state" in s or "composebridge-agent" in s:
+        if is_ignored_path(f, root):
             continue
         try:
             content = f.read_text(encoding="utf-8")
@@ -146,6 +151,12 @@ def update_theme_color(key: str, new_hex: str, expected_checksum: Optional[str] 
         else:
             return (False, f"Color file not found for key: {key}", None)
 
+    # Validate syntax before modification or backup
+    from core.ast_finder import safe_create_backup, validate_kotlin_syntax
+    is_valid, err_msg = validate_kotlin_syntax(file_path)
+    if not is_valid:
+        return (False, err_msg, None)
+
     # 1. طبّع القيمة
     cleaned = new_hex.removeprefix("#").removeprefix("0x").removeprefix("0X").strip()
     if len(cleaned) == 6:
@@ -174,17 +185,19 @@ def update_theme_color(key: str, new_hex: str, expected_checksum: Optional[str] 
     import hashlib
     curr_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
     if expected_checksum and curr_hash != expected_checksum:
-        return (
-            False,
-            f"⚠️ تحذير: الملف '{file_path.name}' تم تعديله خارج الأداة (يدوياً أو بواسطة وكيل آخر).\nاستعادة النسخة الاحتياطية ستحذف هذه التعديلات.\nهل أنت متأكد؟",
-            {
-                "error_code": "EXTERNAL_MODIFICATION_DETECTED",
-                "suggested_action": "confirm_restore",
-                "file": str(file_path),
-                "expected_checksum": expected_checksum,
-                "current_checksum": curr_hash,
-            }
-        )
+        is_clean, err_clean = validate_kotlin_syntax(file_path)
+        if is_clean:
+            # Promote this clean manual edit / Git pull as the new baseline
+            ok_smart, _, _ = safe_create_backup(file_path, project_root=PROJECT_ROOT)
+        else:
+            return (
+                False,
+                f"الملف الحالي يحتوي على أخطاء برمجية ({err_clean})، يرجى إصلاحه أولاً.",
+                {
+                    "error_code": "SYNTAX_ERROR_DETECTED",
+                    "file": str(file_path),
+                }
+            )
 
     # 3. ابحث عن النمط
     pattern = _build_color_pattern(key)
@@ -195,7 +208,7 @@ def update_theme_color(key: str, new_hex: str, expected_checksum: Optional[str] 
         if bak_path.exists():
             return (
                 False,
-                f"⚠️ تحذير: الملف '{file_path.name}' تم تعديله خارج الأداة (يدوياً أو بواسطة وكيل آخر).\nاستعادة النسخة الاحتياطية ستحذف هذه التعديلات.\nهل أنت متأكد؟",
+                f"⚠️ Warning: File '{file_path.name}' was modified externally (manually or by another agent).\nRestoring the backup will overwrite these changes.\nAre you sure?",
                 {
                     "error_code": "EXTERNAL_MODIFICATION_DETECTED",
                     "suggested_action": "confirm_restore",
@@ -250,10 +263,11 @@ def update_theme_color(key: str, new_hex: str, expected_checksum: Optional[str] 
     else:
         new_content = content[:match.start(2)] + normalized_hex + content[match.end(2):]
 
-    # 5. نسخة احتياطية
-    backup_path = str(file_path) + ".bridge.bak"
-    if not os.path.exists(backup_path):
-        shutil.copy2(file_path, backup_path)
+    # 5. نسخة احتياطية آمنة ومتحقق منها
+    ok_bak, bak_err, backup_path_obj = safe_create_backup(file_path)
+    if not ok_bak:
+        return (False, bak_err, None)
+    backup_path = str(backup_path_obj)
 
     # 6. كتابة ذرية
     try:
@@ -272,7 +286,7 @@ def update_theme_color(key: str, new_hex: str, expected_checksum: Optional[str] 
     except Exception as e:
         return (False, f"Write failed: {e}", None)
 
-    _journal_save(file_path, content, new_content)
+    _journal_save(file_path, content, new_content, pattern_id="color_edit")
 
     return (
         True,

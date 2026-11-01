@@ -1,3 +1,4 @@
+from common.file_ops import is_ignored_path
 # -*- coding: utf-8 -*-
 """
 AST scope resolver and element analyzer core.
@@ -259,7 +260,7 @@ def _count_function_calls(
         return count
 
     for kt_file in project_root.rglob("*.kt"):
-        if any(x in str(kt_file).lower() for x in ["build", "backup", ".bak", ".composebridge"]):
+        if is_ignored_path(kt_file, project_root):
             continue
         try:
             content = kt_file.read_text(encoding="utf-8")
@@ -383,18 +384,32 @@ def _update_existing_token(
             new_line = line.strip()
             break
     
+    # Create backup before writing
+    try:
+        from core.ast_finder import safe_create_backup
+        safe_create_backup(ds, project_root=project_root)
+    except Exception as be:
+        print(f"[WARN] Failed to create backup for {ds.name}: {be}")
+
     ds.write_text(new_content, encoding="utf-8")
     
     try:
         from core.pattern_journal import PatternJournal
         journal = PatternJournal(project_root)
+        file_rel = str(ds.relative_to(project_root)).replace("\\", "/")
         journal.record_change(
-            file=str(ds.relative_to(project_root)),
+            file=file_rel,
             line=target_line_no,
             old_line=old_line or "",
             new_line=new_line or f"{token_name} -> {new_color_expr}",
             pattern_id=f"update_token_{token_name}",
         )
+    except Exception:
+        pass
+
+    try:
+        from network.ws_server import trigger_broadcast_refresh
+        trigger_broadcast_refresh()
     except Exception:
         pass
     
@@ -470,7 +485,7 @@ def _find_file(source_file: str, root: Path = PROJECT_ROOT) -> Optional[Path]:
     filename = Path(source_file).name
     candidates = [
         c for c in root.rglob(filename)
-        if 'build' not in str(c) and '.composebridge' not in str(c) and 'backup' not in str(c).lower()
+        if not is_ignored_path(c, root)
     ]
     return candidates[0] if candidates else None
 
@@ -578,48 +593,10 @@ def _empty_result(error: str = "") -> dict:
     }
 
 
-def _clean_duplicate_imports(file_path: Path) -> int:
-    """إزالة imports مكررة."""
-    content = file_path.read_text(encoding="utf-8")
-    lines = content.splitlines()
-    
-    seen_imports = set()
-    new_lines = []
-    removed = 0
-    
-    for line in lines:
-        stripped = line.strip()
-        if stripped.startswith('import '):
-            if stripped in seen_imports:
-                removed += 1
-                continue
-            seen_imports.add(stripped)
-        new_lines.append(line)
-    
-    if removed > 0:
-        file_path.write_text("\n".join(new_lines) + "\n", encoding="utf-8")
-    
-    return removed
-
-
-def _validate_modified_file(
-    file_path: Path,
-    content: str,
-) -> Tuple[bool, str]:
-    """فحص Kotlin syntax بسيط."""
-    
-    # ⭐ 1. توازن الأقواس
-    if content.count("{") != content.count("}"):
-        return False, "Unbalanced braces"
-    if content.count("(") != content.count(")"):
-        return False, "Unbalanced parens"
-    
-    # ⭐ 2. إذا فيه BridgeDimensionRegistry.get → يجب import
-    if "BridgeDimensionRegistry.get" in content:
-        if "import com.composebridge.agent.BridgeDimensionRegistry" not in content:
-            return False, "Missing BridgeDimensionRegistry import"
-    
-    return True, ""
+from common.kotlin_utils import (
+    _clean_duplicate_imports,
+    _validate_modified_file,
+)
 
 
 def get_token_value_map(project_root: Path) -> Dict[str, str]:
@@ -644,8 +621,8 @@ def get_token_value_map(project_root: Path) -> Dict[str, str]:
         pass
 
     if not candidates:
-        candidates = list(project_root.rglob("DesignSystem.kt")) + list(project_root.rglob("AppColors.kt"))
-        candidates = [c for c in candidates if "build" not in str(c) and ".composebridge" not in str(c)]
+        candidates = [c for c in (list(project_root.rglob("DesignSystem.kt")) + list(project_root.rglob("AppColors.kt")))
+                      if not is_ignored_path(c, project_root)]
     
     pattern = re.compile(
         r'val\s+(\w+)\s*:\s*Color[\s\r\n]*get\(\)\s*=\s*'
@@ -745,26 +722,19 @@ def get_global_usage_counts(project_root: Path) -> Dict[str, int]:
     return counts
 
 
-def analyze_element_range(
+
+def _resolve_element_file_and_scope(
     source_file: str,
     line_number: int,
-    utf16_offset: int = 0,
-    utf16_length: int = 0,
-    project_root: Optional[Path] = None,
-    tree: Optional[list] = None,
-    runtime_text_hint: Optional[str] = None,
-    parent_line: Optional[int] = None,
-) -> dict:
+    utf16_offset: int,
+    utf16_length: int,
+    root: Path,
+    tree: Optional[list],
+) -> Tuple[Optional[Path], str, int, str, int, Optional[str], Optional[dict]]:
     """
-    Analyzes literal source code range of an element.
-    Returns dimensions, tokens, literals, and structured Focus Mode color objects.
+    تحديد الملف الحقيقي ونطاق الكود (Scope) للعنصر المستهدف.
+    Resolves the actual target source file, its content, and the precise textual scope.
     """
-    from .color_analyzer import _clean_hex, _find_color_locations, NAMED_COLORS_HEX, NAMED_COLOR_VARIANTS
-    from .dimension_analyzer import _find_dimension_usage, _extract_dimensions_with_property
-    from .text_ref_analyzer import _resolve_app_strings_value, _find_ref_in_app_strings, _detect_composable_name
-    root = project_root or PROJECT_ROOT
-
-    # ⭐ فحص tree لتحديد الملف الحقيقي للعنصر (إذا كان مضمناً من ملف آخر)
     actual_source_file = source_file
     actual_line_number = line_number
     if tree and isinstance(tree, list):
@@ -784,20 +754,18 @@ def analyze_element_range(
         actual_source_file = source_file
 
     if full_path is None:
-        return _empty_result(error=f"File not found: {source_file}")
+        return None, actual_source_file, actual_line_number, "", 1, None, _empty_result(error=f"File not found: {source_file}")
 
     try:
         content = full_path.read_text(encoding="utf-8")
     except Exception as e:
-        return _empty_result(error=f"Read failed: {e}")
+        return full_path, actual_source_file, actual_line_number, "", 1, None, _empty_result(error=f"Read failed: {e}")
 
-    # Extract literal range or line context
     start_line_in_file = 1
     if utf16_offset > 0 and utf16_length > 0 and actual_source_file == source_file:
         element_code = _extract_utf16_range(content, utf16_offset, utf16_length)
         if element_code:
             search_scope = element_code
-            # Calculate line number where offset begins
             prefix = content.encode('utf-16-le')[:utf16_offset * 2].decode('utf-16-le', errors='ignore')
             start_line_in_file = prefix.count('\n') + 1
         else:
@@ -806,18 +774,22 @@ def analyze_element_range(
         search_scope, start_line_in_file = _line_context_with_start(content, actual_line_number)
 
     if not search_scope:
-        return _empty_result(error="Empty scope")
+        return full_path, actual_source_file, actual_line_number, content, start_line_in_file, "", _empty_result(error="Empty scope")
 
-    scope_lines = search_scope.splitlines()
+    return full_path, actual_source_file, actual_line_number, content, start_line_in_file, search_scope, None
 
-    # Pre-warm In-Memory Cache once for the entire analysis
-    try:
-        from common.project_cache import PROJECT_CACHE
-        kt_cache = PROJECT_CACHE.get_kt_cache(root)
-    except Exception:
-        kt_cache = None
 
-    # 1. Colors & Tokens
+def _extract_colors_in_scope(
+    search_scope: str,
+    start_line_in_file: int,
+    root: Path,
+    kt_cache: Any,
+) -> Tuple[List[str], List[str], List[Dict[str, Any]]]:
+    """
+    استخراج الألوان والتوكنز من نطاق الكود النصي.
+    Extracts tokens, literals, and structured color objects from the textual scope.
+    """
+    from .color_analyzer import _clean_hex, _find_color_locations, NAMED_COLORS_HEX
     token_pattern = re.compile(r'\bAppColors\.(\w+)\b')
     literal_pattern = re.compile(r'Color\s*\(\s*(0x[0-9A-Fa-f]+)\s*\)')
     named_pattern = re.compile(r'\bColor\.(White|Black|LightGray|Gray|DarkGray|Red|Green|Blue|Yellow|Cyan|Magenta|Transparent|Unspecified)\b')
@@ -826,18 +798,16 @@ def analyze_element_range(
     tokens = list(set(token_pattern.findall(search_scope)))
     literals = list(set(literal_pattern.findall(search_scope)))
 
-    # Look up token hex values & global counts
     token_value_map = get_token_value_map(root)
     global_counts = get_global_usage_counts(root)
 
-    # Line-by-line detailed color extraction
     element_color_occurrences: Dict[str, List[Dict]] = {}
+    scope_lines = search_scope.splitlines()
 
     for idx, l_str in enumerate(scope_lines):
         line_no = start_line_in_file + idx
         prop = _detect_property(l_str)
 
-        # AppColors tokens
         for m in token_pattern.finditer(l_str):
             t_name = m.group(1)
             t_hex = token_value_map.get(t_name, "#818CF8")
@@ -852,7 +822,6 @@ def analyze_element_range(
                 "line": line_no,
             })
 
-        # MaterialTheme colors (MaterialTheme.colorScheme.surface, etc.)
         for m in material_pattern.finditer(l_str):
             mat_name = m.group(0)
             rest_of_line = l_str[m.end():]
@@ -870,9 +839,8 @@ def analyze_element_range(
                 "line": line_no,
             })
 
-        # Named colors (Color.White, Color.LightGray, etc.)
         for m in named_pattern.finditer(l_str):
-            col_name = m.group(0)  # e.g. "Color.White"
+            col_name = m.group(0)
             simple_name = m.group(1)
             col_hex = NAMED_COLORS_HEX.get(simple_name, "#FFFFFF")
             rest_of_line = l_str[m.end():]
@@ -891,7 +859,6 @@ def analyze_element_range(
                 "line": line_no,
             })
 
-        # Literal colors Color(0xFF...)
         for m in literal_pattern.finditer(l_str):
             raw_hex = m.group(1)
             clean_val = _clean_hex(raw_hex)
@@ -912,13 +879,11 @@ def analyze_element_range(
                 "line": line_no,
             })
 
-    # Build final structured color list for Focus Mode BottomSheet
     structured_colors = []
     for c_name, occs in element_color_occurrences.items():
         primary_occ = occs[0]
         usage_in_element = len(occs)
         
-        # Determine global usage count
         if primary_occ["is_token"]:
             usage_global = global_counts.get(c_name, usage_in_element)
         else:
@@ -956,19 +921,24 @@ def analyze_element_range(
             "is_theme_dependent": is_theme_dep,
         })
 
-    # Composable Name
-    composable_name = _detect_composable_name(
-        search_scope,
-        fallback_line_content=content.splitlines()[line_number - 1] if 0 < line_number <= len(content.splitlines()) else "",
-        full_content=content,
-        line_number=actual_line_number
-    )
-    if composable_name in ["Element", "Text", "BasicText", "Column", "Row", "Box", "Spacer"] and content:
-        enclosing_name = _find_enclosing_function_or_class(content, actual_line_number)
-        if enclosing_name != "Element":
-            composable_name = enclosing_name
+    return tokens, literals, structured_colors
 
-    # ⭐ 1. ابحث عن Composable scope أولاً
+
+def _extract_dimensions_in_scope(
+    content: str,
+    search_scope: str,
+    start_line_in_file: int,
+    actual_source_file: str,
+    actual_line_number: int,
+    composable_name: str,
+    root: Path,
+    kt_cache: Any,
+) -> Tuple[List[Dict[str, Any]], str, int, str, List[str], List[str], List[str]]:
+    """
+    استخراج أبعاد العنصر (Padding, Size, Font Sizes, Spacings).
+    Extracts dimensions, font sizes, weights, and properties within the composable scope.
+    """
+    from .dimension_analyzer import _find_dimension_usage, _extract_dimensions_with_property
     dim_scope_text = search_scope
     dim_scope_start_line = start_line_in_file
     effective_file = actual_source_file
@@ -983,10 +953,8 @@ def analyze_element_range(
             if comp_file:
                 effective_file = comp_file
 
-    # ⭐ 2. استخرج الأبعاد مع property
     dimensions_with_props = _extract_dimensions_with_property(dim_scope_text)
 
-    # ⭐ 3. احسب line number لكل بُعد
     for d in dimensions_with_props:
         rel = d.get("relative_offset", 0)
         lines_before = dim_scope_text[:rel].count("\n")
@@ -995,27 +963,10 @@ def analyze_element_range(
         d["default_value"] = d["number"]
         d["current_value"] = d["number"]
 
-    # ⭐ 4. تصفية الأبعاد حسب الـ depth: اعرض فقط depth <= 2 (البطاقة الخارجية)
     filtered_dims = [d for d in dimensions_with_props if d.get("depth", 1) <= 2]
     if not filtered_dims:
         filtered_dims = dimensions_with_props
 
-    # ⭐ 5. حساب عدد مرات الاستخدام في المشروع (usage_global & is_shared & locations)
-    if kt_cache is None:
-        try:
-            from common.project_cache import PROJECT_CACHE
-            kt_cache = PROJECT_CACHE.get_kt_cache(root)
-        except Exception:
-            kt_cache = []
-            for kt_file in root.rglob("*.kt"):
-                if any(x in str(kt_file).lower() for x in ["build", "backup", ".composebridge", ".bak"]):
-                    continue
-                try:
-                    kt_cache.append((str(kt_file.relative_to(root)).replace("\\", "/"), kt_file.read_text(encoding="utf-8")))
-                except Exception:
-                    pass
-
-    # ⭐ احسب عدد الاستدعاءات للدالة
     call_count = 0
     if composable_name and composable_name not in ["Box", "Column", "Row", "Text", "Icon", "Surface", "Spacer", "_"]:
         call_count = _count_function_calls(root, composable_name, kt_cache=kt_cache)
@@ -1031,7 +982,6 @@ def analyze_element_range(
         d["function_name"] = composable_name
         d["function_call_count"] = call_count
 
-    # Bridge spacing tokens & typography
     bridge_token_pattern = re.compile(r'BridgeSpacing\.(\w+)')
     bridge_tokens = list(set(bridge_token_pattern.findall(dim_scope_text)))
 
@@ -1046,157 +996,158 @@ def analyze_element_range(
     )
     properties = list(set(prop_pattern.findall(dim_scope_text)))
 
-    # ─── Text Extraction ───
+    return filtered_dims, dim_scope_text, dim_scope_start_line, effective_file, bridge_tokens, sps, weights, properties
+
+
+def _find_matching_parenthesis(text: str, start_paren_idx: int) -> int:
+    """
+    Finds the index of the matching closing parenthesis ')' for the '(' at start_paren_idx.
+    Handles nested parentheses, strings, and escape sequences in linear O(N) time.
+    Returns -1 if not found.
+    """
+    depth = 0
+    in_string = False
+    escape = False
+    i = start_paren_idx
+    n = len(text)
+    while i < n:
+        c = text[i]
+        if in_string:
+            if escape:
+                escape = False
+            elif c == '\\':
+                escape = True
+            elif c == '"':
+                in_string = False
+        else:
+            if c == '"':
+                in_string = True
+            elif c == '(':
+                depth += 1
+            elif c == ')':
+                depth -= 1
+                if depth == 0:
+                    return i
+        i += 1
+    return -1
+
+
+def _extract_texts_in_scope(
+    search_scope: str,
+    start_line_in_file: int,
+    dim_scope_text: str,
+    dim_scope_start_line: int,
+    actual_source_file: str,
+    effective_file: str,
+    content: str,
+    root: Path,
+    parent_line: Optional[int],
+    runtime_text_hint: Optional[str],
+) -> List[Dict[str, Any]]:
+    """
+    استخراج السلاسل النصية ومراجع الموارد من نطاق العنصر.
+    Extracts hardcoded string literals and AppStrings resource references from scope.
+    """
+    from .text_ref_analyzer import _resolve_app_strings_value
+
     def _extract_from_text(scope_str: str, base_line: int, file_p: str, filter_call_line: Optional[int] = None) -> List[Dict]:
         results = []
         seen = set()
 
-        # 1. Composable parameter references: e.g. title = AppStrings.Actions.scheduleTitle
-        param_ref_pattern = re.compile(r'([a-zA-Z0-9_]+)\s*=\s*(AppStrings(?:\.[a-zA-Z0-9_]+)+)')
-        for m in param_ref_pattern.finditer(scope_str):
-            prop_name = m.group(1)
-            ref_k = m.group(2)
-            key = ("ref", ref_k)
-            if key not in seen:
-                seen.add(key)
-                line_off = scope_str[:m.start()].count("\n")
-                detected_line = base_line + line_off
-                resolved_val = _resolve_app_strings_value(root, ref_k, runtime_text_hint)
-                results.append({
-                    "property": prop_name,
-                    "text": resolved_val or ref_k,
-                    "file": file_p,
-                    "line": detected_line,
-                    "is_resource_or_ref": True,
-                    "ref_key": ref_k,
-                })
+        target_start_pattern = re.compile(
+            r'\b(?:Text|BasicText|Button|OutlinedButton|FilledTonalButton|TextButton|'
+            r'Icon|IconButton|Badge|ExtendedFloatingActionButton)\s*\('
+        )
 
-        # 2. Direct Text(AppStrings.xyz) or Text(text = AppStrings.xyz)
-        ref_text_pattern = re.compile(r'Text\s*\(\s*(?:text\s*=\s*)?(AppStrings(?:\.[a-zA-Z0-9_]+)+)')
-        for m in ref_text_pattern.finditer(scope_str):
-            ref_k = m.group(1)
-            key = ("ref", ref_k)
-            if key not in seen:
-                seen.add(key)
-                line_off = scope_str[:m.start()].count("\n")
-                detected_line = base_line + line_off
-                resolved_val = _resolve_app_strings_value(root, ref_k, runtime_text_hint)
-                results.append({
-                    "property": "text",
-                    "text": resolved_val or ref_k,
-                    "file": file_p,
-                    "line": detected_line,
-                    "is_resource_or_ref": True,
-                    "ref_key": ref_k,
-                })
+        for match in target_start_pattern.finditer(scope_str):
+            call_offset = match.start()
+            open_paren = match.end() - 1
+            close_paren = _find_matching_parenthesis(scope_str, open_paren)
+            if close_paren != -1:
+                call_text = scope_str[call_offset : close_paren + 1]
+            else:
+                call_text = scope_str[call_offset:]
+            line_in_file = base_line + scope_str[:call_offset].count("\n")
 
-        # 3. Composable parameter string literals: e.g. title = "..."
-        param_str_pattern = re.compile(r'([a-zA-Z0-9_]+)\s*=\s*"([^"\\]*(?:\\.[^"\\]*)*)"')
-        for m in param_str_pattern.finditer(scope_str):
-            prop_name = m.group(1)
-            if prop_name in ("modifier", "tag", "key", "route", "id"):
+            if filter_call_line and abs(line_in_file - filter_call_line) > 5:
                 continue
-            raw_lit = m.group(2)
-            has_template = "$" in raw_lit
-            # Check for embedded AppStrings reference in template
-            embedded_ref = None
-            if has_template:
-                m_emb = re.search(r'\$\{?(AppStrings(?:\.[a-zA-Z0-9_]+)+)\}?', raw_lit)
-                if m_emb:
-                    embedded_ref = m_emb.group(1)
 
-            val = runtime_text_hint if (has_template and runtime_text_hint) else raw_lit.replace('\\"', '"').replace('\\\\', '\\').replace('\\n', '\n')
-            if has_template and not runtime_text_hint and embedded_ref:
-                val = _resolve_app_strings_value(root, embedded_ref) or val
+            for m in re.finditer(r'AppStrings(?:\.[a-zA-Z0-9_]+)+', call_text):
+                ref_key = m.group(0)
+                resolved = _resolve_app_strings_value(root, ref_key, runtime_text_hint)
+                key = ("ref", ref_key, line_in_file)
+                if key not in seen:
+                    seen.add(key)
+                    results.append({
+                        "property": "text",
+                        "text": resolved or ref_key,
+                        "file": file_p,
+                        "line": line_in_file,
+                        "is_resource_or_ref": True,
+                        "ref_key": ref_key,
+                    })
 
-            key = ("hardcoded", val)
-            if key not in seen and val.strip():
-                seen.add(key)
-                line_off = scope_str[:m.start()].count("\n")
-                detected_line = base_line + line_off
-                results.append({
-                    "property": prop_name,
-                    "text": val,
-                    "file": file_p,
-                    "line": detected_line,
-                    "is_resource_or_ref": bool(embedded_ref),
-                    "ref_key": embedded_ref,
-                })
+            for m in re.finditer(r'"([^"\\]*(?:\\.[^"\\]*)*)"', call_text):
+                raw = m.group(1)
+                prefix_context = call_text[:m.start()]
+                if re.search(r'(?:tag|key|route|name|testTag|action)\s*=\s*$', prefix_context):
+                    continue
+                clean = raw.replace('\\"', '"').replace('\\\\', '\\')
+                key = ("hardcoded", clean, line_in_file)
+                if key not in seen:
+                    seen.add(key)
+                    results.append({
+                        "property": "text",
+                        "text": clean,
+                        "file": file_p,
+                        "line": line_in_file,
+                        "is_resource_or_ref": False,
+                        "ref_key": None,
+                    })
 
-        # 4. Direct Text("...") or Text(text = "...")
-        hardcoded_text_pattern = re.compile(r'Text\s*\(\s*(?:text\s*=\s*)?"([^"\\]*(?:\\.[^"\\]*)*)"')
-        for m in hardcoded_text_pattern.finditer(scope_str):
-            raw_lit = m.group(1)
-            has_template = "$" in raw_lit
-            embedded_ref = None
-            if has_template:
-                m_emb = re.search(r'\$\{?(AppStrings(?:\.[a-zA-Z0-9_]+)+)\}?', raw_lit)
-                if m_emb:
-                    embedded_ref = m_emb.group(1)
-
-            val = runtime_text_hint if (has_template and runtime_text_hint) else raw_lit.replace('\\"', '"').replace('\\\\', '\\').replace('\\n', '\n')
-            if has_template and not runtime_text_hint and embedded_ref:
-                val = _resolve_app_strings_value(root, embedded_ref) or val
-
-            key = ("hardcoded", val)
-            if key not in seen and val.strip():
-                seen.add(key)
-                line_off = scope_str[:m.start()].count("\n")
-                detected_line = base_line + line_off
-                results.append({
-                    "property": "text",
-                    "text": val,
-                    "file": file_p,
-                    "line": detected_line,
-                    "is_resource_or_ref": bool(embedded_ref),
-                    "ref_key": embedded_ref,
-                })
-
-        # 5. Parameter/Variable text: Text(title) or Text(subtitle)
-        var_text_pattern = re.compile(r'Text\s*\(\s*(?:text\s*=\s*)?([a-zA-Z0-9_]+)')
-        for m in var_text_pattern.finditer(scope_str):
+        for m in re.finditer(r'\btext\s*=\s*([a-zA-Z0-9_]+)\b', scope_str):
             var_name = m.group(1)
-            if var_name in ("modifier", "color", "style", "null", "true", "false", "it", "fontSize", "fontWeight"):
+            if var_name in ["it", "text", "value"]:
                 continue
-            abs_pos = content.find(scope_str) + m.start() if scope_str in content else m.start()
-            before_code = content[:abs_pos]
-            func_matches = list(re.finditer(r'fun\s+([a-zA-Z0-9_]+)\s*\(([^)]*)\)', before_code))
-            if func_matches:
-                last_func = func_matches[-1]
+            before_scope = content[:content.find(scope_str)] if scope_str in content else ""
+            func_defs = list(re.finditer(r'fun\s+([A-Za-z0-9_]+)\s*\(([^)]*)\)', before_scope))
+            if func_defs:
+                last_func = func_defs[-1]
                 func_name = last_func.group(1)
                 params = last_func.group(2)
                 if re.search(rf'\b{var_name}\b', params):
-                    call_pattern = re.compile(rf'{func_name}\s*\((.*?)\)', re.DOTALL)
-                    all_calls = list(call_pattern.finditer(content))
+                    all_calls = []
+                    call_start_pat = re.compile(rf'\b{re.escape(func_name)}\s*\(')
+                    for cm in call_start_pat.finditer(content):
+                        c_open = cm.end() - 1
+                        c_close = _find_matching_parenthesis(content, c_open)
+                        if c_close != -1:
+                            all_calls.append((cm.start(), content[c_open + 1 : c_close]))
                     chosen_call = None
 
-                    # If filter_call_line specified, match call near that line
                     target_line = filter_call_line or parent_line
                     if target_line:
-                        for call_m in all_calls:
-                            c_line = content[:call_m.start()].count("\n") + 1
+                        for c_start, call_body in all_calls:
+                            c_line = content[:c_start].count("\n") + 1
                             if abs(c_line - target_line) <= 5:
-                                chosen_call = call_m
+                                chosen_call = (c_start, call_body)
                                 break
 
-                    # Match by runtime_text_hint
                     if not chosen_call and runtime_text_hint:
-                        for call_m in all_calls:
-                            call_body = call_m.group(1)
+                        for c_start, call_body in all_calls:
                             if runtime_text_hint in call_body:
-                                chosen_call = call_m
+                                chosen_call = (c_start, call_body)
                                 break
                             for ref_m in re.finditer(r'AppStrings(?:\.[a-zA-Z0-9_]+)+', call_body):
                                 res_val = _resolve_app_strings_value(root, ref_m.group(0), runtime_text_hint)
                                 if res_val == runtime_text_hint:
-                                    chosen_call = call_m
+                                    chosen_call = (c_start, call_body)
                                     break
                             if chosen_call:
                                 break
 
                     calls_to_process = [chosen_call] if chosen_call else all_calls
-                    for call_m in calls_to_process:
-                        call_body = call_m.group(1)
+                    for c_start, call_body in calls_to_process:
                         param_m = re.search(rf'{var_name}\s*=\s*([^\n,]+)', call_body)
                         if param_m:
                             arg_val = param_m.group(1).strip()
@@ -1230,12 +1181,72 @@ def analyze_element_range(
                                     })
         return results
 
-    # First, extract from the immediate call scope (search_scope)
     structured_texts = _extract_from_text(search_scope, start_line_in_file, actual_source_file)
-
-    # If no texts found in call scope and we expanded to composable scope, extract there
     if not structured_texts and dim_scope_text != search_scope:
         structured_texts = _extract_from_text(dim_scope_text, dim_scope_start_line, effective_file, filter_call_line=start_line_in_file)
+
+    return structured_texts
+
+
+def analyze_element_range(
+    source_file: str,
+    line_number: int,
+    utf16_offset: int = 0,
+    utf16_length: int = 0,
+    project_root: Optional[Path] = None,
+    tree: Optional[list] = None,
+    runtime_text_hint: Optional[str] = None,
+    parent_line: Optional[int] = None,
+) -> dict:
+    """
+    Analyzes literal source code range of an element.
+    Returns dimensions, tokens, literals, and structured Focus Mode color objects.
+    Decomposed into specialized sub-extractors for clarity and maintainability.
+    """
+    from .text_ref_analyzer import _detect_composable_name
+    root = project_root or PROJECT_ROOT
+
+    # 1. تحديد الملف الحقيقي والنطاق النصي (File & Scope Resolution)
+    full_path, actual_source_file, actual_line_number, content, start_line_in_file, search_scope, error_res = _resolve_element_file_and_scope(
+        source_file, line_number, utf16_offset, utf16_length, root, tree
+    )
+    if error_res is not None:
+        return error_res
+
+    # تجهيز الكاش المشترك
+    try:
+        from common.project_cache import PROJECT_CACHE
+        kt_cache = PROJECT_CACHE.get_kt_cache(root)
+    except Exception:
+        kt_cache = None
+
+    # 2. استخراج الألوان والتوكنز (Colors & Tokens Extraction)
+    tokens, literals, structured_colors = _extract_colors_in_scope(
+        search_scope, start_line_in_file, root, kt_cache
+    )
+
+    # 3. تحديد اسم الـ Composable المحيط
+    composable_name = _detect_composable_name(
+        search_scope,
+        fallback_line_content=content.splitlines()[line_number - 1] if 0 < line_number <= len(content.splitlines()) else "",
+        full_content=content,
+        line_number=actual_line_number
+    )
+    if composable_name in ["Element", "Text", "BasicText", "Column", "Row", "Box", "Spacer"] and content:
+        enclosing_name = _find_enclosing_function_or_class(content, actual_line_number)
+        if enclosing_name != "Element":
+            composable_name = enclosing_name
+
+    # 4. استخراج الأبعاد (Dimensions Extraction)
+    filtered_dims, dim_scope_text, dim_scope_start_line, effective_file, bridge_tokens, sps, weights, properties = _extract_dimensions_in_scope(
+        content, search_scope, start_line_in_file, actual_source_file, actual_line_number, composable_name, root, kt_cache
+    )
+
+    # 5. استخراج النصوص ومراجع الموارد (Texts Extraction)
+    structured_texts = _extract_texts_in_scope(
+        search_scope, start_line_in_file, dim_scope_text, dim_scope_start_line,
+        actual_source_file, effective_file, content, root, parent_line, runtime_text_hint
+    )
 
     return {
         "composable_name": composable_name,
@@ -1254,4 +1265,3 @@ def analyze_element_range(
         "scope_size": len(search_scope),
         "used_exact_range": utf16_offset > 0 and utf16_length > 0,
     }
-

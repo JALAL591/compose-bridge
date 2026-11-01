@@ -12,7 +12,7 @@ import subprocess
 import time
 import os
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, Callable
 
 
 # ⚠️ قائمة المهام المسموحة فقط
@@ -55,6 +55,7 @@ def run_gradle_build(
     project_root: Path,
     task: str = "compileDebugKotlin",
     timeout_seconds: int = 300,
+    on_progress: Optional[Callable[[str], None]] = None,
 ) -> Dict:
     """
     Run a gradle task and return structured result.
@@ -111,23 +112,43 @@ def run_gradle_build(
             env={**os.environ, "GRADLE_OPTS": "-Dorg.gradle.daemon=false"},
         )
         
+        start_time = time.time()
+        output_lines = []
         try:
-            output, _ = process.communicate(timeout=timeout_seconds)
-            exit_code = process.returncode
-        except subprocess.TimeoutExpired:
-            timed_out = True
-            exit_code = -1
-            if os.name == "nt":
-                try:
-                    subprocess.run(["taskkill", "/F", "/T", "/PID", str(process.pid)], capture_output=True)
-                except Exception:
+            if process.stdout:
+                while True:
+                    line = process.stdout.readline()
+                    if not line:
+                        break
+                    output_lines.append(line)
+                    if on_progress:
+                        try:
+                            on_progress(line.strip())
+                        except Exception:
+                            pass
+                    if time.time() - start_time > timeout_seconds:
+                        timed_out = True
+                        break
+                process.stdout.close()
+            
+            if timed_out:
+                if os.name == "nt":
+                    try:
+                        subprocess.run(["taskkill", "/F", "/T", "/PID", str(process.pid)], capture_output=True)
+                    except Exception:
+                        process.kill()
+                else:
                     process.kill()
+                exit_code = -1
             else:
-                process.kill()
+                exit_code = process.wait(timeout=10)
+        except Exception:
             try:
-                output, _ = process.communicate(timeout=3)
+                process.kill()
             except Exception:
                 pass
+            exit_code = -1
+        output = "".join(output_lines)
     
     except Exception as e:
         return {

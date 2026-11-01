@@ -2,30 +2,37 @@
     <id>com.composebridge.plugin</id>
     <name>ComposeBridge</name>
     <vendor>ComposeBridge</vendor>
-    <version>1.1.5</version>
+    <version>1.1.6</version>        <description><![CDATA[
+<h1>ComposeBridge: Real-Time Visual Editor &amp; MCP Server for Jetpack Compose</h1>
+<p><strong>ComposeBridge</strong> bridges the gap between running Android applications and your Kotlin source code. It enables developers and AI agents to inspect and modify UI elements—including colors, dimensions, and text—directly from the device screen, applying surgical changes straight to the source code via AST mutation without full project rebuilds.</p>
 
-    <description><![CDATA[
-<h2>ComposeBridge v1.1.5: Real-Time Visual Editor & MCP Server for Jetpack Compose</h2>
-<p><b>ComposeBridge</b> bridges the gap between running Android applications and your Kotlin source code. It enables developers and AI agents to inspect and modify UI elements—including colors, dimensions, and text—directly from the device screen, applying surgical changes straight to the source code via AST mutation without full project rebuilds.</p>
-
-<h3>🚀 Key Features</h3>
+<h2>🚀 Key Features</h2>
 <ul>
-    <li><b>Real-Time On-Device Editing:</b> Tap and adjust padding, dimensions, colors, and text directly on your connected device with instant Live Preview.</li>
-    <li><b>AI-Ready via MCP:</b> Built-in Model Context Protocol (MCP) server enables AI assistants (such as Antigravity, Cursor, or Claude Desktop) to inspect runtime layouts and safely execute surgical patches.</li>
-    <li><b>⚡ Extreme Performance:</b> Powered by an In-Memory Project Cache for a 60x faster analysis engine (~0.15s response time).</li>
-    <li><b>Surgical AST Refactoring:</b> Employs precise AST manipulation to update target Composable nodes without altering surrounding logic, imports, or formatting.</li>
-    <li><b>Human-in-the-Loop Safety:</b> Review all incoming changes in a side-by-side visual diff inside Android Studio. Approve, reject, or roll back edits with a single click.</li>
-    <li><b>Zero-Rebuild Workflow:</b> See layout and text updates reflect instantly without resetting screen state, user input, or navigation backstacks.</li>
+    <li><strong>⚡ Extreme Performance (60x Faster):</strong> Element analysis now takes ~0.15s thanks to In-Memory caching.</li>
+    <li><strong>Real-Time On-Device Editing:</strong> Tap and adjust padding, dimensions, colors, and text directly on your connected device with instant Live Preview.</li>
+    <li><strong>🤖 AI-Ready via MCP (27 Tools):</strong> Built-in Model Context Protocol (MCP) server enables AI assistants (like Antigravity, Cursor, or Claude) to safely execute surgical patches.</li>
+    <li><strong>Universal Design Scanner:</strong> Detects scattered hardcoded tokens (colors, strings, dimensions) across any Kotlin project, giving you an exact map of what needs refactoring.</li>
+    <li><strong>Human-in-the-Loop Safety:</strong> Review all incoming changes in a side-by-side visual diff inside Android Studio.</li>
 </ul>
 
-<h3>🛠️ Requirements</h3>
+<h2>⚠️ Honest Limitations &amp; Experimental Features</h2>
+<p>We believe in absolute transparency. Please read our <a href="https://github.com/JALAL591/compose-bridge/blob/main/LIMITATIONS.md">LIMITATIONS.md</a>. Key warnings:</p>
 <ul>
-    <li><b>Supported IDEs:</b> Android Studio Hedgehog (2023.1.1) or newer, IntelliJ IDEA 2023.1+.</li>
-    <li><b>Host Environment:</b> Python 3.10 or higher (for the companion server).</li>
+    <li><strong>Experimental Remote Connection:</strong> Editing over the internet via Tailscale Funnel is experimental. It may disconnect due to network changes. USB connection is recommended for maximum stability.</li>
+    <li><strong>Design System Mapping Required:</strong> If the tool cannot automatically find your Color, Dimension, or String files, it will <b>safely pause and refuse to edit</b> until you specify the file path in the "Discovery" tab. This prevents accidental code pollution.</li>
+    <li><strong>KMP Support:</strong> Desktop (KMP) projects must use source modules instead of `.aar` binaries for the runtime.</li>
 </ul>
+<p><em>Built for the Jetpack Compose Community. Actively developed.</em></p>
     ]]></description>
 
         <change-notes><![CDATA[
+<h3>v1.1.6 - Architecture Decomposition, Dynamic QR, & Debranding</h3>
+<ul>
+  <li><b>Modular Monolith Refactoring:</b> Decomposed Agent, IDE plugin, and Server monoliths into clean, single-responsibility packages.</li>
+  <li><b>Dynamic QR Scanner:</b> Host app reflection automatically finds local QrScannerActivity.</li>
+  <li><b>Full UI Localization:</b> Complete English copy across all dialogs, toasts, and overlays.</li>
+  <li><b>P0 Fix:</b> Color token re-edits in hex format reliably appear in the Changes tab.</li>
+</ul>
 <h3>v1.1.5 - Critical Rollback Fix (Hotfix)</h3>
 <ul>
   <li><b>CRLF False Positives Fixed:</b> The server now normalizes line endings (CRLF/LF) before checksum comparisons, preventing false EXTERNAL_MODIFICATION_DETECTED warnings on Windows.</li>

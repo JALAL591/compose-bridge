@@ -3,13 +3,13 @@
 State Queue — User pending edits.
 """
 
-import json
 from pathlib import Path
 from typing import List, Dict, Optional
 from datetime import datetime
+from .base_state import JsonPersistentState
 
 
-class UserQueue:
+class UserQueue(JsonPersistentState):
     """Manages user queued edits."""
     
     def __init__(self, file_path: Path):
@@ -31,7 +31,7 @@ class UserQueue:
             "token": token,
             "value": value,
             "source": source,
-            "kind": kind,  # ⭐ جديد
+            "kind": kind,
             "queued_at": datetime.utcnow().isoformat(),
             "id": f"edit_{len(self.edits) + 1}_{int(datetime.utcnow().timestamp())}",
         }
@@ -63,15 +63,7 @@ class UserQueue:
         return list(self.edits)
     
     def save(self):
-        self.file_path.write_text(
-            json.dumps(self.edits, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
+        self.save_json(self.file_path, self.edits)
     
     def load(self):
-        if not self.file_path.exists():
-            return
-        try:
-            self.edits = json.loads(self.file_path.read_text(encoding="utf-8"))
-        except Exception:
-            self.edits = []
+        self.edits = self.load_json(self.file_path, default=[]) or []

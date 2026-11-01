@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "com.composebridge"
-version = "1.1.5"
+version = "1.1.6"
 
 kotlin {
     androidTarget {
@@ -40,6 +40,7 @@ kotlin {
         val androidMain by getting {
             dependencies {
                 implementation("androidx.compose.ui:ui-tooling-data:1.6.7")
+                implementation("androidx.core:core-ktx:1.13.1")
                 implementation("com.squareup.okhttp3:okhttp:4.12.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
             }

@@ -1,4 +1,4 @@
-﻿package com.composebridge.plugin.services
+package com.composebridge.plugin.services
 
 import com.composebridge.plugin.settings.ComposeBridgeSettings
 import com.intellij.openapi.project.Project
@@ -207,35 +207,158 @@ class PythonRunner(private val project: Project) {
     }
 
 
+    fun cleanTempFiles(): String {
+        val bridge = getBridgePath()
+        val pRoot = project.basePath ?: "."
+        val safeRoot = pRoot.replace("\\", "\\\\").replace("'", "\\'")
+        val script = """
+            import sys, os, json
+            from pathlib import Path
+            sys.path.insert(0, os.path.abspath('.'))
+            root = Path(r'$safeRoot')
+            from core.project_root import clean_temp_files
+            result = clean_temp_files(root)
+            print(json.dumps(result, ensure_ascii=False))
+        """.trimIndent()
+        return executeCommand(listOf(getPython(), "-c", script), bridge)
+    }
+
     fun listModifiedFiles(): String {
         val bridge = getBridgePath()
+        val pRoot = project.basePath ?: "."
+        val safeRoot = pRoot.replace("\\", "\\\\").replace("'", "\\'")
         val script = """
-            import mcp_server
-            result = mcp_server.list_modified_files()
-            print(result)
+            import sys, os, json
+            from pathlib import Path
+            sys.path.insert(0, os.path.abspath('.'))
+            root = Path(r'$safeRoot')
+            from core.pattern_journal import PatternJournal
+            journal = PatternJournal(root)
+            files = journal.list_modified_files()
+            print(json.dumps({'success': True, 'count': len(files), 'files': files}, ensure_ascii=False))
+        """.trimIndent()
+        return executeCommand(listOf(getPython(), "-c", script), bridge)
+    }
+
+    fun analyzeDesignScatter(): String {
+        val bridge = getBridgePath()
+        val pRoot = project.basePath ?: "."
+        val safeRoot = pRoot.replace("\\", "\\\\").replace("'", "\\'")
+        val script = """
+            import sys, os, json
+            from pathlib import Path
+            sys.path.insert(0, os.path.abspath('.'))
+            root = Path(r'$safeRoot')
+            from analysis.universal_scanner import scan_design_scatter
+            result = scan_design_scatter(root)
+            print(json.dumps(result, ensure_ascii=False))
+        """.trimIndent()
+        return executeCommand(listOf(getPython(), "-c", script), bridge)
+    }
+
+    fun setDesignFileMapping(tokenType: String, filePath: String): String {
+        val bridge = getBridgePath()
+        val pRoot = project.basePath ?: "."
+        val safeRoot = pRoot.replace("\\", "\\\\").replace("'", "\\'")
+        val safeType = tokenType.replace("'", "\\'")
+        val safePath = filePath.replace("\\", "\\\\").replace("'", "\\'")
+        val script = """
+            import sys, os, json
+            from pathlib import Path
+            sys.path.insert(0, os.path.abspath('.'))
+            root = Path(r'$safeRoot')
+            from analysis.universal_scanner import save_design_file_mapping
+            result = save_design_file_mapping('$safeType', r'$safePath', root)
+            print(json.dumps(result, ensure_ascii=False))
+        """.trimIndent()
+        return executeCommand(listOf(getPython(), "-c", script), bridge)
+    }
+
+    fun getDesignFileMappings(): String {
+        val bridge = getBridgePath()
+        val pRoot = project.basePath ?: "."
+        val safeRoot = pRoot.replace("\\", "\\\\").replace("'", "\\'")
+        val script = """
+            import sys, os, json
+            from pathlib import Path
+            sys.path.insert(0, os.path.abspath('.'))
+            root = Path(r'$safeRoot')
+            from analysis.universal_scanner import get_design_file_mappings
+            result = get_design_file_mappings(root)
+            print(json.dumps({'success': True, 'mappings': result}, ensure_ascii=False))
+        """.trimIndent()
+        return executeCommand(listOf(getPython(), "-c", script), bridge)
+    }
+
+    fun approveChange(filePath: String, changeId: String): String {
+        val bridge = getBridgePath()
+        val pRoot = project.basePath ?: "."
+        val safeRoot = pRoot.replace("\\", "\\\\").replace("'", "\\'")
+        val safePath = filePath.replace("\\", "\\\\").replace("'", "\\'")
+        val safeId = changeId.replace("'", "\\'")
+        val script = """
+            import sys, os, json
+            from pathlib import Path
+            sys.path.insert(0, os.path.abspath('.'))
+            root = Path(r'$safeRoot')
+            from core.diff_engine import approve_change
+            result = approve_change(r'$safePath', '$safeId', root)
+            print(json.dumps(result, ensure_ascii=False))
+        """.trimIndent()
+        return executeCommand(listOf(getPython(), "-c", script), bridge)
+    }
+
+    fun rejectChange(filePath: String, changeId: String): String {
+        val bridge = getBridgePath()
+        val pRoot = project.basePath ?: "."
+        val safeRoot = pRoot.replace("\\", "\\\\").replace("'", "\\'")
+        val safePath = filePath.replace("\\", "\\\\").replace("'", "\\'")
+        val safeId = changeId.replace("'", "\\'")
+        val script = """
+            import sys, os, json
+            from pathlib import Path
+            sys.path.insert(0, os.path.abspath('.'))
+            root = Path(r'$safeRoot')
+            from core.diff_engine import reject_change
+            result = reject_change(r'$safePath', '$safeId', root)
+            print(json.dumps(result, ensure_ascii=False))
         """.trimIndent()
         return executeCommand(listOf(getPython(), "-c", script), bridge)
     }
 
     fun rejectFileChanges(filePath: String, force: Boolean = false): String {
         val bridge = getBridgePath()
+        val pRoot = project.basePath ?: "."
+        val safeRoot = pRoot.replace("\\", "\\\\").replace("'", "\\'")
         val safePath = filePath.replace("\\", "\\\\").replace("'", "\\'")
-        val forceArg = if (force) ", force=True" else ""
+        val forceArg = if (force) "True" else "False"
         val script = """
-            import mcp_server
-            result = mcp_server.reject_file_changes('$safePath'$forceArg)
-            print(result)
+            import sys, os, json
+            from pathlib import Path
+            sys.path.insert(0, os.path.abspath('.'))
+            root = Path(r'$safeRoot')
+            from core.pattern_journal import PatternJournal
+            journal = PatternJournal(root)
+            result = journal.reject_file_changes(r'$safePath', force=$forceArg)
+            print(json.dumps(result, ensure_ascii=False))
         """.trimIndent()
         return executeCommand(listOf(getPython(), "-c", script), bridge)
     }
 
     fun approveFileChanges(filePath: String): String {
         val bridge = getBridgePath()
+        val pRoot = project.basePath ?: "."
+        val safeRoot = pRoot.replace("\\", "\\\\").replace("'", "\\'")
         val safePath = filePath.replace("\\", "\\\\").replace("'", "\\'")
         val script = """
-            import mcp_server
-            result = mcp_server.approve_file_changes('$safePath')
-            print(result)
+            import sys, os, json
+            from pathlib import Path
+            sys.path.insert(0, os.path.abspath('.'))
+            root = Path(r'$safeRoot')
+            from core.pattern_journal import PatternJournal
+            journal = PatternJournal(root)
+            result = journal.approve_file_changes(r'$safePath')
+            print(json.dumps(result, ensure_ascii=False))
         """.trimIndent()
         return executeCommand(listOf(getPython(), "-c", script), bridge)
     }
@@ -323,6 +446,17 @@ class PythonRunner(private val project: Project) {
         return executeCommand(listOf(getPython(), "-c", script), bridge)
     }
 
+        fun checkSyntaxFile(filePath: String): String {
+        val bridge = getBridgePath()
+        val script = "$bridge\\check_syntax_cli.py"
+        val command = listOf(
+            getPython(),
+            script,
+            filePath
+        )
+        return executeCommand(command, bridge)
+    }
+
     fun syncDirtyFilesToDisk() {
         try {
             val fdm = com.intellij.openapi.fileEditor.FileDocumentManager.getInstance()
@@ -351,6 +485,18 @@ class PythonRunner(private val project: Project) {
         }
     }
 
+    fun <T> runPythonJson(script: String, classOfT: Class<T>, workingDir: String? = null): T? {
+        val raw = executeCommand(listOf(getPython(), "-c", script), workingDir ?: getBridgePath())
+        return try {
+            val start = raw.indexOf('{')
+            val end = raw.lastIndexOf('}')
+            val clean = if (start != -1 && end != -1 && end >= start) raw.substring(start, end + 1) else raw
+            com.google.gson.Gson().fromJson(clean, classOfT)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     private fun executeCommand(command: List<String>, workingDir: String): String {
         syncDirtyFilesToDisk()
         if (workingDir.isBlank() || !File(workingDir).exists()) {
@@ -365,6 +511,7 @@ class PythonRunner(private val project: Project) {
 
             processBuilder.environment()["PYTHONIOENCODING"] = "utf-8"
             processBuilder.environment()["PYTHONUTF8"] = "1"
+            processBuilder.redirectErrorStream(true)
 
             val process = processBuilder.start()
             val reader = BufferedReader(InputStreamReader(process.inputStream, Charsets.UTF_8))
@@ -373,15 +520,9 @@ class PythonRunner(private val project: Project) {
             while (reader.readLine().also { line = it } != null) {
                 output.append(line).append("\n")
             }
-            val exitCode = process.waitFor()
-            if (exitCode != 0 && output.isBlank()) {
-                val errReader = BufferedReader(InputStreamReader(process.errorStream, Charsets.UTF_8))
-                val errOutput = StringBuilder()
-                while (errReader.readLine().also { line = it } != null) {
-                    errOutput.append(line).append("\n")
-                }
-                return errOutput.toString()
-            }
+            try {
+                process.waitFor(15, java.util.concurrent.TimeUnit.SECONDS)
+            } catch (_: Exception) {}
             output.toString()
         } catch (e: Exception) {
             "Error: ${e.message}"
