@@ -8,7 +8,8 @@ import hashlib
 import json
 import shutil
 from pathlib import Path
-from typing import Optional, Tuple, Dict, Any
+from datetime import datetime
+from typing import Optional, Tuple, Dict, Any, List
 
 def compute_normalized_hash(content_or_bytes) -> str:
     """Compute SHA-256 hash with normalized line endings to prevent platform CRLF/LF mismatches."""
