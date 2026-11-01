@@ -5,7 +5,6 @@
 *.backup
 *.bak*
 *.backup*
-*backup*
 .DS_Store
 
 # Gradle
