@@ -14,6 +14,7 @@
 [![Glama MCP](https://glama.ai/mcp/servers/JALAL591/compose-bridge/badges/score.svg)](https://glama.ai/mcp/servers/JALAL591/compose-bridge)
 [![M8ven Score](https://m8ven.ai/badge/mcp/jalal591-compose-bridge-rapm1x)](https://m8ven.ai/mcp/jalal591-compose-bridge-rapm1x?s=readme)
 [![compose-bridge on DevHunt](https://devhunt.org/badge/compose-bridge.svg)](https://devhunt.org/tool/compose-bridge)
+[![Listed on MCP Market](https://mcpmarket.com/badge/server/composebridge.svg?style=compact)](https://mcpmarket.com/server/composebridge?utm_source=readme&utm_medium=badge)
 ## 📰 Featured In
 
 <p align="left">
