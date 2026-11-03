@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 from mcp.app import app, log, PROJECT_ROOT, state_manager
+from mcp.types import ToolAnnotations
 
 ALLOWED_GRADLE_TASKS = {"assembleDebug", "assembleRelease", "test", "lint", "clean", "compileDebugKotlin", "compileReleaseKotlin"}
 
@@ -58,7 +59,14 @@ def _execute_gradle_background(job_id: str, task: str, timeout_seconds: int):
             _GRADLE_JOBS[job_id]["error"] = str(e)
 
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=False,
+        idempotent_hint=False,
+        open_world_hint=False,
+    )
+)
 def run_gradle_build(
     task: str = "assembleDebug",
     timeout_seconds: int = 300,
@@ -66,6 +74,18 @@ def run_gradle_build(
 ) -> str:
     """
     Run a Gradle task with async tracking support.
+
+    When to use:
+    - Call to verify that surgical edits or token refactorings compile without errors.
+    - Call after batch changes before approving or completing a task.
+
+    When NOT to use:
+    - Do not use for arbitrary shell execution; tasks are strictly whitelist-restricted.
+    - Do not use for simple file reading or AST validation (use check_syntax_cli or ast_finder instead).
+
+    Side effects:
+    - Executes a Gradle build process in background; may write build artifacts to build/ directories.
+
     
     This lets the agent verify that code changes compile successfully
     before continuing with more changes, without locking the MCP connection.
@@ -120,10 +140,27 @@ def run_gradle_build(
     }, indent=2, ensure_ascii=False)
 
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
+    )
+)
 def get_gradle_status(job_id: str) -> str:
     """
     Check the status and result of a Gradle build job.
+
+    When to use:
+    - Call to poll background Gradle build status returned by run_gradle_build.
+
+    When NOT to use:
+    - Do not use if no Gradle job was started.
+
+    Side effects:
+    - None (strictly read-only job status query).
+
     
     Args:
         job_id: ID returned by run_gradle_build.
@@ -152,19 +189,54 @@ def get_gradle_status(job_id: str) -> str:
     }, indent=2, ensure_ascii=False)
 
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
+    )
+)
 def list_allowed_gradle_tasks() -> str:
-    """List gradle tasks that can be run via run_gradle_build."""
+    """
+    List gradle tasks that can be run via run_gradle_build.
+
+    When to use:
+    - Call to check which Gradle tasks are whitelisted for safe execution.
+
+    When NOT to use:
+    - Do not use to run builds (use run_gradle_build instead).
+
+    Side effects:
+    - None (strictly read-only whitelist listing).
+    """
     return json.dumps({
         "success": True,
         "tasks": sorted(ALLOWED_GRADLE_TASKS),
     }, indent=2, ensure_ascii=False)
 
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=True,
+        idempotent_hint=False,
+        open_world_hint=False,
+    )
+)
 def trigger_user_sync() -> str:
     """
     Trigger user_sync on the Bridge Server.
+
+    When to use:
+    - Call to flush and apply pending queued edits (dimensions and colors) from the Android device to source files.
+
+    When NOT to use:
+    - Do not use if the AI agent is actively modifying source files (agent_busy lock).
+
+    Side effects:
+    - Modifies source files on disk by applying pending changes from the queue.
+
     
     Applies all queued edits (dimension + color) to the files.
     Only works when the AI agent is not busy.
@@ -180,11 +252,26 @@ def trigger_user_sync() -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
+    )
+)
 def get_sync_status() -> str:
     """
-    Get the current sync status from the Bridge Server:
-    agent_busy, queue_count, snapshot_version.
+    Get the current sync status from the Bridge Server.
+
+    When to use:
+    - Call to inspect agent_busy, queue_count, and snapshot_version before running batch operations.
+
+    When NOT to use:
+    - Do not use to apply changes (use trigger_user_sync instead).
+
+    Side effects:
+    - None (strictly read-only state inspection).
     """
     from core.sync_client import get_state_info
     try:

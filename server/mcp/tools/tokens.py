@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 from mcp.app import app, log, PROJECT_ROOT, state_manager
+from mcp.types import ToolAnnotations
 from mcp.tools.misc import notify_bridge_server, notify_agent_lifecycle, notify_refresh_to_bridge, run_async, send_refresh_signal
 
 from core.token_migrator import TokenMigrator
@@ -26,6 +27,12 @@ from common.file_ops import acquire_write_lock
 @app.tool(
     name="find_token_by_color",
     description="Reverse lookup: Find token(s) matching an exact hex color.",
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
+    ),
 )
 def find_token_by_color(hex_color: str) -> str:
     """
@@ -51,7 +58,14 @@ def find_token_by_color(hex_color: str) -> str:
         return json.dumps({"error": str(e)})
 
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=True,
+        idempotent_hint=False,
+        open_world_hint=False,
+    )
+)
 def add_token(
     file: str,
     line: int,
@@ -177,7 +191,14 @@ def add_token(
         }, indent=2, ensure_ascii=False)
 
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
+    )
+)
 def get_naming_convention(token_type: str = "dimension") -> str:
     """
     Read-only analysis. Detects if project uses camelCase, snake_case, or PascalCase for tokens.
@@ -213,7 +234,14 @@ def get_naming_convention(token_type: str = "dimension") -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
+    )
+)
 def list_tokens(project_path: str = None) -> str:
     """
     List all design tokens in the project.
@@ -224,8 +252,16 @@ def list_tokens(project_path: str = None) -> str:
     - Duplicate tokens (same value, different names)
     - Orphan tokens (registered but unused)
     
-    Use this to understand the project's design system
-    before making edits.
+    When to use:
+    - Call to explore all existing design tokens (colors and dimensions) and hardcoded literals in the project.
+    - Call before adding or modifying tokens to understand the existing design system.
+
+    When NOT to use:
+    - Do not use for reverse hex lookup (use find_token_by_color instead).
+    - Do not use for editing token values (use set_token or add_token instead).
+
+    Side effects:
+    - None (strictly read-only design token inspection).
 
     Args:
         project_path: optional — explicit path to project root.
@@ -285,7 +321,14 @@ def list_tokens(project_path: str = None) -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=True,
+        idempotent_hint=False,
+        open_world_hint=False,
+    )
+)
 def set_token(token_name: str, value: str) -> str:
     """
     DESTRUCTIVE: Modifies .kt files. Surgically edit a design token value in source code.
@@ -434,10 +477,26 @@ def set_token(token_name: str, value: str) -> str:
             return json.dumps({"error": str(e)})
 
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
+    )
+)
 def list_orphans(project_path: str = None) -> str:
     """
     List all orphan tokens (registered but never used).
+
+    When to use:
+    - Call during design system cleanup or dead code elimination.
+
+    When NOT to use:
+    - Do not use to delete tokens directly (must be removed manually or approved).
+
+    Side effects:
+    - None (strictly read-only orphan detection).
     
     Orphan tokens are a sign of design system clutter.
     Use this to identify tokens that can be safely removed
@@ -474,10 +533,26 @@ def list_orphans(project_path: str = None) -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
+    )
+)
 def get_token_impact(token_name: str, project_path: str = None) -> str:
     """
     Get impact analysis for a specific token.
+
+    When to use:
+    - Call BEFORE modifying or deleting a token to see every file and line that references it.
+
+    When NOT to use:
+    - Do not use if you already intend to change all occurrences without impact inspection.
+
+    Side effects:
+    - None (strictly read-only impact analysis).
     
     Shows:
     - All places where the token is used (file:line)
@@ -535,7 +610,14 @@ def get_token_impact(token_name: str, project_path: str = None) -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
+    )
+)
 def suggest_token_split(token_name: str = None, project_path: str = None) -> str:
     """
     Read-only analysis. Suggests splitting tokens used in multiple contexts.
@@ -588,7 +670,14 @@ def suggest_token_split(token_name: str = None, project_path: str = None) -> str
         return json.dumps({"success": False, "error": str(e)})
 
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
+    )
+)
 def detect_conditional_variants(token_name: str = None) -> str:
     """
     Detect repeated patterns like:
@@ -630,7 +719,14 @@ def detect_conditional_variants(token_name: str = None) -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
+    )
+)
 def get_token_siblings(token_name: str) -> str:
     """
     Read-only. Returns semantically related tokens (e.g., Primary → PrimaryDark, PrimaryLight).
@@ -658,7 +754,14 @@ def get_token_siblings(token_name: str) -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
+    )
+)
 def get_all_token_groups() -> str:
     """
     Read-only. Returns ALL semantic token groups in the project (e.g., 'Actions', 'Dashboard', 'Settings').

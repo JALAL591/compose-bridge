@@ -10,13 +10,21 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 from mcp.app import app, log, PROJECT_ROOT, state_manager
+from mcp.types import ToolAnnotations
 from core.pattern_journal import PatternJournal
 from core.token_migrator import TokenMigrator
 from core.pattern_detector import PatternDetector
 from core.ast_finder import surgical_edit
 from common.file_ops import acquire_write_lock
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=True,
+        idempotent_hint=False,
+        open_world_hint=False,
+    )
+)
 def replace_pattern(pattern_id: str, dry_run: bool = False) -> str:
     """
     DESTRUCTIVE BATCH OPERATION: Replaces ALL occurrences of a pattern across the project.
@@ -247,9 +255,28 @@ def replace_pattern(pattern_id: str, dry_run: bool = False) -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
+    )
+)
 def list_applied_patterns() -> str:
-    """List all applied patterns that can be rolled back."""
+    """
+    List all applied patterns that can be rolled back.
+
+    When to use:
+    - Call to inspect history of pattern refactorings before deciding to roll back.
+    - Call to retrieve valid pattern_ids for rollback_pattern.
+
+    When NOT to use:
+    - Do not use to revert changes (use rollback_pattern instead).
+
+    Side effects:
+    - None (strictly read-only journal lookup).
+    """
     from core.pattern_journal import PatternJournal
     try:
         journal = PatternJournal(PROJECT_ROOT)
@@ -263,10 +290,29 @@ def list_applied_patterns() -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=True,
+        idempotent_hint=False,
+        open_world_hint=False,
+    )
+)
 def rollback_pattern(pattern_id: str) -> str:
     """
     Rolls back ALL changes made by a specific replace_pattern call.
+
+    When to use:
+    - Call when a pattern replacement resulted in unexpected UI behavior or compilation issues.
+    - Call to safely undo all file changes associated with a pattern_id.
+
+    When NOT to use:
+    - Do not use to revert single token edits (use rollback_last or reject_change instead).
+    - Do not use without a valid pattern_id from list_applied_patterns.
+
+    Side effects:
+    - DESTRUCTIVE: Modifies source files on disk to restore their pre-replacement states.
+
     
     What it does: Requires pattern_id from the original replace_pattern response. All files are reverted byte-for-byte.
     When to use: When a replace_pattern operation caused regressions and needs complete reversal.

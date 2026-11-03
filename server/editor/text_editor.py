@@ -53,18 +53,6 @@ def update_text_in_source(
     p_root = Path(project_root) if project_root else get_project_root()
 
     with acquire_write_lock():
-        # ⭐ P0 GUARD: Ensure a centralized string file exists (AppStrings.kt / mapped file)
-        target_str_file, _ = resolve_target_design_file("string", p_root)
-        if not target_str_file or not target_str_file.exists():
-            return (
-                False,
-                "NEEDS_MANUAL_MAPPING: No centralized string file found. Please map a string file using the Discovery tab before editing text.",
-                {
-                    "error_code": "NEEDS_MANUAL_MAPPING",
-                    "token_type": "string",
-                }
-            )
-
         target_ref = ref_key
         if not target_ref and old_text and old_text.strip().startswith("AppStrings."):
             target_ref = old_text.strip()
@@ -86,8 +74,10 @@ def update_text_in_source(
             except Exception:
                 pass
 
+        target_str_file, _ = resolve_target_design_file("string", p_root)
+
         # Check if old_text belongs to an AppStrings declaration
-        if not target_ref and old_text and target_str_file.exists():
+        if not target_ref and old_text and target_str_file and target_str_file.exists():
             try:
                 s_content = target_str_file.read_text(encoding="utf-8", errors="ignore")
                 if f'"{old_text}"' in s_content:
@@ -103,11 +93,37 @@ def update_text_in_source(
         is_ref = bool(target_ref and target_ref.startswith("AppStrings."))
         escaped_new = escape_kotlin_string(new_text)
 
-        # ----------------------------------------------------
+        # ⭐ P0 GUARD: Ensure a centralized string file exists (AppStrings.kt / mapped file)
+        if not target_str_file or not target_str_file.exists():
+            if is_ref and file_path and (Path(file_path).exists() or (p_root / file_path).exists()):
+                target_str_file = Path(file_path) if Path(file_path).exists() else (p_root / file_path)
+            else:
+                return (
+                    False,
+                    "NEEDS_MANUAL_MAPPING: No centralized string file found. Please map a string file using the Discovery tab before editing text.",
+                    {
+                        "error_code": "NEEDS_MANUAL_MAPPING",
+                        "token_type": "string",
+                    }
+                )
+
         # الحالة ب: نص مرجعي (Reference في AppStrings.kt أو الملف المعين)
         # ----------------------------------------------------
         if is_ref:
             strings_file = target_str_file
+            if file_path and str(file_path).strip():
+                fp = Path(file_path) if Path(file_path).is_absolute() else (p_root / file_path)
+                if not fp.exists():
+                    matches = [m for m in p_root.rglob(Path(file_path).name) if not is_ignored_path(m, p_root)]
+                    fp = matches[0] if matches else None
+                if fp and fp.exists():
+                    var_n = target_ref.split(".")[-1]
+                    try:
+                        fp_txt = fp.read_text(encoding="utf-8", errors="ignore")
+                        if re.search(rf'\bval\s+{re.escape(var_n)}\b', fp_txt) or "string" in fp.name.lower():
+                            strings_file = fp
+                    except Exception:
+                        pass
             if is_file_dirty_in_ide(strings_file, p_root):
                 return (False, f"الملف '{strings_file.name}' مفتوح في IDE وفيه تعديلات غير محفوظة. احفظ أولاً.", {"error_code": "DIRTY_BUFFER_DETECTED", "file": str(strings_file)})
 

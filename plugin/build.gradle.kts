@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.composebridge.plugin"
-version = "1.1.6"
+version = "1.1.7"
 
 repositories {
     mavenCentral()
@@ -33,6 +33,11 @@ tasks {
         sinceBuild.set("241")
         untilBuild.set(provider { null })
                 changeNotes.set("""
+<h3>🛠️ Patch Release v1.1.7</h3>
+<ul>
+    <li><b>Fixed Text Reference Path:</b> Editing reference strings now correctly prioritizes <code>AppStrings.kt</code>.</li>
+    <li><b>M8ven.ai Optimizations:</b> Added tool annotations (read-only, destructive) and improved descriptions for AI agents.</li>
+</ul>
 <h3>v1.1.6 - Architecture Decomposition, Dynamic QR, & Debranding</h3>
 <ul>
   <li><b>Modular Monolith Refactoring:</b> Decomposed Agent, IDE plugin, and Server monoliths into clean, single-responsibility packages.</li>

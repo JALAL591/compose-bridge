@@ -197,7 +197,7 @@ def resolve_target_design_file(
     candidates_map = {
         "color": ["DesignSystem.kt", "AppColors.kt", "Color.kt", "Colors.kt", "Theme.kt"],
         "dimension": ["DesignSystem.kt", "AppDimens.kt", "Dimens.kt", "Dimensions.kt", "Theme.kt"],
-        "string": ["DesignSystem.kt", "AppStrings.kt", "Strings.kt", "StringResources.kt"],
+        "string": ["AppStrings.kt", "Strings.kt", "StringResources.kt", "DesignSystem.kt"],
     }
     candidates = candidates_map.get(token_type_norm, ["DesignSystem.kt", "Theme.kt"])
 

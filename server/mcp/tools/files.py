@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Optional, List, Dict, Any
 
 from mcp.app import app, log, PROJECT_ROOT, state_manager
+from mcp.types import ToolAnnotations
 from core.project_root import get_project_root
 from core.pattern_journal import PatternJournal
 from core.state_editor import rollback_last as _rollback_last
@@ -18,6 +19,12 @@ from common.file_ops import acquire_write_lock
 @app.tool(
     name="rollback_last",
     description="Reverts the LAST surgical edit made in the current session.",
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=True,
+        idempotent_hint=False,
+        open_world_hint=False,
+    ),
 )
 def rollback_last() -> str:
     """
@@ -47,7 +54,14 @@ def rollback_last() -> str:
         return json.dumps({"error": str(e)})
 
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
+    )
+)
 def list_modified_files() -> str:
     """
     Read-only. Lists files modified by recent replace_pattern operations in the current session.
@@ -73,7 +87,14 @@ def list_modified_files() -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=True,
+        idempotent_hint=False,
+        open_world_hint=False,
+    )
+)
 def reject_file_changes(file_path: str, force: bool = False) -> str:
     """
     Destructive: Reverts pending changes for a SINGLE file using .bridge.bak backup.
@@ -104,7 +125,14 @@ def reject_file_changes(file_path: str, force: bool = False) -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=True,
+        idempotent_hint=True,
+        open_world_hint=False,
+    )
+)
 def approve_file_changes(file_path: str) -> str:
     """
     Approves pending changes for a SPECIFIC file. Removes its entry from journal.
@@ -135,7 +163,14 @@ def approve_file_changes(file_path: str) -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=True,
+        idempotent_hint=True,
+        open_world_hint=False,
+    )
+)
 def approve_all_files() -> str:
     """
     Destructive: Approves ALL pending changes permanently. Removes them from journal.
@@ -165,7 +200,14 @@ def approve_all_files() -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=True,
+        idempotent_hint=False,
+        open_world_hint=False,
+    )
+)
 def reject_all_files() -> str:
     """
     Destructive: Reverts ALL pending changes using byte-level backup (.bridge.bak).
@@ -195,7 +237,14 @@ def reject_all_files() -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=True,
+        idempotent_hint=False,
+        open_world_hint=False,
+    )
+)
 def reject_all_files_force() -> str:
     """
     Destructive + Forceful. Clears the entire journal EVEN IF some rollbacks fail.
@@ -225,7 +274,14 @@ def reject_all_files_force() -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=True,
+        destructive_hint=False,
+        idempotent_hint=True,
+        open_world_hint=False,
+    )
+)
 def get_file_diff(file_path: str) -> str:
     """
     Read-only. Returns before/after content and unified diff for a specific modified file.
@@ -249,7 +305,14 @@ def get_file_diff(file_path: str) -> str:
 
 
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=True,
+        idempotent_hint=True,
+        open_world_hint=False,
+    )
+)
 def approve_change(file_path: str, change_id: str) -> str:
     """
     Approves a single granular change (hunk) in a file.
@@ -278,7 +341,14 @@ def approve_change(file_path: str, change_id: str) -> str:
         return json.dumps({"success": False, "error": str(e)})
 
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=True,
+        idempotent_hint=False,
+        open_world_hint=False,
+    )
+)
 def reject_change(file_path: str, change_id: str) -> str:
     """
     Reverts a single granular change (hunk) in a file while keeping other changes intact.
@@ -306,7 +376,14 @@ def reject_change(file_path: str, change_id: str) -> str:
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=True,
+        idempotent_hint=True,
+        open_world_hint=False,
+    )
+)
 def clean_cache() -> str:
     """
     Safely cleans temporary cache, state files, and logs (.composebridge-state, .composebridge-journal.json, *.tmp)

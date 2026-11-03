@@ -5,6 +5,14 @@ All notable changes to ComposeBridge will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.7] - 2026-11-03
+### Fixed
+- **Text Reference Path Resolution (P0):** Correctly prioritizes `AppStrings.kt` (and centralized string files) when editing reference strings (`AppStrings.*`), preventing "Declaration not found" failures when triggered from UI composable call-site files (such as `DashboardScreen.kt`).
+- **M8ven.ai Protocol Optimizations & Complete Tool Annotations:**
+  - Added strict Model Context Protocol hints (`readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint`) across all 34 MCP tools.
+  - Enhanced docstrings for AI coding agents with explicit `When to use`, `When NOT to use`, and `Side effects` guidance.
+  - Added dedicated test suite `test_mcp_tools_coverage.py` ensuring 100% execution and annotation test coverage.
+
 ## [1.1.6] - 2026-11-01
 ### Added
 - **Full Architecture Modularization (Agent & IDE):**

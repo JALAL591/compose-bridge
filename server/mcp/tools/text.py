@@ -9,10 +9,18 @@ from pathlib import Path
 from typing import Optional
 
 from mcp.app import app
+from mcp.types import ToolAnnotations
 from mcp.network_client import notify_bridge_server, send_refresh_signal, run_async
 
 
-@app.tool()
+@app.tool(
+    annotations=ToolAnnotations(
+        read_only_hint=False,
+        destructive_hint=True,
+        idempotent_hint=False,
+        open_world_hint=False,
+    )
+)
 def set_text(token_name: str, new_value: str, file_path: str = None, line: int = None) -> str:
     """
     DESTRUCTIVE: Modifies .kt files. Surgically edit text content with automatic BridgeTextRegistry wrapping.

@@ -2,7 +2,7 @@
     <id>com.composebridge.plugin</id>
     <name>ComposeBridge</name>
     <vendor>ComposeBridge</vendor>
-    <version>1.1.6</version>        <description><![CDATA[
+    <version>1.1.7</version>        <description><![CDATA[
 <h1>ComposeBridge: Real-Time Visual Editor &amp; MCP Server for Jetpack Compose</h1>
 <p><strong>ComposeBridge</strong> bridges the gap between running Android applications and your Kotlin source code. It enables developers and AI agents to inspect and modify UI elements—including colors, dimensions, and text—directly from the device screen, applying surgical changes straight to the source code via AST mutation without full project rebuilds.</p>
 
@@ -26,6 +26,11 @@
     ]]></description>
 
         <change-notes><![CDATA[
+<h3>🛠️ Patch Release v1.1.7</h3>
+<ul>
+    <li><b>Fixed Text Reference Path:</b> Editing reference strings now correctly prioritizes <code>AppStrings.kt</code>.</li>
+    <li><b>M8ven.ai Optimizations:</b> Added tool annotations (read-only, destructive) and improved descriptions for AI agents.</li>
+</ul>
 <h3>v1.1.6 - Architecture Decomposition, Dynamic QR, & Debranding</h3>
 <ul>
   <li><b>Modular Monolith Refactoring:</b> Decomposed Agent, IDE plugin, and Server monoliths into clean, single-responsibility packages.</li>
