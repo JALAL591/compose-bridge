@@ -25,9 +25,14 @@ captures/
 # Scratch & Local Experiments
 scratch/
 
-# Dist Release Artifacts (All binaries excluded, published via GitHub Releases)
+# Dist Release Artifacts (Keep official release assets for v1.1.8)
 dist/*.aar
 dist/*.zip
+!dist/composebridge-runtime-release.aar
+!dist/composebridge-agent-release.aar
+!dist/ComposeBridgeIntelliJ-1.1.8.zip
+!dist/composebridge-server-1.1.8.zip
+!dist/ComposeBridge-v1.1.8-AllInOne.zip
 
 # Python
 __pycache__/
