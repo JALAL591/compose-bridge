@@ -99,7 +99,17 @@ class RollbackMixin:
             warnings = []
             tokens_to_remove = []
 
+            from core.token_baseline import is_pre_existing, check_token_usages_in_project
+
             for tname, (pid, reg_file, ttype) in unique_candidates.items():
+                # 1. BASELINE IMMUNITY CHECK:
+                # If the token is pre-existing in baseline, it MUST NEVER be cascade-deleted!
+                if is_pre_existing(tname, self.project_root):
+                    warnings.append(
+                        f"🛡️ حماية التوكن الأساسي: التوكن '{tname}' مسجل في الفهرس الأساسي للمشروع (Baseline) ولا يمكن حذفه تلقائياً."
+                    )
+                    continue
+
                 other_files_using_token = set()
                 for entry in all_entries:
                     efile = str(entry.get("file", "")).replace("\\", "/")
@@ -114,6 +124,16 @@ class RollbackMixin:
                     entry_content = str(entry.get("new", "") or entry.get("new_line", ""))
                     if (pid and entry_pid == pid) or (tname in entry_content):
                         other_files_using_token.add(Path(efile).name)
+
+                # Check usages via token_baseline index & PROJECT_CACHE
+                try:
+                    baseline_usages = check_token_usages_in_project(tname, self.project_root, exclude_file=file_path)
+                    for bu in baseline_usages:
+                        b_name = Path(bu).name
+                        if b_name != target_name and b_name != Path(file_path).name:
+                            other_files_using_token.add(b_name)
+                except Exception:
+                    pass
 
                 # Check remaining disk usages across all kotlin files in the project
                 try:
@@ -257,7 +277,10 @@ class RollbackMixin:
 
         # ═══ Dependency Guard: Refuse rejecting DesignSystem if its tokens are used by other files ═══
         target_name = Path(file_path).name
-        registry_names = {"designsystem.kt", "appcolors.kt", "appdimens.kt", "appstrings.kt"}
+        registry_names = {
+            "designsystem.kt", "appcolors.kt", "theme.kt", "appdimens.kt",
+            "appstrings.kt", "themetokens.kt", "colors.kt", "dimens.kt", "strings.kt"
+        }
         if target_name.lower() in registry_names and full_path.exists() and not force:
             try:
                 curr_text = full_path.read_text(encoding="utf-8", errors="ignore")
@@ -274,22 +297,38 @@ class RollbackMixin:
                     tname = entry.get("token") or entry.get("token_name")
                     if tname:
                         lost_tokens.add(tname)
+                    pid = str(entry.get("pattern_id", ""))
+                    if pid.startswith("create_token_"):
+                        lost_tokens.add(pid.replace("create_token_", ""))
+                    new_val = str(entry.get("new", "") or entry.get("new_line", ""))
+                    for t in re.findall(r'\bval\s+([A-Za-z0-9_]+)\b', new_val):
+                        lost_tokens.add(t)
 
                 if lost_tokens:
                     for kt in self.project_root.rglob("*.kt"):
-                        if is_ignored_path(kt, self.project_root) or kt.resolve() == full_path.resolve():
+                        if is_ignored_path(kt, self.project_root):
                             continue
                         try:
+                            if kt.resolve() == full_path.resolve():
+                                continue
                             kt_content = kt.read_text(encoding="utf-8", errors="ignore")
                         except Exception:
                             continue
+
                         for t in lost_tokens:
                             pattern = rf'\b(?:AppColors|AppDimens|AppStrings|DesignSystem|Theme)\.{re.escape(t)}\b'
                             if re.search(pattern, kt_content) or f".{t}" in kt_content:
-                                rel_kt = str(kt.relative_to(self.project_root)).replace("\\", "/")
+                                try:
+                                    rel_kt = str(kt.relative_to(self.project_root)).replace("\\", "/")
+                                except Exception:
+                                    rel_kt = str(kt).replace("\\", "/")
                                 return {
                                     "success": False,
-                                    "error": f"Cannot reject {target_name} because its tokens are used by other approved files (file '{rel_kt}' uses token '{t}')."
+                                    "error": f"Cannot reject registry files directly. Reject the UI files that use them instead. Cannot reject {target_name} because its tokens are used by other approved files (file '{rel_kt}' uses token '{t}').",
+                                    "message": f"Cannot reject registry files directly. Reject the UI files that use them instead. Cannot reject {target_name} because its tokens are used by other approved files (file '{rel_kt}' uses token '{t}').",
+                                    "error_code": "DEPENDENCY_BLOCK",
+                                    "blocking_file": rel_kt,
+                                    "blocking_token": t
                                 }
             except Exception:
                 pass

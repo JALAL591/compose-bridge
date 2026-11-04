@@ -498,7 +498,58 @@ async def handle_error(websocket: WebSocketServerProtocol, message: dict, raw: s
     return
 
 
+
+async def handle_ide_diagnostics_request(websocket: WebSocketServerProtocol, message: dict, raw: str) -> None:
+    """Forward diagnostics query to IDE plugin, or respond immediately if no IDE client is connected."""
+    log_info("Forwarding ide_diagnostics_request to connected clients")
+    forwarded = await broadcast(raw, exclude=websocket)
+    if forwarded == 0:
+        await safe_send(websocket, {
+            "type": "ide_diagnostics_response",
+            "request_id": message.get("request_id"),
+            "success": False,
+            "connected": False,
+            "error": "No IDE plugin connected to ComposeBridge server",
+            "errors_count": 0,
+            "diagnostics": []
+        })
+
+
+async def handle_ide_diagnostics_response(websocket: WebSocketServerProtocol, message: dict, raw: str) -> None:
+    """Forward diagnostics response back to MCP client."""
+    log_info(f"Forwarding ide_diagnostics_response (req_id={message.get('request_id')})")
+    await broadcast(raw, exclude=websocket)
+
+
+async def handle_project_diagnostics_scan_request(websocket: WebSocketServerProtocol, message: dict, raw: str) -> None:
+    """Forward project diagnostics scan query to IDE plugin."""
+    log_info("Forwarding project_diagnostics_scan_request to connected clients")
+    forwarded = await broadcast(raw, exclude=websocket)
+    if forwarded == 0:
+        await safe_send(websocket, {
+            "type": "project_diagnostics_scan_response",
+            "request_id": message.get("request_id"),
+            "success": False,
+            "connected": False,
+            "error": "No IDE plugin connected to ComposeBridge server",
+            "scanned_files_count": 0,
+            "total_errors": 0,
+            "total_warnings": 0,
+            "files": []
+        })
+
+
+async def handle_project_diagnostics_scan_response(websocket: WebSocketServerProtocol, message: dict, raw: str) -> None:
+    """Forward project diagnostics scan response back to MCP client."""
+    log_info(f"Forwarding project_diagnostics_scan_response (req_id={message.get('request_id')})")
+    await broadcast(raw, exclude=websocket)
+
+
 HANDLERS = {
+    "ide_diagnostics_request": handle_ide_diagnostics_request,
+    "ide_diagnostics_response": handle_ide_diagnostics_response,
+    "project_diagnostics_scan_request": handle_project_diagnostics_scan_request,
+    "project_diagnostics_scan_response": handle_project_diagnostics_scan_response,
     "auth": handle_auth,
     "hello": handle_hello,
     "ping": handle_ping,

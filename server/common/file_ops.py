@@ -35,6 +35,24 @@ EXTERNAL_MODIFICATION_WARNING_TEMPLATE_AR = (
 )
 
 
+def assert_inside(root: Path, p: Path) -> Path:
+    """
+    Enforces path containment: verifies that path p is strictly inside root.
+    Raises PermissionError if path resolves outside the root directory.
+    """
+    rp = Path(p).resolve()
+    rr = Path(root).resolve()
+    try:
+        if not rp.is_relative_to(rr):
+            raise PermissionError(f"Security Block: Path {p} is outside project root!")
+    except AttributeError:
+        try:
+            rp.relative_to(rr)
+        except ValueError:
+            raise PermissionError(f"Security Block: Path {p} is outside project root!")
+    return rp
+
+
 def _atomic_write_text(file_path: Path, text: str) -> None:
     """Write text atomically preserving CRLF and line endings with retry on Windows lock contention."""
     file_path = Path(file_path)

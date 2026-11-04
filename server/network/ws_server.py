@@ -17,7 +17,7 @@ from core.state_manager import StateManager
 from core.auth_manager import get_or_create_auth_token
 from network.rate_limiter import RateLimiter
 
-HOST = "0.0.0.0"
+HOST = "127.0.0.1"
 PORT = 8711
 
 PROJECT_ROOT = get_project_root()
@@ -230,8 +230,44 @@ def update_device_status_file():
         pass
 
 
+def check_origin(path, request_headers):
+    """
+    Validates Origin header during HTTP WebSocket upgrade to prevent
+    Cross-Site WebSocket Hijacking (CSWSH).
+    """
+    origin = request_headers.get("Origin") or request_headers.get("origin")
+    if origin:
+        allowed_prefixes = (
+            "http://localhost", "https://localhost",
+            "http://127.0.0.1", "https://127.0.0.1",
+            "null"
+        )
+        clean = origin.rstrip("/")
+        if not any(clean == p or clean.startswith(p + ":") for p in allowed_prefixes):
+            log_error(f"[SECURITY] CSWSH Blocked: Origin '{origin}' rejected.")
+            from http import HTTPStatus
+            return (HTTPStatus.FORBIDDEN, [("Content-Type", "text/plain")], b"403 Forbidden: Origin not allowed\n")
+    return None
+
+
 async def handle_client(websocket: WebSocketServerProtocol) -> None:
     """Handles a single WebSocket client connection with rate limiting."""
+    # 0. CSWSH Defense: Validate Origin header if present
+    headers = getattr(websocket, "request_headers", None)
+    if headers:
+        origin = headers.get("Origin") or headers.get("origin")
+        if origin:
+            allowed_prefixes = (
+                "http://localhost", "https://localhost",
+                "http://127.0.0.1", "https://127.0.0.1",
+                "null"
+            )
+            clean = origin.rstrip("/")
+            if not any(clean == p or clean.startswith(p + ":") for p in allowed_prefixes):
+                log_error(f"[SECURITY] Rejected unauthorized Origin: {origin}")
+                await websocket.close(4003, "Origin not allowed")
+                return
+
     from network.message_router import handle_message
     CONNECTED_CLIENTS.add(websocket)
     peer = websocket.remote_address

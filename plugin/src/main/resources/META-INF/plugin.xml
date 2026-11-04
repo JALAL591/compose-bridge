@@ -2,7 +2,7 @@
     <id>com.composebridge.plugin</id>
     <name>ComposeBridge</name>
     <vendor>ComposeBridge</vendor>
-    <version>1.1.7</version>        <description><![CDATA[
+    <version>1.1.8</version>        <description><![CDATA[
 <h1>ComposeBridge: Real-Time Visual Editor &amp; MCP Server for Jetpack Compose</h1>
 <p><strong>ComposeBridge</strong> bridges the gap between running Android applications and your Kotlin source code. It enables developers and AI agents to inspect and modify UI elements—including colors, dimensions, and text—directly from the device screen, applying surgical changes straight to the source code via AST mutation without full project rebuilds.</p>
 
@@ -26,6 +26,17 @@
     ]]></description>
 
         <change-notes><![CDATA[
+<h3>🛡️ v1.1.8 - Security Hardened & Ultimate Stability</h3>
+<ul>
+    <li><b>Atomic Dependency Approval:</b> Registry files (like DesignSystem.kt) are now auto-approved when you approve a UI file, preventing accidental broken builds.</li>
+    <li><b>Whole-Project Token Baseline:</b> Pre-existing tokens are strictly immune to cascade rejection, even if moved to different files.</li>
+    <li><b>Massively Parallel Diagnostics:</b> New Diagnostics tab scans 1,000+ files in seconds using multi-threaded processing.</li>
+    <li><b>Interactive Diagnostics UI:</b> TreeTable layout grouped by file, with Smart Filters and AI Actions (Copy Prompt / Auto-Fix).</li>
+    <li><b>Critical Security Patches:</b> Server now binds strictly to 127.0.0.1, added Origin header validation to prevent CSWSH, and implemented Path Containment to prevent unauthorized file access.</li>
+    <li><b>Built-in Help Tab:</b> A new interactive guide inside the IDE to help you get started and troubleshoot.</li>
+    <li><b>CI/CD Integration:</b> Added automated GitHub Actions for testing and releases.</li>
+</ul>
+
 <h3>🛠️ Patch Release v1.1.7</h3>
 <ul>
     <li><b>Fixed Text Reference Path:</b> Editing reference strings now correctly prioritizes <code>AppStrings.kt</code>.</li>
@@ -84,6 +95,7 @@
             <category>ComposeBridge</category>
         </intentionAction>
         <projectService serviceImplementation="com.composebridge.plugin.settings.ComposeBridgeSettings" />
+        <projectService serviceImplementation="com.composebridge.plugin.state.DiagnosticsState" />
         <projectConfigurable
             instance="com.composebridge.plugin.settings.ComposeBridgeConfigurable"
             id="com.composebridge.plugin.settings"

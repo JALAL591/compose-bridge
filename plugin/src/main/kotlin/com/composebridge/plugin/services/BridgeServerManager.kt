@@ -279,11 +279,20 @@ object BridgeServerManager {
                 runAdbReverse(token)
             }
 
+            try {
+                com.intellij.openapi.project.ProjectManager.getInstance().openProjects.firstOrNull()?.let {
+                    IdeDiagnosticsService.ensureConnected(it)
+                }
+            } catch (_: Exception) {}
+
             onStatusChange?.invoke(true)
             return true
         } catch (e: Exception) {
             LOG.error("Failed to start Bridge Server", e)
             serverProcess = null
+            try {
+                IdeDiagnosticsService.disconnect()
+            } catch (_: Exception) {}
             onStatusChange?.invoke(false)
             return false
         }

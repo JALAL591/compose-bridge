@@ -81,6 +81,8 @@ class ComposeBridgePanel(
     private val changesPanel: ChangesTabPanel
     private val scannerPanel: ScannerTabPanel
     private val discoveryPanel: DiscoveryTabPanel
+    private val diagnosticsPanel: DiagnosticsTabPanel
+    private val helpPanel: HelpTabPanel
     private val headerPanel: ServerHeaderPanel
 
     private val tabbedPane = JTabbedPane()
@@ -113,6 +115,12 @@ class ComposeBridgePanel(
             BridgeUiUtils.openFileAtLine(project, file, line)
         }
 
+        diagnosticsPanel = DiagnosticsTabPanel(project) { file, line ->
+            BridgeUiUtils.openFileAtLine(project, file, line)
+        }
+
+        helpPanel = HelpTabPanel(project)
+
         scannerPanel = ScannerTabPanel(
             project,
             pythonRunner,
@@ -141,6 +149,8 @@ class ComposeBridgePanel(
         tabbedPane.addTab("Split", splitPanel)
         tabbedPane.addTab("Patterns", patternsPanel)
         tabbedPane.addTab("Changes", changesPanel)
+        tabbedPane.addTab("Diagnostics", diagnosticsPanel)
+        tabbedPane.addTab("Help", helpPanel)
 
         // Custom Changes Tab Component with Red Badge
         val changesTabIndex = tabbedPane.indexOfTab("Changes")
@@ -166,6 +176,7 @@ class ComposeBridgePanel(
             if (dIdx != -1 && tabbedPane.selectedIndex == dIdx) {
                 discoveryPanel.refreshScatter()
             }
+
         }
 
         // Virtual File Watcher & Document Listener for real-time changes

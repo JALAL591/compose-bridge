@@ -1,0 +1,111 @@
+name: CI - Test & Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # =========================================================================
+  # 1. Python Server Unit & Integration Tests
+  # =========================================================================
+  server-tests:
+    name: Python Server Tests (Linux / 3.12)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: 'server/requirements.txt'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r server/requirements.txt
+
+      - name: Run Test Suite
+        env:
+          PYTHONPATH: server
+        run: |
+          python -m unittest discover -s server/tests -p "test_*.py"
+
+  # =========================================================================
+  # 2. Kotlin Plugin Build
+  # =========================================================================
+  plugin-build:
+    name: IntelliJ / AS Plugin Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Cache Android Studio Distribution
+        id: cache-android-studio
+        uses: actions/cache@v4
+        with:
+          path: /opt/android-studio
+          key: android-studio-2024.1.2.13-linux
+
+      - name: Download & Extract Android Studio (if not cached)
+        if: steps.cache-android-studio.outputs.cache-hit != 'true'
+        run: |
+          sudo mkdir -p /opt/android-studio
+          curl -fSL "https://redirector.gvt1.com/edgedl/android/studio/ide-zips/2024.1.2.13/android-studio-2024.1.2.13-linux.tar.gz" | sudo tar -xz --strip-components=1 -C /opt/android-studio
+
+      - name: Grant Execute Permission for Gradlew
+        run: chmod +x plugin/gradlew
+
+      - name: Compile Kotlin Plugin
+        working-directory: plugin
+        env:
+          ANDROID_STUDIO_HOME: /opt/android-studio
+        run: ./gradlew compileKotlin --no-daemon
+
+  # =========================================================================
+  # 3. Android Agent Build
+  # =========================================================================
+  agent-build:
+    name: Android Agent Library Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept Android Licenses
+        run: yes | sdkmanager --licenses || true
+
+      - name: Grant Execute Permission for Gradlew
+        run: chmod +x agent/gradlew
+
+      - name: Assemble Agent Release
+        working-directory: agent
+        run: ./gradlew assembleRelease --no-daemon
+

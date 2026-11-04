@@ -19,7 +19,7 @@ import unittest
 import subprocess
 from pathlib import Path
 
-SERVER_DIR = Path(r"C:\Users\thinkpad\StudioProjects\compose-bridge\server")
+SERVER_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(SERVER_DIR))
 
 from core.pattern_journal import PatternJournal

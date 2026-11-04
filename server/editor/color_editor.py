@@ -18,12 +18,12 @@ except Exception:
     PROJECT_ROOT = Path(os.environ.get("COMPOSEBRIDGE_ROOT", "."))
 
 try:
-    from common.file_ops import _atomic_write_text, _find_registry_file
+    from common.file_ops import _atomic_write_text, _find_registry_file, assert_inside
 except ImportError:
     try:
-        from server.common.file_ops import _atomic_write_text, _find_registry_file
+        from server.common.file_ops import _atomic_write_text, _find_registry_file, assert_inside
     except ImportError:
-        from ..common.file_ops import _atomic_write_text, _find_registry_file
+        from ..common.file_ops import _atomic_write_text, _find_registry_file, assert_inside
 
 from core.ast_finder import parse_file, find_all_call_expressions
 
@@ -150,6 +150,8 @@ def update_theme_color(key: str, new_hex: str, expected_checksum: Optional[str] 
             file_path = APP_COLORS_FILE
         else:
             return (False, f"Color file not found for key: {key}", None)
+
+    file_path = assert_inside(p_root, file_path)
 
     # Validate syntax before modification or backup
     from core.ast_finder import safe_create_backup, validate_kotlin_syntax

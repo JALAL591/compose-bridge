@@ -41,8 +41,8 @@ def get_project_root():
     if "COMPOSEBRIDGE_ROOT" in os.environ:
         return Path(os.environ["COMPOSEBRIDGE_ROOT"])
     candidates = [
-        Path(r"C:\Users\thinkpad\StudioProjects\MyTeacher-App"),
-        Path(r"C:\Users\thinkpad\StudioProjects\StudentApp"),
+        Path.cwd(),
+        Path(__file__).resolve().parent.parent.parent,
         Path(".").resolve(),
     ]
     for c in candidates:

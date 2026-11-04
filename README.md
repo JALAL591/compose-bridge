@@ -219,7 +219,7 @@ ComposeBridge operates as a tri-part system coordinating an IDE extension, a sur
 - **PatternJournal & Rollback Engine:**
   Before touching any source file, a pristine snapshot is verified with Tree-sitter and preserved as `.bridge.bak`. Rollbacks prioritize Git tracking (`git checkout -- <file>`), safely falling back to byte-level `.bridge.bak` restoration for untracked files.
 - **Model Context Protocol (MCP Server):**
-  Exposes 27 structured tools over stdio/JSON-RPC, enabling autonomous AI coding assistants (Antigravity, Cursor, Claude) to discover design tokens, detect orphans, suggest splits, and validate builds independently without requiring a physical phone connected.
+  Exposes 34 structured tools over stdio/JSON-RPC, enabling autonomous AI coding assistants (Antigravity, Cursor, Claude) to discover design tokens, detect orphans, suggest splits, and validate builds independently without requiring a physical phone connected.
 
 ---
 
@@ -249,14 +249,14 @@ ComposeBridge coordinates three interconnected components over a fast local loop
                                               |    - Token Split / Scanner |
                                               |  [Autonomous MCP Agents]   |
                                               |    - Antigravity / Claude  |
-                                              |    - 27 Standard MCP Tools |
+                                              |    - 34 Standard MCP Tools |
                                               +----------------------------+
 ```
 
 1. **On-Device Agent (`:composebridge-agent`):** Injected via `ComposeBridgeAgent.Root`. Renders non-intrusive hit-testing overlays, extracts semantic metadata, and transmits change requests over local WebSocket (`ws://127.0.0.1:8711`).
 2. **Decoupled Runtime (`:composebridge-runtime`):** Standalone ~9KB runtime containing registry singletons (`BridgeTextRegistry`, `BridgeThemeRegistry`, `BridgeDimensionRegistry`). Ensures production Release builds compile with zero overhead without packaging debug overlays.
 3. **Local Bridge Server (`server.py`):** Acts as the central event hub and Kotlin AST manipulation engine. Applies deterministic changes using file write-locks, atomic rewrites, and maintains a byte-level `.bridge.bak` rollback journal.
-4. **Model Context Protocol (MCP Server):** Exposes 27 structured tools allowing AI pair programmers (Antigravity, Claude, Cursor) to autonomously analyze token usage, suggest token splits, and execute multi-file refactorings.
+4. **Model Context Protocol (MCP Server):** Exposes 34 structured tools allowing AI pair programmers (Antigravity, Claude, Cursor) to autonomously analyze token usage, suggest token splits, and execute multi-file refactorings.
 
 ---
 
@@ -268,16 +268,16 @@ ComposeBridge coordinates three interconnected components over a fast local loop
 | **🧠 Semantic Token Intelligence** | Detects whether a modified color or dimension is shared globally. Offers **Split** (create an isolated token for this widget) or **Global** (update theme-wide). |
 | **📝 Text Editing & Auto-Migration** | Tap any text element to edit wording directly on device. The AST engine automatically wraps raw strings into `BridgeTextRegistry` on first edit. |
 | **💾 Safe Rollbacks (PatternJournal)** | Every surgical edit is backed up byte-for-byte. The Studio **Changes** tab allows reviewing unified diffs and reverting individual files or all edits with one click. |
-| **🤖 Full MCP Server for AI Agents** | 27 tools supporting token discovery, impact analysis, orphan detection, surgical pattern replacement, and safe Gradle compilation validation. |
+| **🤖 Full MCP Server for AI Agents** | 34 tools supporting token discovery, impact analysis, orphan detection, surgical pattern replacement, and safe Gradle compilation validation. |
 
 ---
 
 ## 🤖 AI Agent Integration (MCP)
 
-ComposeBridge exposes 27 deep-inspection and code refactoring tools to any AI assistant supporting the **Model Context Protocol (MCP)**. **No physical phone is required to use MCP tools.**
+ComposeBridge exposes 34 deep-inspection and code refactoring tools to any AI assistant supporting the **Model Context Protocol (MCP)**. **No physical phone is required to use MCP tools.**
 
 > 💡 **Ultra-Lightweight Context Window:**
-> ComposeBridge uses Lazy Loading, so 27 MCP tools consume only ~176 tokens (<1% of context window).
+> ComposeBridge uses Lazy Loading, so 34 MCP tools consume only ~176 tokens (<1% of context window).
 
 ### Compatible AI Clients:
 - ✅ **Google Antigravity IDE**
@@ -302,7 +302,7 @@ Add the ComposeBridge server configuration to your AI agent's config file (e.g. 
   "mcpServers": {
     "composebridge": {
       "command": "python",
-      "args": ["-u", "C:\Users\thinkpad\StudioProjects\compose-bridge\server\mcp_server.py"],
+      "args": ["-u", "/path/to/compose-bridge/server/mcp_server.py"],
       "env": {
         "COMPOSEBRIDGE_ROOT": "/absolute/path/to/your/android/project",
         "PYTHONIOENCODING": "utf-8"
@@ -312,7 +312,7 @@ Add the ComposeBridge server configuration to your AI agent's config file (e.g. 
 }
 ```
 
-> ⚠️ **Important:** Any changes made to `mcp_config.json` require starting a **New Chat** in your AI agent interface so that all 27 MCP tools are freshly discovered and initialized.
+> ⚠️ **Important:** Any changes made to `mcp_config.json` require starting a **New Chat** in your AI agent interface so that all 34 MCP tools are freshly discovered and initialized.
 
 #### How to set it up in Android Studio / Antigravity:
 1. Open Android Studio / IntelliJ IDEA.
@@ -321,9 +321,9 @@ Add the ComposeBridge server configuration to your AI agent's config file (e.g. 
 4. Click on the **"Import JSON file"** button (or **"...Add via JSON"** depending on your IDE version).
 5. Paste the JSON configuration provided above.
 6. Click **OK** or **Apply**.
-7. ⚠️ **Crucial:** Start a **New Chat** (or restart the agent) for the new 27 MCP tools to load and become visible.
+7. ⚠️ **Crucial:** Start a **New Chat** (or restart the agent) for the new 34 MCP tools to load and become visible.
 
-### Overview of MCP Tools (27 Tools):
+### Overview of MCP Tools (34 Tools):
 - **Token Discovery & Analysis:** `list_tokens`, `find_token_by_color`, `get_token_impact`, `get_token_siblings`, `get_all_token_groups`, `list_orphans`, `get_naming_convention`.
 - **Surgical Code Editing:** `set_token`, `set_text`, `add_token`, `rollback_last`.
 - **Pattern Refactoring:** `replace_pattern`, `list_applied_patterns`, `rollback_pattern`, `suggest_token_split`, `detect_conditional_variants`.

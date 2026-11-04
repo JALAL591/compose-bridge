@@ -18,7 +18,7 @@ class TestMCPToolsCoverage(unittest.TestCase):
     def test_all_tools_have_annotations(self):
         """Verify all 34 tools carry complete MCP annotations."""
         tools = mcp_server.app._tool_manager._tools
-        self.assertEqual(len(tools), 34)
+        self.assertEqual(len(tools), 36)
         for name, tool in tools.items():
             self.assertIsNotNone(tool.annotations, f"Tool {name} missing annotations")
             dump = tool.annotations.model_dump(by_alias=True, exclude_none=True)
@@ -125,6 +125,18 @@ class TestMCPToolsCoverage(unittest.TestCase):
         res_str = mcp_server.clean_cache()
         data = json.loads(res_str)
         self.assertTrue(data.get("success", False))
+
+    def test_get_ide_diagnostics(self):
+        res_str = mcp_server.get_ide_diagnostics(timeout_seconds=0.5)
+        data = json.loads(res_str)
+        self.assertIsInstance(data, dict)
+        self.assertIn("success", data)
+
+    def test_scan_project_diagnostics(self):
+        res_str = mcp_server.scan_project_diagnostics(timeout_seconds=0.5)
+        data = json.loads(res_str)
+        self.assertIsInstance(data, dict)
+        self.assertIn("success", data)
 
 
 if __name__ == "__main__":

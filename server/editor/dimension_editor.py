@@ -18,12 +18,12 @@ except Exception:
     PROJECT_ROOT = Path(os.environ.get("COMPOSEBRIDGE_ROOT", "."))
 
 try:
-    from common.file_ops import _atomic_write_text, _find_registry_file
+    from common.file_ops import _atomic_write_text, _find_registry_file, assert_inside
 except ImportError:
     try:
-        from server.common.file_ops import _atomic_write_text, _find_registry_file
+        from server.common.file_ops import _atomic_write_text, _find_registry_file, assert_inside
     except ImportError:
-        from ..common.file_ops import _atomic_write_text, _find_registry_file
+        from ..common.file_ops import _atomic_write_text, _find_registry_file, assert_inside
 
 from core.ast_finder import parse_file, find_all_call_expressions
 from core.utils import read_file_as_utf8
@@ -50,7 +50,8 @@ def edit_dimension_in_source(
     import tempfile
     import os
 
-    full_path = PROJECT_ROOT / source_file
+    target = Path(source_file) if Path(source_file).is_absolute() else (PROJECT_ROOT / source_file)
+    full_path = assert_inside(PROJECT_ROOT, target)
 
     from core.ignore_rules import get_ignore_rules
     rules = get_ignore_rules(PROJECT_ROOT)
@@ -89,25 +90,33 @@ def edit_dimension_in_source(
         sub = encoded[start_byte:end_byte].decode('utf-16-le', errors='ignore')
         match = pattern.search(sub)
         if not match:
-            # Fallback: ابحث في الملف كامل
+            # Fallback: ابحث في الملف كامل مع فحص الغموض (Ambiguity Check)
             sub_full = content
-            match_full = pattern.search(sub_full)
-            if not match_full:
+            candidates = list(pattern.finditer(sub_full))
+            if len(candidates) == 1:
+                match_full = candidates[0]
+                new_text = sub_full[:match_full.start()] + f"{new_clean}.dp" + sub_full[match_full.end():]
+            elif len(candidates) > 1:
+                return (False, f"Ambiguous: found {len(candidates)} matches for '{old_value}'. Please re-select the element.", {"need_reselect": True})
+            else:
                 return (False, f"Value {old_value} not found at offset {utf16_offset}", None)
-            new_text = sub_full[:match_full.start()] + f"{new_clean}.dp" + sub_full[match_full.end():]
         else:
             new_sub = sub[:match.start()] + f"{new_clean}.dp" + sub[match.end():]
             new_encoded = new_sub.encode('utf-16-le')
             new_content = encoded[:start_byte] + new_encoded + encoded[end_byte:]
             new_text = new_content.decode('utf-16-le', errors='ignore')
     else:
-        # fallback: ابحث في الملف كامل (مع تحذير)
-        sub = content
-        match = pattern.search(sub)
-        if not match:
+        # fallback: ابحث في الملف كامل مع فحص الغموض (Ambiguity Check)
+        sub_full = content
+        candidates = list(pattern.finditer(sub_full))
+        if len(candidates) == 1:
+            match_full = candidates[0]
+            new_text = sub_full[:match_full.start()] + f"{new_clean}.dp" + sub_full[match_full.end():]
+            print(f"[state_editor] ⚠️ Used unambiguous fallback for {old_value}")
+        elif len(candidates) > 1:
+            return (False, f"Ambiguous: found {len(candidates)} matches for '{old_value}'. Please re-select the element.", {"need_reselect": True})
+        else:
             return (False, f"Value {old_value} not found in file", None)
-        new_text = sub[:match.start()] + f"{new_clean}.dp" + sub[match.end():]
-        print(f"[state_editor] ⚠️ Used fallback (no offset) for {old_value}")
 
     # نسخة احتياطية
     backup_path = str(full_path) + ".bridge.bak"

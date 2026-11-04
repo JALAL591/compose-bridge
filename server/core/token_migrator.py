@@ -33,12 +33,12 @@ from typing import Optional, Tuple, Dict, List
 from datetime import datetime
 
 try:
-    from common.file_ops import _atomic_write_text, _find_registry_file, is_ignored_path
+    from common.file_ops import _atomic_write_text, _find_registry_file, is_ignored_path, assert_inside
 except ImportError:
     try:
-        from server.common.file_ops import _atomic_write_text, _find_registry_file, is_ignored_path
+        from server.common.file_ops import _atomic_write_text, _find_registry_file, is_ignored_path, assert_inside
     except ImportError:
-        from ..common.file_ops import _atomic_write_text, _find_registry_file, is_ignored_path
+        from ..common.file_ops import _atomic_write_text, _find_registry_file, is_ignored_path, assert_inside
 from .write_lock import acquire_write_lock
 
 
@@ -544,6 +544,7 @@ class TokenMigrator(NamingAdvisorMixin, ImportInjectorMixin):
                     if not target_files:
                         return (False, f"File not found: {file_name}", None)
                     target_file = target_files[0]
+                    target_file = assert_inside(self.project_root, target_file)
                     
                     try:
                         content = target_file.read_text(encoding="utf-8")
@@ -661,6 +662,7 @@ class TokenMigrator(NamingAdvisorMixin, ImportInjectorMixin):
                 return (False, f"File not found: {file_name}", None)
             
             target_file = target_files[0]
+            target_file = assert_inside(self.project_root, target_file)
             
             # ═══ 4. Read target file ═══
             try:
@@ -788,6 +790,7 @@ class TokenMigrator(NamingAdvisorMixin, ImportInjectorMixin):
                     "token_type": token_type,
                 })
             
+            registry_file = assert_inside(self.project_root, registry_file)
             style = self.detect_storage_style(registry_file)
 
             # ═══ 7. Generate new registry entry ═══

@@ -53,7 +53,7 @@
 - **طابور التعديلات المعلقة (Queue):** اجمع عدة تعديلات للواجهة محلياً ثم اضغط **Sync** مرة واحدة.
 - **دعم الأبعاد (Dimensions):** عدّل الارتفاع، العرض، الحشوات، وأحجام الخطوط لحظياً — وليس الألوان فقط.
 - **المراجعة والتراجع (Review & Reject):** مراجعة كاملة تشبه `git status` داخل بيئة التطوير. اعتمد التغييرات (Approve) أو تراجع عنها بالبايت (Reject All).
-- **27 أداة MCP متكاملة:** يمكن لوكلاء الذكاء الاصطناعي الآن تشغيل بناء Gradle، واكتشاف الأنماط، والتراجع عن التغييرات بشكل مستقل.
+- **34 أداة MCP متكاملة:** يمكن لوكلاء الذكاء الاصطناعي الآن تشغيل بناء Gradle، واكتشاف الأنماط، والتراجع عن التغييرات بشكل مستقل.
 
 ### 🎬 شاهد المشروع أثناء العمل ولقطات الشاشة
 
@@ -99,7 +99,7 @@
 - **محرك اليومية والتراجع الآمن (PatternJournal):**
   قبل تعديل أي ملف، يتم فحص صحة قواعده بـ Tree-sitter وأخذ نسخة احتياطية سالمة `.bridge.bak`. عند التراجع (Reject)، تعتمد الأداة على Git أولاً (`git checkout -- <file>`) لضمان استرجاع سليم 100%، وتعود للنسخة الاحتياطية في الملفات غير المتتبعة.
 - **بروتوكول سياق النموذج (MCP Server):**
-  يوفر 27 أداة قياسية عبر stdio/JSON-RPC تمكّن وكلاء الذكاء الاصطناعي (مثل Antigravity, Cursor, Claude) من فحص المشروع والتوكنات والقيام بإعادة الهيكلة آلياً دون الحاجة لاتصال هاتف حقيقي.
+  يوفر 34 أداة قياسية عبر stdio/JSON-RPC تمكّن وكلاء الذكاء الاصطناعي (مثل Antigravity, Cursor, Claude) من فحص المشروع والتوكنات والقيام بإعادة الهيكلة آلياً دون الحاجة لاتصال هاتف حقيقي.
 
 ---
 
@@ -282,10 +282,10 @@ override fun onCreate(savedInstanceState: Bundle?) {
 
 ## 🤖 AI Agent Integration (MCP) - تكامل وكلاء الذكاء الاصطناعي
 
-يعرض ComposeBridge أدواته الـ 27 لوكلاء الذكاء الاصطناعي عبر بروتوكول Model Context Protocol (MCP). **لا يُشترط وجود هاتف لاستخدام MCP.**
+يعرض ComposeBridge أدواته الـ 34 لوكلاء الذكاء الاصطناعي عبر بروتوكول Model Context Protocol (MCP). **لا يُشترط وجود هاتف لاستخدام MCP.**
 
 > 💡 **كفاءة استهلاك السياق (Context Window):**
-> "ComposeBridge uses Lazy Loading, so 27 MCP tools consume only ~176 tokens (<1% of context window)."
+> "ComposeBridge uses Lazy Loading, so 34 MCP tools consume only ~176 tokens (<1% of context window)."
 
 ### العملاء المدعومون
 - ✅ **Google Antigravity IDE**
@@ -309,7 +309,7 @@ pip install -r requirements.txt
   "mcpServers": {
     "composebridge": {
       "command": "python",
-      "args": ["-u", "C:\Users\thinkpad\StudioProjects\compose-bridge\server\mcp_server.py"],
+      "args": ["-u", "/path/to/compose-bridge/server/mcp_server.py"],
       "env": {
         "COMPOSEBRIDGE_ROOT": "/مسار/مشروع/الاندرويد/الخاص/بك",
         "PYTHONIOENCODING": "utf-8"
@@ -319,7 +319,7 @@ pip install -r requirements.txt
 }
 ```
 
-> ⚠️ **ملاحظة هامة جداً:** أي تعديل على `mcp_config.json` يتطلب بدء محادثة جديدة (**New Chat**) في الوكيل حتى يتم تحميل الأدوات الـ 27 تلقائياً.
+> ⚠️ **ملاحظة هامة جداً:** أي تعديل على `mcp_config.json` يتطلب بدء محادثة جديدة (**New Chat**) في الوكيل حتى يتم تحميل الأدوات الـ 34 تلقائياً.
 
 #### خطوات الإعداد داخل Android Studio / Antigravity (UI Steps):
 1. افتح Android Studio / IntelliJ IDEA.
@@ -328,9 +328,9 @@ pip install -r requirements.txt
 4. اضغط على زر **"Import JSON file"** (أو **"...Add via JSON"** حسب إصدار الـ IDE).
 5. الصق كود الـ JSON المرفق أعلاه.
 6. اضغط **OK** أو **Apply**.
-7. ⚠️ **هام جداً:** ابدأ **محادثة جديدة (New Chat)** أو أعد تشغيل الوكيل لكي يتم تحميل الأدوات الـ 27 الجديدة وتصبح مرئية.
+7. ⚠️ **هام جداً:** ابدأ **محادثة جديدة (New Chat)** أو أعد تشغيل الوكيل لكي يتم تحميل الأدوات الـ 34 الجديدة وتصبح مرئية.
 
-### الأدوات المتاحة (27 أداة MCP)
+### الأدوات المتاحة (34 أداة MCP)
 
 | الفئة | الأدوات |
 |-------|---------|

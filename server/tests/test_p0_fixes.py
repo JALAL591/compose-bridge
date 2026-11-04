@@ -17,7 +17,7 @@ import unittest
 from pathlib import Path
 
 # Setup paths
-PROJECT_ROOT = Path(r"C:\Users\thinkpad\StudioProjects\compose-bridge\server")
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from core.pattern_journal import PatternJournal

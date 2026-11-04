@@ -300,9 +300,25 @@ class ChangesTabPanel(
             preferredSize = Dimension(95, 24)
             addActionListener { onRejectFile(file) }
         }
+        val isRegistry = RegistryFileGuard.isRegistryFile(file)
         eastPanel.add(diffBtn)
-        eastPanel.add(approveFileBtn)
-        eastPanel.add(rejectFileBtn)
+        if (isRegistry) {
+            val autoApproveBadge = JLabel("Dependency (Auto-Approved)").apply {
+                font = Font("Segoe UI", Font.BOLD, 11)
+                foreground = Color(0x34, 0xD3, 0x99)
+                background = Color(0x06, 0x4E, 0x3B)
+                isOpaque = true
+                border = BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(Color(0x05, 0x96, 0x69), 1, true),
+                    BorderFactory.createEmptyBorder(3, 8, 3, 8)
+                )
+                toolTipText = "Design tokens are managed and approved atomically with dependent UI widgets"
+            }
+            eastPanel.add(autoApproveBadge)
+        } else {
+            eastPanel.add(approveFileBtn)
+            eastPanel.add(rejectFileBtn)
+        }
         fileHeader.add(eastPanel, BorderLayout.EAST)
 
         val hunksPanel = JPanel().apply {
@@ -421,20 +437,29 @@ class ChangesTabPanel(
         val actionsPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 6, 4)).apply {
             isOpaque = false
         }
-        val approveHunkBtn = BridgeUiUtils.createStyledButton("Approve Change", BridgeColors.btnGreen, Color.WHITE).apply {
-            font = Font("Segoe UI", Font.BOLD, 11)
-            preferredSize = Dimension(135, 24)
-            toolTipText = "Accept this specific change only"
-            addActionListener { onApproveChange(file, hunkId) }
+        if (RegistryFileGuard.isRegistryFile(file)) {
+            val readOnlyBadge = JLabel("Dependency (Auto-Managed)").apply {
+                font = Font("Segoe UI", Font.ITALIC, 11)
+                foreground = BridgeColors.textMuted
+                border = BorderFactory.createEmptyBorder(2, 6, 2, 6)
+            }
+            actionsPanel.add(readOnlyBadge)
+        } else {
+            val approveHunkBtn = BridgeUiUtils.createStyledButton("Approve Change", BridgeColors.btnGreen, Color.WHITE).apply {
+                font = Font("Segoe UI", Font.BOLD, 11)
+                preferredSize = Dimension(135, 24)
+                toolTipText = "Accept this specific change only"
+                addActionListener { onApproveChange(file, hunkId) }
+            }
+            val rejectHunkBtn = BridgeUiUtils.createStyledButton("Reject Change", BridgeColors.btnRed, Color.WHITE).apply {
+                font = Font("Segoe UI", Font.BOLD, 11)
+                preferredSize = Dimension(125, 24)
+                toolTipText = "Revert this specific change only"
+                addActionListener { onRejectChange(file, hunkId) }
+            }
+            actionsPanel.add(approveHunkBtn)
+            actionsPanel.add(rejectHunkBtn)
         }
-        val rejectHunkBtn = BridgeUiUtils.createStyledButton("Reject Change", BridgeColors.btnRed, Color.WHITE).apply {
-            font = Font("Segoe UI", Font.BOLD, 11)
-            preferredSize = Dimension(125, 24)
-            toolTipText = "Revert this specific change only"
-            addActionListener { onRejectChange(file, hunkId) }
-        }
-        actionsPanel.add(approveHunkBtn)
-        actionsPanel.add(rejectHunkBtn)
         hunkRow.add(actionsPanel, BorderLayout.EAST)
 
         return hunkRow
@@ -514,6 +539,10 @@ class ChangesTabPanel(
     }
 
     private fun onApproveFile(file: String) {
+        if (RegistryFileGuard.isRegistryFile(file)) {
+            Messages.showInfoMessage("This registry file is auto-approved atomically when you approve UI files that reference it.", "Auto-Managed Dependency")
+            return
+        }
         val fileName = File(file).name
         val choice = Messages.showYesNoDialog(
             "Approve changes for '$fileName'?\n\nThis will mark modifications in this file as accepted and remove it from the pending journal.",
@@ -541,6 +570,10 @@ class ChangesTabPanel(
     }
 
     private fun onRejectFile(file: String) {
+        if (RegistryFileGuard.isRegistryFile(file)) {
+            Messages.showWarningDialog("Cannot reject registry files directly. Reject the UI files that use them instead.", "Dependency Protected")
+            return
+        }
         val fileName = File(file).name
         Thread {
             val json = pythonRunner.rejectFileChanges(file, force = false)

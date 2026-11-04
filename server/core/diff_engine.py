@@ -1,3 +1,4 @@
+import re
 from common.file_ops import is_ignored_path
 # -*- coding: utf-8 -*-
 """
@@ -202,6 +203,33 @@ def reject_change(file_path_str: str, change_id: str, project_root: Path) -> Dic
     if not target_hunk:
         return {"success": False, "error": f"Change '{change_id}' not found in '{rel_file}'"}
 
+    # ═══ Dependency Guard: Refuse rejecting registry hunk if its tokens are used elsewhere ═══
+    target_name_lower = full_path.name.lower()
+    if target_name_lower in {"designsystem.kt", "appcolors.kt", "appdimens.kt", "appstrings.kt"}:
+        removed_tokens = set(re.findall(r'\bval\s+([A-Za-z0-9_]+)\b', target_hunk.get("new", "")))
+        for t in removed_tokens:
+            for kt in project_root.rglob("*.kt"):
+                if is_ignored_path(kt, project_root):
+                    continue
+                try:
+                    if kt.resolve() == full_path.resolve():
+                        continue
+                    kt_code = kt.read_text(encoding="utf-8", errors="ignore")
+                    if f".{t}" in kt_code or re.search(rf'\b(?:AppColors|AppDimens|DesignSystem)\.{re.escape(t)}\b', kt_code):
+                        try:
+                            rel_kt = str(kt.relative_to(project_root)).replace("\\", "/")
+                        except Exception:
+                            rel_kt = str(kt).replace("\\", "/")
+                        return {
+                            "success": False,
+                            "error": f"Cannot reject change in {full_path.name}: token '{t}' is used by '{rel_kt}'. Reverting this change would break the build.",
+                            "error_code": "DEPENDENCY_BLOCK",
+                            "blocking_file": rel_kt,
+                            "blocking_token": t
+                        }
+                except Exception:
+                    continue
+
     # Atomic Rejection: find any associated import hunks
     hunks_to_reject = [target_hunk]
     for assoc in _find_associated_import_hunks(target_hunk, hunks, mode="reject"):
@@ -289,6 +317,33 @@ def approve_change(file_path_str: str, change_id: str, project_root: Path) -> Di
     target_hunk = _find_target_hunk(hunks, change_id)
     if not target_hunk:
         return {"success": False, "error": f"Change '{change_id}' not found in '{rel_file}'"}
+
+    # ═══ Dependency Guard: Refuse rejecting registry hunk if its tokens are used elsewhere ═══
+    target_name_lower = full_path.name.lower()
+    if target_name_lower in {"designsystem.kt", "appcolors.kt", "appdimens.kt", "appstrings.kt"}:
+        removed_tokens = set(re.findall(r'\bval\s+([A-Za-z0-9_]+)\b', target_hunk.get("new", "")))
+        for t in removed_tokens:
+            for kt in project_root.rglob("*.kt"):
+                if is_ignored_path(kt, project_root):
+                    continue
+                try:
+                    if kt.resolve() == full_path.resolve():
+                        continue
+                    kt_code = kt.read_text(encoding="utf-8", errors="ignore")
+                    if f".{t}" in kt_code or re.search(rf'\b(?:AppColors|AppDimens|DesignSystem)\.{re.escape(t)}\b', kt_code):
+                        try:
+                            rel_kt = str(kt.relative_to(project_root)).replace("\\", "/")
+                        except Exception:
+                            rel_kt = str(kt).replace("\\", "/")
+                        return {
+                            "success": False,
+                            "error": f"Cannot reject change in {full_path.name}: token '{t}' is used by '{rel_kt}'. Reverting this change would break the build.",
+                            "error_code": "DEPENDENCY_BLOCK",
+                            "blocking_file": rel_kt,
+                            "blocking_token": t
+                        }
+                except Exception:
+                    continue
 
     # Atomic Approval: find any associated import hunks that must be approved with this code
     hunks_to_approve = [target_hunk]
