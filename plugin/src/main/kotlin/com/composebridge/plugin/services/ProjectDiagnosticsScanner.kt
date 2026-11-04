@@ -1,10 +1,10 @@
 package com.composebridge.plugin.services
 
 import com.composebridge.plugin.services.IdeDiagnosticsService.DiagnosticItem
-import com.intellij.codeInsight.daemon.impl.DaemonCodeAnalyzerImpl
 import com.intellij.codeInsight.daemon.impl.HighlightInfo
 import com.intellij.codeInspection.InspectionEngine
 import com.intellij.codeInspection.InspectionManager
+import com.intellij.codeInspection.ProblemDescriptor
 import com.intellij.codeInspection.ProblemHighlightType
 import com.intellij.codeInspection.ex.LocalInspectionToolWrapper
 import com.intellij.lang.annotation.HighlightSeverity
@@ -13,6 +13,7 @@ import com.intellij.openapi.diagnostic.Logger
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.progress.EmptyProgressIndicator
+import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VirtualFile
@@ -24,6 +25,8 @@ import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiManager
 import com.intellij.psi.util.PsiTreeUtil
 import kotlinx.coroutines.*
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import java.io.File
 import kotlin.coroutines.coroutineContext
 
@@ -61,8 +64,7 @@ object ProjectDiagnosticsScanner {
             ProblemHighlightType.WARNING -> "WARNING"
             ProblemHighlightType.WEAK_WARNING,
             ProblemHighlightType.POSSIBLE_PROBLEM -> "WEAK_WARNING"
-            ProblemHighlightType.INFORMATION,
-            ProblemHighlightType.INFO -> "INFO"
+            ProblemHighlightType.INFORMATION -> "INFO"
             else -> "WARNING"
         }
     }
@@ -158,7 +160,7 @@ object ProjectDiagnosticsScanner {
         }
 
         val parallelism = Runtime.getRuntime().availableProcessors().coerceIn(2, 8)
-        val scanDispatcher = Dispatchers.Default.limitedParallelism(parallelism)
+        val scanSemaphore = Semaphore(parallelism)
 
         val allResults = mutableListOf<FileScanResult>()
         var totalErrors = 0
@@ -172,21 +174,23 @@ object ProjectDiagnosticsScanner {
                 break
             }
 
-            // Parallel inspection of files in the current batch
+            // Parallel inspection of files in the current batch with semaphore concurrency limiter
             val batchResults = coroutineScope {
                 chunk.map { vFile ->
-                    async(scanDispatcher) {
-                        scanSingleFile(
-                            vFile = vFile,
-                            basePath = basePath,
-                            fdm = fdm,
-                            psiManager = psiManager,
-                            wolf = wolf,
-                            inspectionManager = inspectionManager,
-                            toolsToRun = toolsToRun,
-                            includeWarnings = includeWarnings,
-                            project = project
-                        )
+                    async(Dispatchers.Default) {
+                        scanSemaphore.withPermit {
+                            scanSingleFile(
+                                vFile = vFile,
+                                basePath = basePath,
+                                fdm = fdm,
+                                psiManager = psiManager,
+                                wolf = wolf,
+                                inspectionManager = inspectionManager,
+                                toolsToRun = toolsToRun,
+                                includeWarnings = includeWarnings,
+                                project = project
+                            )
+                        }
                     }
                 }.awaitAll().filterNotNull()
             }
@@ -270,7 +274,7 @@ object ProjectDiagnosticsScanner {
             ApplicationManager.getApplication().runReadAction {
                 try {
                     val minSeverity = if (includeWarnings) HighlightSeverity.INFORMATION else HighlightSeverity.ERROR
-                    val existingHighlights = DaemonCodeAnalyzerImpl.getHighlights(doc, minSeverity, project)
+                    val existingHighlights = IdeDiagnosticsService.getHighlightsReflectively(doc, minSeverity, project)
 
                     if (existingHighlights.isNotEmpty()) {
                         for (info in existingHighlights) {
@@ -287,7 +291,7 @@ object ProjectDiagnosticsScanner {
                                 HighlightSeverity.ERROR -> "ERROR"
                                 HighlightSeverity.WARNING -> "WARNING"
                                 HighlightSeverity.WEAK_WARNING -> "WEAK_WARNING"
-                                HighlightSeverity.INFORMATION, HighlightSeverity.INFO -> "INFO"
+                                HighlightSeverity.INFORMATION -> "INFO"
                                 else -> if (info.severity >= HighlightSeverity.ERROR) "ERROR"
                                         else if (info.severity >= HighlightSeverity.WARNING) "WARNING"
                                         else if (info.severity >= HighlightSeverity.WEAK_WARNING) "WEAK_WARNING"
@@ -306,7 +310,7 @@ object ProjectDiagnosticsScanner {
                             }
                         }
                     } else if (toolsToRun.isNotEmpty()) {
-                        val problemsMap = InspectionEngine.inspectEx(
+                        val problemsMap = inspectExReflectively(
                             toolsToRun,
                             psiFile,
                             inspectionManager,
@@ -393,6 +397,32 @@ object ProjectDiagnosticsScanner {
         } catch (e: Exception) {
             LOG.warn("Error scanning source file ${vFile.name}: ${e.message}")
             null
+        }
+    }
+
+    /**
+     * Safely invokes InspectionEngine.inspectEx via reflection for forward and backward
+     * binary compatibility across IntelliJ platform versions (2024.1 through 2026.3+).
+     */
+    @Suppress("UNCHECKED_CAST")
+    private fun inspectExReflectively(
+        tools: List<LocalInspectionToolWrapper>,
+        psiFile: PsiFile,
+        manager: InspectionManager,
+        onTheFly: Boolean,
+        indicator: ProgressIndicator
+    ): Map<String, List<ProblemDescriptor>> {
+        return try {
+            val method = InspectionEngine::class.java.methods.firstOrNull {
+                it.name == "inspectEx" && it.parameterTypes.size == 5
+            }
+            if (method != null) {
+                (method.invoke(null, tools, psiFile, manager, onTheFly, indicator) as? Map<String, List<ProblemDescriptor>>) ?: emptyMap()
+            } else {
+                emptyMap()
+            }
+        } catch (_: Throwable) {
+            emptyMap()
         }
     }
 }

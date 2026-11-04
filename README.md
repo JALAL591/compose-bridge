@@ -8,7 +8,7 @@
 [![Status](https://img.shields.io/badge/Status-Early%20Access%20%7C%20Tested%20on%20Device-orange.svg)]()
 [![DevEx](https://img.shields.io/badge/DevEx-Zero--Rebuild%20Tuning-brightgreen.svg)]()
 [![Latency](https://img.shields.io/badge/Latency-%3C50ms-success.svg)]()
-[![Version](https://img.shields.io/badge/Version-1.1.7-blue.svg)]()
+[![Version](https://img.shields.io/badge/Version-1.1.8-blue.svg)]()
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/JALAL591/compose-bridge/blob/main/LICENSE)
 [![JetBrains Marketplace](https://img.shields.io/badge/JetBrains%20Marketplace-ComposeBridge-blue.svg?logo=jetbrains&logoColor=white)](https://plugins.jetbrains.com/plugin/35226-composebridge)
 [![Glama MCP](https://glama.ai/mcp/servers/JALAL591/compose-bridge/badges/score.svg)](https://glama.ai/mcp/servers/JALAL591/compose-bridge)
@@ -32,15 +32,15 @@
 
 ---
 
-### 📥 Direct Downloads (v1.1.7)
+### 📥 Direct Downloads (v1.1.8)
 
 | Package | Asset | Purpose |
 |---|---|---|
-| **IDE Plugin (Android Studio / IntelliJ)** | [🚀 **Install from JetBrains Marketplace**](https://plugins.jetbrains.com/plugin/35226-composebridge)<br>or [📥 **ComposeBridgeIntelliJ-1.1.7.zip**](https://github.com/JALAL591/compose-bridge/raw/main/dist/ComposeBridgeIntelliJ-1.1.7.zip) | Official Marketplace install (One-click) or manual install via `Settings` ➔ `Plugins` ➔ `⚙️` ➔ `Install Plugin from Disk...` |
+| **IDE Plugin (Android Studio / IntelliJ)** | [🚀 **Install from JetBrains Marketplace**](https://plugins.jetbrains.com/plugin/35226-composebridge)<br>or [📥 **ComposeBridgeIntelliJ-1.1.8.zip**](https://github.com/JALAL591/compose-bridge/raw/main/dist/ComposeBridgeIntelliJ-1.1.8.zip) | Official Marketplace install (One-click) or manual install via `Settings` ➔ `Plugins` ➔ `⚙️` ➔ `Install Plugin from Disk...` |
 | **Compose Runtime Library (Release & Debug)** | [📦 **composebridge-runtime-release.aar**](https://github.com/JALAL591/compose-bridge/raw/main/dist/composebridge-runtime-release.aar) | Core registries (~9KB). Required in `implementation` for production-safe APK builds |
 | **Compose Agent Library (Debug Only)** | [📦 **composebridge-agent-release.aar**](https://github.com/JALAL591/compose-bridge/raw/main/dist/composebridge-agent-release.aar) | Visual overlays, touch inspector, and WebSocket bridge. Put in `debugImplementation` |
-| **Python Server & MCP Package** | [📦 **composebridge-server-1.1.7.zip**](https://github.com/JALAL591/compose-bridge/raw/main/dist/composebridge-server-1.1.7.zip) | Standalone modular WebSocket hub & MCP server for AI coding agents |
-| **All-in-One Distribution** | [📦 **ComposeBridge-v1.1.7-AllInOne.zip**](https://github.com/JALAL591/compose-bridge/raw/main/dist/ComposeBridge-v1.1.7-AllInOne.zip) | Complete offline distribution: Plugin, Runtime, Agent, Server, and Docs |
+| **Python Server & MCP Package** | [📦 **composebridge-server-1.1.8.zip**](https://github.com/JALAL591/compose-bridge/raw/main/dist/composebridge-server-1.1.8.zip) | Standalone modular WebSocket hub & MCP server for AI coding agents |
+| **All-in-One Distribution** | [📦 **ComposeBridge-v1.1.8-AllInOne.zip**](https://github.com/JALAL591/compose-bridge/raw/main/dist/ComposeBridge-v1.1.8-AllInOne.zip) | Complete offline distribution: Plugin, Runtime, Agent, Server, and Docs |
 
 ---
 
@@ -62,11 +62,11 @@ Watch ComposeBridge visually edit a running Jetpack Compose UI live:
 
 ---
 
-## 🔄 Upgrading from v1.1.x to v1.1.7
+## 🔄 Upgrading from v1.1.x to v1.1.8
 
-Upgrading from ComposeBridge v1.1.x to v1.1.7 is straightforward and involves **zero breaking changes** in your codebase or Gradle configurations:
+Upgrading from ComposeBridge v1.1.x to v1.1.8 is straightforward and involves **zero breaking changes** in your codebase or Gradle configurations:
 
-1. **Update the IDE Plugin:** Install the latest `dist/ComposeBridgeIntelliJ-1.1.7.zip` in Android Studio (**Settings** ➔ **Plugins** ➔ **Install Plugin from Disk...**) and restart the IDE.
+1. **Update the IDE Plugin:** Install the latest `dist/ComposeBridgeIntelliJ-1.1.8.zip` in Android Studio (**Settings** ➔ **Plugins** ➔ **Install Plugin from Disk...**) and restart the IDE.
 2. **Update Android AAR:** Replace `composebridge-agent-release.aar` in your app module's `libs/` folder with the updated build from `dist/composebridge-agent-release.aar`, then re-sync Gradle.
 3. **Update Python Server:** If running standalone, re-run `pip install -r requirements.txt --upgrade` in `server/`.
 4. **Breaking Changes:** **None.** All protocol messages, runtime registries, and MCP tool signatures remain 100% backward-compatible.
@@ -76,7 +76,7 @@ Upgrading from ComposeBridge v1.1.x to v1.1.7 is straightforward and involves **
 ## ⚡ Quick Start in 60 Seconds
 
 ### Step 1: Install IDE Plugin
-1. Download [ComposeBridgeIntelliJ-1.1.7.zip](dist/ComposeBridgeIntelliJ-1.1.7.zip).
+1. Download [ComposeBridgeIntelliJ-1.1.8.zip](dist/ComposeBridgeIntelliJ-1.1.8.zip).
 2. In Android Studio, go to **Settings (Preferences)** ➔ **Plugins** ➔ Click the **⚙️ gear icon** ➔ **Install Plugin from Disk...**.
 3. Select the zip file and restart Android Studio.
 

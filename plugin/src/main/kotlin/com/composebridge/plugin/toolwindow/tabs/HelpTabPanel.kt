@@ -4,7 +4,7 @@ import com.composebridge.plugin.ui.components.BridgeColors
 import com.intellij.ide.BrowserUtil
 import com.intellij.openapi.project.Project
 import com.intellij.ui.components.JBScrollPane
-import com.intellij.util.ui.UIUtil
+import com.intellij.ui.JBColor
 import java.awt.BorderLayout
 import java.awt.Color
 import javax.swing.*
@@ -43,7 +43,7 @@ class HelpTabPanel(private val project: Project) : JPanel(BorderLayout()) {
     }
 
     fun refreshContent() {
-        val isDark = UIUtil.isUnderDarcula()
+        val isDark = !JBColor.isBright()
         val bgHex = if (isDark) "#1E1F22" else "#F8FAFC"
         val textHex = if (isDark) "#DFE1E5" else "#1E293B"
         val cardBgHex = if (isDark) "#26282D" else "#FFFFFF"

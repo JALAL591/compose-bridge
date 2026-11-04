@@ -8,9 +8,9 @@
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-1.7.3+-4285F4.svg)](https://developer.android.com/jetpack/compose)
 [![Zero Rebuild](https://img.shields.io/badge/DevEx-Zero--Rebuild%20Preview-brightgreen.svg)]()
 [![Latency](https://img.shields.io/badge/Latency-%3C50ms-success.svg)]()
-[![Status](https://img.shields.io/badge/Status-Production%20Ready%20(v1.1.7)-success.svg)]()
+[![Status](https://img.shields.io/badge/Status-Production%20Ready%20(v1.1.8)-success.svg)]()
 [![Scanner Speed](https://img.shields.io/badge/Scanner%20Speed-137ms%20%2F%20146%20files-brightgreen.svg)]()
-[![Version](https://img.shields.io/badge/Version-1.1.7-blue.svg)]()
+[![Version](https://img.shields.io/badge/Version-1.1.8-blue.svg)]()
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/JALAL591/compose-bridge/blob/main/LICENSE)
 [![JetBrains Marketplace](https://img.shields.io/badge/JetBrains%20Marketplace-ComposeBridge-blue.svg?logo=jetbrains&logoColor=white)](https://plugins.jetbrains.com/plugin/35226-composebridge)
 [![M8ven Score](https://m8ven.ai/badge/mcp/jalal591-compose-bridge-rapm1x)](https://m8ven.ai/mcp/jalal591-compose-bridge-rapm1x?s=readme)
@@ -31,15 +31,15 @@
 
 ---
 
-### 📥 التحميل المباشر والتثبيت السريع (v1.1.7)
+### 📥 التحميل المباشر والتثبيت السريع (v1.1.8)
 
 | الحزمة | ملف التثبيت (.zip / .aar) | طريقة التثبيت السريع |
 |---|---|---|
-| **إضافة بيئة التطوير (Android Studio / IntelliJ)** | [🚀 **تثبيت من متجر JetBrains Marketplace الرسمي**](https://plugins.jetbrains.com/plugin/35226-composebridge)<br>أو [📥 **تحميل ComposeBridgeIntelliJ-1.1.7.zip**](https://github.com/JALAL591/compose-bridge/raw/main/dist/ComposeBridgeIntelliJ-1.1.7.zip) | التثبيت بضغطة زر من المتجر مباشرة، أو في Android Studio: `Settings` ➔ `Plugins` ➔ `⚙️` ➔ `Install Plugin from Disk...` |
+| **إضافة بيئة التطوير (Android Studio / IntelliJ)** | [🚀 **تثبيت من متجر JetBrains Marketplace الرسمي**](https://plugins.jetbrains.com/plugin/35226-composebridge)<br>أو [📥 **تحميل ComposeBridgeIntelliJ-1.1.8.zip**](https://github.com/JALAL591/compose-bridge/raw/main/dist/ComposeBridgeIntelliJ-1.1.8.zip) | التثبيت بضغطة زر من المتجر مباشرة، أو في Android Studio: `Settings` ➔ `Plugins` ➔ `⚙️` ➔ `Install Plugin from Disk...` |
 | **مكتبة أندرويد لـ Jetpack Compose (Agent)** | [📦 **تحميل composebridge-agent-release.aar**](https://github.com/JALAL591/compose-bridge/raw/main/dist/composebridge-agent-release.aar) | انسخ الملف إلى مجلد `app/libs/` أو ضعه في `debugImplementation` |
 | **مكتبة أندرويد الأساسية (Runtime)** | [📦 **تحميل composebridge-runtime-release.aar**](https://github.com/JALAL591/compose-bridge/raw/main/dist/composebridge-runtime-release.aar) | ضعه في `implementation` لضمان أمان البناء في وضعي Debug و Release |
-| **سيرفر بايثون وخادم MCP** | [📦 **تحميل composebridge-server-1.1.7.zip**](https://github.com/JALAL591/compose-bridge/raw/main/dist/composebridge-server-1.1.7.zip) | حزمة السيرفر المنفصلة لوكلاء الذكاء الاصطناعي والمزامنة |
-| **الحزمة الشاملة المتكاملة (All-in-One)** | [📦 **تحميل ComposeBridge-v1.1.7-AllInOne.zip**](https://github.com/JALAL591/compose-bridge/raw/main/dist/ComposeBridge-v1.1.7-AllInOne.zip) | تجمع الإضافة، العميل، مكتبة الـ Runtime، التوثيق، والسيرفر معاً |
+| **سيرفر بايثون وخادم MCP** | [📦 **تحميل composebridge-server-1.1.8.zip**](https://github.com/JALAL591/compose-bridge/raw/main/dist/composebridge-server-1.1.8.zip) | حزمة السيرفر المنفصلة لوكلاء الذكاء الاصطناعي والمزامنة |
+| **الحزمة الشاملة المتكاملة (All-in-One)** | [📦 **تحميل ComposeBridge-v1.1.8-AllInOne.zip**](https://github.com/JALAL591/compose-bridge/raw/main/dist/ComposeBridge-v1.1.8-AllInOne.zip) | تجمع الإضافة، العميل، مكتبة الـ Runtime، التوثيق، والسيرفر معاً |
 
 **ComposeBridge** هي حزمة أدوات للمطورين تربط تطبيق Compose (KMP/Android) بمحرر الأكواد أو وكيل الذكاء الاصطناعي الخاص بك.
 
@@ -115,11 +115,11 @@ composebridge/
 
 ---
 
-## 🔄 دليل الترقية من v1.1.x إلى v1.1.7
+## 🔄 دليل الترقية من v1.1.x إلى v1.1.8
 
-الترقية إلى الإصدار v1.1.7 سهلة ومباشرة ولا تتضمن **أي تغييرات كاسرة (Zero Breaking Changes)** في كود مشروعك أو إعدادات Gradle:
+الترقية إلى الإصدار v1.1.8 سهلة ومباشرة ولا تتضمن **أي تغييرات كاسرة (Zero Breaking Changes)** في كود مشروعك أو إعدادات Gradle:
 
-1. **تحديث إضافة بيئة التطوير (IDE Plugin):** قم بتثبيت حزمة الإضافة المحدثة `dist/ComposeBridgeIntelliJ-1.1.7.zip` في Android Studio عبر (**Settings** ➔ **Plugins** ➔ **Install Plugin from Disk...**) وأعد تشغيل البرنامج.
+1. **تحديث إضافة بيئة التطوير (IDE Plugin):** قم بتثبيت حزمة الإضافة المحدثة `dist/ComposeBridgeIntelliJ-1.1.8.zip` في Android Studio عبر (**Settings** ➔ **Plugins** ➔ **Install Plugin from Disk...**) وأعد تشغيل البرنامج.
 2. **تحديث مكتبة الـ Android AAR:** استبدل ملف `composebridge-agent-release.aar` في مجلد `libs/` داخل تطبيقك بالنسخة المحدثة من `dist/composebridge-agent-release.aar`، ثم أعد مزامنة Gradle (`Sync Project`).
 3. **تحديث سيرفر البايثون:** إذا كنت تشغله يدوياً، حدّث الحزم عبر `pip install -r requirements.txt --upgrade` في مجلد `server/`.
 4. **التغييرات الكاسرة:** **لا توجد أي تغييرات كاسرة.** جميع بروتوكولات الاتصال وسجلات الـ Runtime وأدوات الـ MCP متوافقة 100% مع الإصدارات السابقة.
