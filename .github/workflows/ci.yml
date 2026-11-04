@@ -96,11 +96,8 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Accept Android Licenses
-        run: yes | sdkmanager --licenses || true
+      - name: Accept Android SDK Licenses
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
 
       - name: Grant Execute Permission for Gradlew
         run: chmod +x agent/gradlew
@@ -108,4 +105,3 @@ jobs:
       - name: Assemble Agent Release
         working-directory: agent
         run: ./gradlew assembleRelease --no-daemon
-
